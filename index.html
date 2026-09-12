@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iWhisper</title>
+</head>
+<body>
+
+```
+<h1>iWhisper</h1>
+<p>Voice transcription with Whisper</p>
+
+<button id="recordButton">Start Recording</button>
+<button id="transcribeButton">Transcribe</button>
+
+<div id="status"></div>
+
+<h2>Transcript</h2>
+<div id="transcript"></div>
+
+<script>
+    const recordButton = document.getElementById("recordButton");
+    const transcribeButton = document.getElementById("transcribeButton");
+    const status = document.getElementById("status");
+
+    let mediaRecorder;
+    let audioChunks = [];
+
+    recordButton.addEventListener("click", async () => {
+
+        if (!mediaRecorder || mediaRecorder.state === "inactive") {
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: true
+                });
+
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.addEventListener("dataavailable", event => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener("stop", () => {
+                    stream.getTracks().forEach(track => track.stop());
+
+                    const audioBlob = new Blob(audioChunks, {
+                        type: "audio/webm"
+                    });
+
+                    console.log("Recording complete:", audioBlob);
+
+                    status.textContent = "Recording complete.";
+                    window.lastRecording = audioBlob;
+                });
+
+                mediaRecorder.start();
+
+                recordButton.textContent = "Stop Recording";
+                status.textContent = "Recording...";
+
+            } catch (error) {
+                console.error(error);
+                status.textContent =
+                    "Microphone access was denied or unavailable.";
+            }
+
+        } else {
+
+            mediaRecorder.stop();
+            recordButton.textContent = "Start Recording";
+        }
+    });
+
+    transcribeButton.addEventListener("click", () => {
+        window.transcribeRecording();
+    });
+</script>
+
+<script type="module" src="whisper.js"></script>
+```
+
+</body>
+</html>
