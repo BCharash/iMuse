@@ -1,24 +1,36 @@
+javascript
 import { pipeline } from
     "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2";
 
 const modelSelect =
     document.getElementById("modelSelect");
 
+const recordButton =
+    document.getElementById("recordButton");
+
+const transcribeButton =
+    document.getElementById("transcribeButton");
+
+const status =
+    document.getElementById("status");
+
 let transcriber = null;
 let loadedModel = null;
+let loadingModel = false;
 
 const models = {
     tiny: "onnx-community/whisper-tiny",
     base: "onnx-community/whisper-base",
-    small: "onnx-community/whisper-small",
-   
+    small: "onnx-community/whisper-small"
 };
 
 async function loadModel(modelName) {
 
-    const modelId = models[modelName];
+    const modelId =
+        models[modelName];
 
     if (!modelId) {
+
         throw new Error(
             `Unknown Whisper model: ${modelName}`
         );
@@ -28,174 +40,240 @@ async function loadModel(modelName) {
         loadedModel === modelName &&
         transcriber
     ) {
+
+        recordButton.disabled =
+            false;
+
+        status.textContent =
+            `Whisper ${modelName} ready.`;
+
         return;
     }
+
+    loadingModel = true;
+
+    recordButton.disabled =
+        true;
+
+    transcribeButton.disabled =
+        true;
 
     console.log(
         "Loading Whisper model:",
         modelId
     );
 
-    document.getElementById("status").textContent =
+    status.textContent =
         `Loading Whisper ${modelName}...`;
 
-    transcriber = await pipeline(
-        "automatic-speech-recognition",
-        modelId
-    );
+    try {
 
-    loadedModel = modelName;
+        const newTranscriber =
+            await pipeline(
+                "automatic-speech-recognition",
+                modelId
+            );
 
-    console.log(
-        "Whisper loaded:",
-        modelId
-    );
+        /*
+         * Only make the new model active
+         * after it has loaded successfully.
+         */
+        transcriber =
+            newTranscriber;
 
-    document.getElementById("status").textContent =
-        `Whisper ${modelName} ready.`;
+        loadedModel =
+            modelName;
+
+        window.loadedWhisperModel =
+            modelName;
+
+        console.log(
+            "Whisper loaded:",
+            modelId
+        );
+
+        /*
+         * Whisper is now genuinely ready.
+         * Enable recording directly.
+         */
+        recordButton.disabled =
+            false;
+
+        status.textContent =
+            `Whisper ${modelName} ready.`;
+
+    } catch (error) {
+
+        console.error(
+            "Could not load Whisper model:",
+            error
+        );
+
+        transcriber =
+            null;
+
+        loadedModel =
+            null;
+
+        recordButton.disabled =
+            true;
+
+        status.textContent =
+            `Could not load Whisper ${modelName}.`;
+
+    } finally {
+
+        loadingModel =
+            false;
+    }
 }
 
-await loadModel(modelSelect.value);
+window.loadWhisperModel =
+    loadModel;
 
-modelSelect.addEventListener(
-    "change",
-    async () => {
-
-        try {
-
-            await loadModel(
-                modelSelect.value
-            );
-
-        } catch (error) {
-
-            console.error(
-                "Could not load Whisper model:",
-                error
-            );
-
-            document.getElementById("status").textContent =
-                "Could not load the selected Whisper model.";
-        }
-    }
+await loadModel(
+    modelSelect.value
 );
 
-window.transcribeRecording = async function () {
+window.transcribeRecording =
+    async function () {
 
-    if (!window.lastRecording) {
+        if (loadingModel) {
+
+            console.log(
+                "Whisper is still loading."
+            );
+
+            return;
+        }
+
+        if (!window.lastRecording) {
+
+            console.log(
+                "No recording available."
+            );
+
+            return;
+        }
+
+        if (!transcriber) {
+
+            console.log(
+                "Whisper is not loaded."
+            );
+
+            status.textContent =
+                "Whisper is not ready.";
+
+            return;
+        }
 
         console.log(
-            "No recording available."
+            "Transcribing with:",
+            loadedModel
         );
 
-        return;
-    }
+        status.textContent =
+            "Transcribing...";
 
-    if (!transcriber) {
+        const arrayBuffer =
+            await window.lastRecording.arrayBuffer();
+
+        const audioContext =
+            new AudioContext();
+
+        const audioBuffer =
+            await audioContext.decodeAudioData(
+                arrayBuffer
+            );
+
+        const sourceData =
+            audioBuffer.getChannelData(0);
 
         console.log(
-            "Whisper is not loaded yet."
+            "Audio duration:",
+            audioBuffer.duration,
+            "seconds"
         );
 
-        return;
-    }
-
-    console.log("Transcribing...");
-
-    document.getElementById("status").textContent =
-        "Transcribing...";
-
-    const arrayBuffer =
-        await window.lastRecording.arrayBuffer();
-
-    const audioContext =
-        new AudioContext();
-
-    const audioBuffer =
-        await audioContext.decodeAudioData(
-            arrayBuffer
-        );
-
-    const sourceData =
-        audioBuffer.getChannelData(0);
-
-    console.log(
-        "Audio duration:",
-        audioBuffer.duration,
-        "seconds"
-    );
-
-    console.log(
-        "Original sample rate:",
-        audioBuffer.sampleRate
-    );
-
-    const targetSampleRate = 16000;
-
-    const targetLength =
-        Math.round(
-            sourceData.length *
-            targetSampleRate /
+        console.log(
+            "Original sample rate:",
             audioBuffer.sampleRate
         );
 
-    const offlineContext =
-        new OfflineAudioContext(
-            1,
-            targetLength,
+        const targetSampleRate =
+            16000;
+
+        const targetLength =
+            Math.round(
+                sourceData.length *
+                targetSampleRate /
+                audioBuffer.sampleRate
+            );
+
+        const offlineContext =
+            new OfflineAudioContext(
+                1,
+                targetLength,
+                targetSampleRate
+            );
+
+        const buffer =
+            offlineContext.createBuffer(
+                1,
+                sourceData.length,
+                audioBuffer.sampleRate
+            );
+
+        buffer.copyToChannel(
+            sourceData,
+            0
+        );
+
+        const source =
+            offlineContext.createBufferSource();
+
+        source.buffer =
+            buffer;
+
+        source.connect(
+            offlineContext.destination
+        );
+
+        source.start();
+
+        const resampledBuffer =
+            await offlineContext.startRendering();
+
+        const audioData =
+            resampledBuffer.getChannelData(0);
+
+        console.log(
+            "Resampled sample rate:",
             targetSampleRate
         );
 
-    const buffer =
-        offlineContext.createBuffer(
-            1,
-            sourceData.length,
-            audioBuffer.sampleRate
+        console.log(
+            "Resampled samples:",
+            audioData.length
         );
 
-    buffer.copyToChannel(
-        sourceData,
-        0
-    );
+        const result =
+            await transcriber(
+                audioData
+            );
 
-    const source =
-        offlineContext.createBufferSource();
+        console.log(
+            "TRANSCRIPTION:",
+            result
+        );
 
-    source.buffer = buffer;
+        document.getElementById(
+            "transcript"
+        ).textContent =
+            result.text;
 
-    source.connect(
-        offlineContext.destination
-    );
+        status.textContent =
+            "Transcription complete.";
+    };
 
-    source.start();
-
-    const resampledBuffer =
-        await offlineContext.startRendering();
-
-    const audioData =
-        resampledBuffer.getChannelData(0);
-
-    console.log(
-        "Resampled sample rate:",
-        targetSampleRate
-    );
-
-    console.log(
-        "Resampled samples:",
-        audioData.length
-    );
-
-    const result =
-        await transcriber(audioData);
-
-    console.log(
-        "TRANSCRIPTION:",
-        result
-    );
-
-    document.getElementById("transcript").textContent =
-        result.text;
-
-    document.getElementById("status").textContent =
-        "Transcription complete.";
-};
