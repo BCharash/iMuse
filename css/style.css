@@ -1,3 +1,4 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500&display=swap');
 
 /* iMuse — visual foundation */
@@ -67,20 +68,30 @@ h1 {
     font-size: 16px;
 }
 
-#modelSelector {
+#modelSelector,
+#languageSelector {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
+}
+
+#modelSelector {
+    margin-bottom: 18px;
+}
+
+#languageSelector {
     margin-bottom: 24px;
 }
 
-#modelSelector label {
+#modelSelector label,
+#languageSelector label {
     font-size: 15px;
     color: var(--muted);
 }
 
-#modelSelect {
+#modelSelect,
+#languageSelect {
     padding: 9px 14px;
     border: 1px solid var(--border);
     border-radius: 10px;

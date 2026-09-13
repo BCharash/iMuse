@@ -5,6 +5,9 @@ import { pipeline } from
 const modelSelect =
     document.getElementById("modelSelect");
 
+const languageSelect =
+    document.getElementById("languageSelect");
+
 const recordButton =
     document.getElementById("recordButton");
 
@@ -74,10 +77,6 @@ async function loadModel(modelName) {
                 modelId
             );
 
-        /*
-         * Only make the new model active
-         * after it has loaded successfully.
-         */
         transcriber =
             newTranscriber;
 
@@ -92,10 +91,6 @@ async function loadModel(modelName) {
             modelId
         );
 
-        /*
-         * Whisper is now genuinely ready.
-         * Enable recording directly.
-         */
         recordButton.disabled =
             false;
 
@@ -168,9 +163,17 @@ window.transcribeRecording =
             return;
         }
 
+        const language =
+            languageSelect.value;
+
         console.log(
             "Transcribing with:",
             loadedModel
+        );
+
+        console.log(
+            "Language:",
+            language
         );
 
         status.textContent =
@@ -260,7 +263,11 @@ window.transcribeRecording =
 
         const result =
             await transcriber(
-                audioData
+                audioData,
+                {
+                    language: language,
+                    task: "transcribe"
+                }
             );
 
         console.log(
