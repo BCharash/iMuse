@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/style.css">
 
     <title>iMuse</title>
 
@@ -26,8 +27,10 @@
 </head>
 <body>
 
+<main>
+
 <h1>iMuse</h1>
-<p>Voice transcription with Whisper</p>
+<p>Transcribe your musings with Whisper</p>
 
 <button id="recordButton">Start Recording</button> <button id="transcribeButton">Transcribe</button>
 
@@ -35,6 +38,7 @@
 
 <h2>Transcript</h2>
 <div id="transcript"></div>
+</main>
 
 <script>
     const recordButton = document.getElementById("recordButton");
@@ -96,7 +100,7 @@
     });
 </script>
 
-<script type="module" src="whisper.js"></script>
+<script type="module" src="js/whisper.js"></script>
 
 </body>
 </html>
