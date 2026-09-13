@@ -1,36 +1,96 @@
 import { pipeline } from
     "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2";
 
-console.log("Loading Whisper...");
+const modelSelect = document.getElementById("modelSelect");
 
-const transcriber = await pipeline(
-    "automatic-speech-recognition",
-    "onnx-community/whisper-tiny.en"
-);
+let transcriber = null;
+let loadedModel = null;
 
-console.log("Whisper loaded!");
+async function loadModel(modelName) {
+
+    const modelId = `onnx-community/whisper-${modelName}.en`;
+
+    if (loadedModel === modelName && transcriber) {
+        return;
+    }
+
+    console.log("Loading Whisper model:", modelId);
+
+    document.getElementById("status").textContent =
+        `Loading Whisper ${modelName}...`;
+
+    transcriber = await pipeline(
+        "automatic-speech-recognition",
+        modelId
+    );
+
+    loadedModel = modelName;
+
+    console.log("Whisper loaded:", modelId);
+
+    document.getElementById("status").textContent =
+        `Whisper ${modelName} ready.`;
+}
+
+await loadModel(modelSelect.value);
+
+modelSelect.addEventListener("change", async () => {
+
+    try {
+        await loadModel(modelSelect.value);
+    } catch (error) {
+        console.error("Could not load Whisper model:", error);
+
+        document.getElementById("status").textContent =
+            "Could not load the selected Whisper model.";
+    }
+});
 
 window.transcribeRecording = async function () {
+
     if (!window.lastRecording) {
         console.log("No recording available.");
         return;
     }
 
+    if (!transcriber) {
+        console.log("Whisper is not loaded yet.");
+        return;
+    }
+
     console.log("Transcribing...");
 
-    const arrayBuffer = await window.lastRecording.arrayBuffer();
+    document.getElementById("status").textContent =
+        "Transcribing...";
+
+    const arrayBuffer =
+        await window.lastRecording.arrayBuffer();
 
     const audioContext = new AudioContext();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-    const sourceData = audioBuffer.getChannelData(0);
+    const audioBuffer =
+        await audioContext.decodeAudioData(arrayBuffer);
 
-    console.log("Audio duration:", audioBuffer.duration, "seconds");
-    console.log("Original sample rate:", audioBuffer.sampleRate);
+    const sourceData =
+        audioBuffer.getChannelData(0);
+
+    console.log(
+        "Audio duration:",
+        audioBuffer.duration,
+        "seconds"
+    );
+
+    console.log(
+        "Original sample rate:",
+        audioBuffer.sampleRate
+    );
 
     const targetSampleRate = 16000;
+
     const targetLength = Math.round(
-        sourceData.length * targetSampleRate / audioBuffer.sampleRate
+        sourceData.length *
+        targetSampleRate /
+        audioBuffer.sampleRate
     );
 
     const offlineContext = new OfflineAudioContext(
@@ -45,22 +105,43 @@ window.transcribeRecording = async function () {
         audioBuffer.sampleRate
     );
 
-buffer.copyToChannel(sourceData, 0);
+    buffer.copyToChannel(sourceData, 0);
 
-const source = offlineContext.createBufferSource();
-source.buffer = buffer;
-source.connect(offlineContext.destination);
-source.start();
+    const source =
+        offlineContext.createBufferSource();
 
-const resampledBuffer = await offlineContext.startRendering();
-const audioData = resampledBuffer.getChannelData(0);
+    source.buffer = buffer;
 
-console.log("Resampled sample rate:", targetSampleRate);
-console.log("Resampled samples:", audioData.length);
+    source.connect(
+        offlineContext.destination
+    );
 
-const result = await transcriber(audioData);
+    source.start();
+
+    const resampledBuffer =
+        await offlineContext.startRendering();
+
+    const audioData =
+        resampledBuffer.getChannelData(0);
+
+    console.log(
+        "Resampled sample rate:",
+        targetSampleRate
+    );
+
+    console.log(
+        "Resampled samples:",
+        audioData.length
+    );
+
+    const result =
+        await transcriber(audioData);
 
     console.log("TRANSCRIPTION:", result);
 
-    document.getElementById("transcript").textContent = result.text;
+    document.getElementById("transcript").textContent =
+        result.text;
+
+    document.getElementById("status").textContent =
+        "Transcription complete.";
 };
