@@ -36,9 +36,21 @@
 <main>
 
 <h1>iMuse</h1>
-<p>Transcribe your musings with Whisper</p>
+<p class="tagline">Turn your thoughts into text</p>
+<p class="subtitle">Speak freely. iMuse listens.</p>
 
-<button id="recordButton">Start Recording</button> <button id="transcribeButton">Transcribe</button>
+<div id="modelSelector">
+    <label for="modelSelect">Whisper model:</label>
+    <select id="modelSelect">
+        <option value="tiny">Tiny — fastest</option>
+        <option value="base">Base — better accuracy</option>
+        <option value="small">Small — best accuracy</option>
+    </select>
+</div>
+
+<button id="recordButton">Start Recording</button>
+<button id="transcribeButton">Transcribe</button>
+
 
 <div id="status"></div>
 
