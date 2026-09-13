@@ -140,14 +140,22 @@ button:active {
 #transcribeButton {
     display: block;
     margin: 0 auto;
-    background: transparent;
-    color: var(--accent-dark);
-    border: 1px solid var(--border);
+    background: #65758b;
+    color: white;
+    border: 1px solid #65758b;
 }
 
 #transcribeButton:hover {
-    background: var(--surface);
+    background: #506176;
+    border-color: #506176;
 }
+
+#transcribeButton:disabled {
+    background: #d6d3cd;
+    color: #99958e;
+    border-color: #d6d3cd;
+}
+
 
 #status {
     min-height: 28px;

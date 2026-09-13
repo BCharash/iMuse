@@ -59,14 +59,70 @@ self.onmessage = async event => {
         } catch (error) {
 
             console.error(
-                "Worker could not load Whisper:",
+                "Worker Whisper error:",
                 error
             );
 
             self.postMessage({
                 type: "error",
                 message:
-                    `Could not load Whisper ${modelName}.`
+                    error?.message ||
+                    String(error)
+            });
+        }
+
+        return;
+    }
+
+    if (message.type === "transcribe") {
+
+        if (!transcriber) {
+
+            self.postMessage({
+                type: "error",
+                message:
+                    "Whisper is not loaded."
+            });
+
+            return;
+        }
+
+        try {
+
+            self.postMessage({
+                type: "status",
+                message:
+                    "Transcribing..."
+            });
+
+            const result =
+                await transcriber(
+                    message.audioData,
+                    {
+                        language: message.language,
+                        task: "transcribe",
+                        chunk_length_s: 30,
+                        stride_length_s: 5
+                    }
+                );
+
+            self.postMessage({
+                type: "transcription",
+                text: result.text
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Worker transcription error:",
+                error
+            );
+
+            self.postMessage({
+                type: "error",
+                message:
+                    error?.message ||
+                    String(error)
             });
         }
     }
