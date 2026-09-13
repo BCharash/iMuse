@@ -4,16 +4,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>iWhisper</title>
+
+    <title>iMuse</title>
+
+    <!-- Browser tab -->
+    <link rel="icon" type="image/png" sizes="32x32"
+          href="icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16"
+          href="icons/favicon-16.png">
+
+    <!-- iPhone Home Screen -->
+    <link rel="apple-touch-icon" sizes="180x180"
+          href="icons/apple-touch-icon.png">
+
+    <!-- Progressive Web App -->
+    <link rel="manifest" href="manifest.json">
+
+    <meta name="apple-mobile-web-app-title" content="iMuse">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#07145C">
 </head>
 <body>
 
-```
-<h1>iWhisper</h1>
+<h1>iMuse</h1>
 <p>Voice transcription with Whisper</p>
 
-<button id="recordButton">Start Recording</button>
-<button id="transcribeButton">Transcribe</button>
+<button id="recordButton">Start Recording</button> <button id="transcribeButton">Transcribe</button>
 
 <div id="status"></div>
 
@@ -81,7 +97,6 @@
 </script>
 
 <script type="module" src="whisper.js"></script>
-```
 
 </body>
 </html>
