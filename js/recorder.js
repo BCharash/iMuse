@@ -1,4 +1,4 @@
-```javascript id="2n0g0x"
+
 const recordButton =
     document.getElementById("recordButton");
 
@@ -160,4 +160,4 @@ recordButton.addEventListener(
         }
     }
 );
-```
+
