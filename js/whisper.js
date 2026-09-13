@@ -11,7 +11,7 @@ const models = {
     tiny: "onnx-community/whisper-tiny",
     base: "onnx-community/whisper-base",
     small: "onnx-community/whisper-small",
-    medium: "onnx-community/whisper-medium-ONNX"
+   
 };
 
 async function loadModel(modelName) {
