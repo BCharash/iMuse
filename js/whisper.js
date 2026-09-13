@@ -190,6 +190,10 @@ window.transcribeRecording =
         const audioData =
             preparedAudio.audioData;
 
+        console.log(
+            "Using long-form transcription."
+        );
+
         status.textContent =
             "Transcribing...";
 
@@ -198,7 +202,9 @@ window.transcribeRecording =
                 audioData,
                 {
                     language: language,
-                    task: "transcribe"
+                    task: "transcribe",
+                    chunk_length_s: 30,
+                    stride_length_s: 5
                 }
             );
 
