@@ -57,11 +57,6 @@ function createWorker() {
 
                 status.textContent =
                     `Whisper ${message.model} ready.`;
-
-                console.log(
-                    "Whisper ready:",
-                    message.model
-                );
             }
 
             if (message.type === "transcription") {
@@ -72,13 +67,8 @@ function createWorker() {
                 transcribeButton.disabled =
                     false;
 
-                status.textContent =
+                status.innerHTML =
                     "Transcription complete.";
-
-                console.log(
-                    "TRANSCRIPTION:",
-                    message.text
-                );
             }
 
             if (message.type === "error") {
@@ -94,16 +84,11 @@ function createWorker() {
 
                 status.textContent =
                     message.message;
-
-                console.error(
-                    "Whisper worker error:",
-                    message.message
-                );
             }
         };
 
     worker.onerror =
-        error => {
+        () => {
 
             loadingModel =
                 false;
@@ -116,11 +101,6 @@ function createWorker() {
 
             status.textContent =
                 "Whisper worker error.";
-
-            console.error(
-                "Whisper worker error:",
-                error
-            );
         };
 }
 
@@ -190,8 +170,11 @@ window.transcribeRecording =
                     window.lastRecording
                 );
 
-            status.textContent =
-                "Transcribing...";
+            status.innerHTML =
+                '<span class="transcribing-status">' +
+                '<span class="transcribing-spinner"></span>' +
+                'Transcribing…' +
+                '</span>';
 
             transcribeButton.disabled =
                 true;
@@ -205,11 +188,6 @@ window.transcribeRecording =
             });
 
         } catch (error) {
-
-            console.error(
-                "Audio preparation error:",
-                error
-            );
 
             status.textContent =
                 "Could not prepare audio.";

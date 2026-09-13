@@ -2,7 +2,6 @@ import { pipeline } from
     "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2";
 
 let transcriber = null;
-let loadedModel = null;
 
 const models = {
     tiny: "onnx-community/whisper-tiny",
@@ -48,20 +47,12 @@ self.onmessage = async event => {
                     modelId
                 );
 
-            loadedModel =
-                modelName;
-
             self.postMessage({
                 type: "ready",
                 model: modelName
             });
 
         } catch (error) {
-
-            console.error(
-                "Worker Whisper error:",
-                error
-            );
 
             self.postMessage({
                 type: "error",
@@ -89,12 +80,6 @@ self.onmessage = async event => {
 
         try {
 
-            self.postMessage({
-                type: "status",
-                message:
-                    "Transcribing..."
-            });
-
             const result =
                 await transcriber(
                     message.audioData,
@@ -112,11 +97,6 @@ self.onmessage = async event => {
             });
 
         } catch (error) {
-
-            console.error(
-                "Worker transcription error:",
-                error
-            );
 
             self.postMessage({
                 type: "error",
