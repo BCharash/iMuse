@@ -108,6 +108,13 @@ button:hover {
     background: var(--accent-dark);
 }
 
+button:disabled {
+    background: #d6d3cd;
+    color: #99958e;
+    cursor: not-allowed;
+    transform: none;
+}
+
 button:active {
     transform: scale(0.97);
 }
