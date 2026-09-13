@@ -1,81 +1,102 @@
+html
 <!DOCTYPE html>
 
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <link rel="stylesheet" href="css/style.css">
 
+    <title>iMuse</title>
 
-<title>iMuse</title>
+    <!-- Browser tab -->
+    <link rel="icon" href="./favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32"
+          href="./icons/favicon-32-v2.png">
+    <link rel="icon" type="image/png" sizes="16x16"
+          href="./icons/favicon-16.png">
 
-<!-- Browser tab -->
-<link rel="icon" href="./favicon.ico">
-<link rel="icon" type="image/png" sizes="32x32"
-      href="icons/favicon-32-v2.png">
-<link rel="icon" type="image/png" sizes="16x16"
-      href="icons/favicon-16.png">
+    <!-- iPhone Home Screen -->
+    <link rel="apple-touch-icon" sizes="180x180"
+          href="./icons/apple-touch-icon.png">
 
+    <!-- Progressive Web App -->
+    <link rel="manifest" href="./manifest.json">
 
-<!-- iPhone Home Screen -->
-<link rel="apple-touch-icon" sizes="180x180"
-      href="icons/apple-touch-icon.png">
-
-<!-- Progressive Web App -->
-<link rel="manifest" href="manifest.json">
-
-<meta name="apple-mobile-web-app-title" content="iMuse">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#07145C">
-
-
+    <meta name="apple-mobile-web-app-title" content="iMuse">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#07145C">
 </head>
 
 <body>
 
 <main>
 
-<h1>iMuse</h1>
-<p class="tagline">Turn your thoughts into text</p>
-<p class="subtitle">Speak freely. iMuse listens.</p>
+    <h1>iMuse</h1>
 
-<div id="modelSelector">
-    <label for="modelSelect">Whisper model:</label>
-    <select id="modelSelect">
-        <option value="tiny">Tiny — fastest</option>
-        <option value="base">Base — better accuracy</option>
-        <option value="small">Small — best accuracy</option>
-    </select>
-</div>
+    <p class="tagline">Turn your thoughts into text</p>
+    <p class="subtitle">Speak freely. iMuse listens.</p>
 
-<button id="recordButton">Start Recording</button>
-<button id="transcribeButton">Transcribe</button>
+    <div id="modelSelector">
+        <label for="modelSelect">Whisper model:</label>
 
+        <select id="modelSelect">
+            <option value="tiny">Tiny — fastest</option>
+            <option value="base" selected>Base — recommended</option>
+            <option value="small">Small — high accuracy</option>
+        </select>
+    </div>
 
-<div id="status"></div>
+    <button id="recordButton" disabled>
+        Start Recording
+    </button>
 
-<h2>Transcript</h2>
-<div id="transcript"></div>
+    <button id="transcribeButton" disabled>
+        Transcribe
+    </button>
+
+    <div id="status">Loading Whisper base...</div>
+
+    <h2>Transcript</h2>
+
+    <div id="transcript"></div>
 
 </main>
 
 <script>
-    const recordButton = document.getElementById("recordButton");
-    const transcribeButton = document.getElementById("transcribeButton");
-    const status = document.getElementById("status");
+    const recordButton =
+        document.getElementById("recordButton");
+
+    const transcribeButton =
+        document.getElementById("transcribeButton");
+
+    const modelSelect =
+        document.getElementById("modelSelect");
+
+    const status =
+        document.getElementById("status");
 
     let mediaRecorder;
     let audioChunks = [];
 
     function playReadyChime() {
-        const audioContext = new AudioContext();
 
-        const now = audioContext.currentTime;
+        const audioContext =
+            new AudioContext();
 
-        const oscillator1 = audioContext.createOscillator();
-        const oscillator2 = audioContext.createOscillator();
+        const now =
+            audioContext.currentTime;
 
-        const gain = audioContext.createGain();
+        const oscillator1 =
+            audioContext.createOscillator();
+
+        const oscillator2 =
+            audioContext.createOscillator();
+
+        const gain =
+            audioContext.createGain();
 
         oscillator1.frequency.value = 659.25;
         oscillator2.frequency.value = 783.99;
@@ -85,11 +106,20 @@
 
         oscillator1.connect(gain);
         oscillator2.connect(gain);
+
         gain.connect(audioContext.destination);
 
         gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.08, now + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+        gain.gain.linearRampToValueAtTime(
+            0.08,
+            now + 0.02
+        );
+
+        gain.gain.exponentialRampToValueAtTime(
+            0.001,
+            now + 0.35
+        );
 
         oscillator1.start(now);
         oscillator2.start(now + 0.12);
@@ -98,69 +128,139 @@
         oscillator2.stop(now + 0.47);
     }
 
-    recordButton.addEventListener("click", async () => {
+    recordButton.addEventListener(
+        "click",
+        async () => {
 
-        if (!mediaRecorder || mediaRecorder.state === "inactive") {
+            if (
+                !mediaRecorder ||
+                mediaRecorder.state === "inactive"
+            ) {
 
-            try {
-                status.textContent = "Preparing microphone...";
+                try {
 
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: true
-                });
+                    status.textContent =
+                        "Preparing microphone...";
 
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
+                    const stream =
+                        await navigator.mediaDevices.getUserMedia({
+                            audio: true
+                        });
 
-                let readySignalPlayed = false;
+                    mediaRecorder =
+                        new MediaRecorder(stream);
 
-                mediaRecorder.addEventListener("dataavailable", event => {
-                    audioChunks.push(event.data);
+                    audioChunks = [];
 
-                    if (!readySignalPlayed) {
-                        readySignalPlayed = true;
+                    let readySignalPlayed = false;
 
-                        playReadyChime();
-                        status.textContent = "Ready — speak now.";
-                    }
-                });
+                    mediaRecorder.addEventListener(
+                        "dataavailable",
+                        event => {
 
-                mediaRecorder.addEventListener("stop", () => {
-                    stream.getTracks().forEach(track => track.stop());
+                            audioChunks.push(
+                                event.data
+                            );
 
-                    const audioBlob = new Blob(audioChunks, {
-                        type: "audio/webm"
-                    });
+                            if (!readySignalPlayed) {
 
-                    console.log("Recording complete:", audioBlob);
+                                readySignalPlayed = true;
 
-                    status.textContent = "Recording complete.";
-                    window.lastRecording = audioBlob;
-                });
+                                playReadyChime();
 
-                mediaRecorder.start(100);
+                                status.textContent =
+                                    "Ready — speak now.";
+                            }
+                        }
+                    );
 
-                recordButton.textContent = "Stop Recording";
+                    mediaRecorder.addEventListener(
+                        "stop",
+                        () => {
 
-            } catch (error) {
-                console.error(error);
-                status.textContent =
-                    "Microphone access was denied or unavailable.";
+                            stream
+                                .getTracks()
+                                .forEach(track =>
+                                    track.stop()
+                                );
+
+                            const audioBlob =
+                                new Blob(
+                                    audioChunks,
+                                    {
+                                        type: "audio/webm"
+                                    }
+                                );
+
+                            console.log(
+                                "Recording complete:",
+                                audioBlob
+                            );
+
+                            status.textContent =
+                                "Recording complete.";
+
+                            window.lastRecording =
+                                audioBlob;
+
+                            transcribeButton.disabled =
+                                false;
+                        }
+                    );
+
+                    mediaRecorder.start(100);
+
+                    recordButton.textContent =
+                        "Stop Recording";
+
+                } catch (error) {
+
+                    console.error(error);
+
+                    status.textContent =
+                        "Microphone access was denied or unavailable.";
+                }
+
+            } else {
+
+                mediaRecorder.stop();
+
+                recordButton.textContent =
+                    "Start Recording";
             }
-
-        } else {
-
-            mediaRecorder.stop();
-            recordButton.textContent = "Start Recording";
         }
-    });
+    );
 
-    transcribeButton.addEventListener("click", () => {
-        window.transcribeRecording();
-    });
+    transcribeButton.addEventListener(
+        "click",
+        () => {
+            window.transcribeRecording();
+        }
+    );
+
+    modelSelect.addEventListener(
+        "change",
+        () => {
+
+            recordButton.disabled = true;
+            transcribeButton.disabled = true;
+
+            window.lastRecording = null;
+
+            document.getElementById("transcript").textContent = "";
+
+            window.loadWhisperModel(
+                modelSelect.value
+            );
+        }
+    );
 </script>
 
-<script type="module" src="js/whisper.js"></script>
+<script
+    type="module"
+    src="js/whisper.js">
+</script>
 
 </body>
 </html>
+

@@ -1,20 +1,40 @@
 import { pipeline } from
     "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2";
 
-const modelSelect = document.getElementById("modelSelect");
+const modelSelect =
+    document.getElementById("modelSelect");
 
 let transcriber = null;
 let loadedModel = null;
 
+const models = {
+    tiny: "onnx-community/whisper-tiny",
+    base: "onnx-community/whisper-base",
+    small: "onnx-community/whisper-small",
+    medium: "onnx-community/whisper-medium-ONNX"
+};
+
 async function loadModel(modelName) {
 
-    const modelId = `onnx-community/whisper-${modelName}.en`;
+    const modelId = models[modelName];
 
-    if (loadedModel === modelName && transcriber) {
+    if (!modelId) {
+        throw new Error(
+            `Unknown Whisper model: ${modelName}`
+        );
+    }
+
+    if (
+        loadedModel === modelName &&
+        transcriber
+    ) {
         return;
     }
 
-    console.log("Loading Whisper model:", modelId);
+    console.log(
+        "Loading Whisper model:",
+        modelId
+    );
 
     document.getElementById("status").textContent =
         `Loading Whisper ${modelName}...`;
@@ -26,7 +46,10 @@ async function loadModel(modelName) {
 
     loadedModel = modelName;
 
-    console.log("Whisper loaded:", modelId);
+    console.log(
+        "Whisper loaded:",
+        modelId
+    );
 
     document.getElementById("status").textContent =
         `Whisper ${modelName} ready.`;
@@ -34,27 +57,46 @@ async function loadModel(modelName) {
 
 await loadModel(modelSelect.value);
 
-modelSelect.addEventListener("change", async () => {
+modelSelect.addEventListener(
+    "change",
+    async () => {
 
-    try {
-        await loadModel(modelSelect.value);
-    } catch (error) {
-        console.error("Could not load Whisper model:", error);
+        try {
 
-        document.getElementById("status").textContent =
-            "Could not load the selected Whisper model.";
+            await loadModel(
+                modelSelect.value
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Could not load Whisper model:",
+                error
+            );
+
+            document.getElementById("status").textContent =
+                "Could not load the selected Whisper model.";
+        }
     }
-});
+);
 
 window.transcribeRecording = async function () {
 
     if (!window.lastRecording) {
-        console.log("No recording available.");
+
+        console.log(
+            "No recording available."
+        );
+
         return;
     }
 
     if (!transcriber) {
-        console.log("Whisper is not loaded yet.");
+
+        console.log(
+            "Whisper is not loaded yet."
+        );
+
         return;
     }
 
@@ -66,10 +108,13 @@ window.transcribeRecording = async function () {
     const arrayBuffer =
         await window.lastRecording.arrayBuffer();
 
-    const audioContext = new AudioContext();
+    const audioContext =
+        new AudioContext();
 
     const audioBuffer =
-        await audioContext.decodeAudioData(arrayBuffer);
+        await audioContext.decodeAudioData(
+            arrayBuffer
+        );
 
     const sourceData =
         audioBuffer.getChannelData(0);
@@ -87,25 +132,31 @@ window.transcribeRecording = async function () {
 
     const targetSampleRate = 16000;
 
-    const targetLength = Math.round(
-        sourceData.length *
-        targetSampleRate /
-        audioBuffer.sampleRate
-    );
+    const targetLength =
+        Math.round(
+            sourceData.length *
+            targetSampleRate /
+            audioBuffer.sampleRate
+        );
 
-    const offlineContext = new OfflineAudioContext(
-        1,
-        targetLength,
-        targetSampleRate
-    );
+    const offlineContext =
+        new OfflineAudioContext(
+            1,
+            targetLength,
+            targetSampleRate
+        );
 
-    const buffer = offlineContext.createBuffer(
-        1,
-        sourceData.length,
-        audioBuffer.sampleRate
-    );
+    const buffer =
+        offlineContext.createBuffer(
+            1,
+            sourceData.length,
+            audioBuffer.sampleRate
+        );
 
-    buffer.copyToChannel(sourceData, 0);
+    buffer.copyToChannel(
+        sourceData,
+        0
+    );
 
     const source =
         offlineContext.createBufferSource();
@@ -137,7 +188,10 @@ window.transcribeRecording = async function () {
     const result =
         await transcriber(audioData);
 
-    console.log("TRANSCRIPTION:", result);
+    console.log(
+        "TRANSCRIPTION:",
+        result
+    );
 
     document.getElementById("transcript").textContent =
         result.text;
