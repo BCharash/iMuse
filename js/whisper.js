@@ -2,6 +2,9 @@
 import { pipeline } from
     "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2";
 
+import { prepareAudioForWhisper } from
+    "./audio.js";
+
 const modelSelect =
     document.getElementById("modelSelect");
 
@@ -177,89 +180,18 @@ window.transcribeRecording =
         );
 
         status.textContent =
-            "Transcribing...";
+            "Preparing audio...";
 
-        const arrayBuffer =
-            await window.lastRecording.arrayBuffer();
-
-        const audioContext =
-            new AudioContext();
-
-        const audioBuffer =
-            await audioContext.decodeAudioData(
-                arrayBuffer
+        const preparedAudio =
+            await prepareAudioForWhisper(
+                window.lastRecording
             );
-
-        const sourceData =
-            audioBuffer.getChannelData(0);
-
-        console.log(
-            "Audio duration:",
-            audioBuffer.duration,
-            "seconds"
-        );
-
-        console.log(
-            "Original sample rate:",
-            audioBuffer.sampleRate
-        );
-
-        const targetSampleRate =
-            16000;
-
-        const targetLength =
-            Math.round(
-                sourceData.length *
-                targetSampleRate /
-                audioBuffer.sampleRate
-            );
-
-        const offlineContext =
-            new OfflineAudioContext(
-                1,
-                targetLength,
-                targetSampleRate
-            );
-
-        const buffer =
-            offlineContext.createBuffer(
-                1,
-                sourceData.length,
-                audioBuffer.sampleRate
-            );
-
-        buffer.copyToChannel(
-            sourceData,
-            0
-        );
-
-        const source =
-            offlineContext.createBufferSource();
-
-        source.buffer =
-            buffer;
-
-        source.connect(
-            offlineContext.destination
-        );
-
-        source.start();
-
-        const resampledBuffer =
-            await offlineContext.startRendering();
 
         const audioData =
-            resampledBuffer.getChannelData(0);
+            preparedAudio.audioData;
 
-        console.log(
-            "Resampled sample rate:",
-            targetSampleRate
-        );
-
-        console.log(
-            "Resampled samples:",
-            audioData.length
-        );
+        status.textContent =
+            "Transcribing...";
 
         const result =
             await transcriber(
