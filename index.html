@@ -57,7 +57,9 @@ html
         Transcribe
     </button>
 
-    <div id="status">Loading Whisper base...</div>
+    <div id="status">
+        Loading Whisper base...
+    </div>
 
     <h2>Transcript</h2>
 
@@ -71,9 +73,6 @@ html
 
     const transcribeButton =
         document.getElementById("transcribeButton");
-
-    const modelSelect =
-        document.getElementById("modelSelect");
 
     const status =
         document.getElementById("status");
@@ -127,6 +126,56 @@ html
         oscillator1.stop(now + 0.35);
         oscillator2.stop(now + 0.47);
     }
+
+    /*
+     * Whisper tells the page when the model
+     * has successfully loaded.
+     */
+    window.addEventListener(
+        "whisperready",
+        () => {
+
+            recordButton.disabled =
+                false;
+
+            status.textContent =
+                `Whisper ${window.loadedWhisperModel} ready.`;
+        }
+    );
+
+    /*
+     * Whisper tells the page when a model
+     * is beginning to load.
+     */
+    window.addEventListener(
+        "whisperloading",
+        event => {
+
+            recordButton.disabled =
+                true;
+
+            transcribeButton.disabled =
+                true;
+
+            status.textContent =
+                `Loading Whisper ${event.detail}...`;
+        }
+    );
+
+    /*
+     * Whisper tells the page when loading fails.
+     */
+    window.addEventListener(
+        "whispererror",
+        event => {
+
+            recordButton.disabled =
+                true;
+
+            status.textContent =
+                `Could not load Whisper ${event.detail}.`;
+        }
+    );
 
     recordButton.addEventListener(
         "click",
@@ -234,26 +283,35 @@ html
     transcribeButton.addEventListener(
         "click",
         () => {
+
             window.transcribeRecording();
         }
     );
 
-    modelSelect.addEventListener(
-        "change",
-        () => {
+    document
+        .getElementById("modelSelect")
+        .addEventListener(
+            "change",
+            event => {
 
-            recordButton.disabled = true;
-            transcribeButton.disabled = true;
+                recordButton.disabled =
+                    true;
 
-            window.lastRecording = null;
+                transcribeButton.disabled =
+                    true;
 
-            document.getElementById("transcript").textContent = "";
+                window.lastRecording =
+                    null;
 
-            window.loadWhisperModel(
-                modelSelect.value
-            );
-        }
-    );
+                document.getElementById(
+                    "transcript"
+                ).textContent = "";
+
+                window.loadWhisperModel(
+                    event.target.value
+                );
+            }
+        );
 </script>
 
 <script
