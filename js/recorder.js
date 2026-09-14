@@ -88,6 +88,10 @@ function startRecording() {
         mediaRecorder =
             new MediaRecorder(stream);
 
+        status.textContent =
+            "Recorder format: " +
+            mediaRecorder.mimeType;
+
         audioChunks = [];
 
         let readySignalPlayed = false;
@@ -113,7 +117,8 @@ function startRecording() {
                         false;
 
                     status.textContent =
-                        "Ready — speak now.";
+                        "Ready — speak now. " +
+                        mediaRecorder.mimeType;
                 }
             }
         );
@@ -163,10 +168,7 @@ function startRecording() {
                     false;
 
                 status.textContent =
-                    "Recording complete. " +
-                    `MP4: ${MediaRecorder.isTypeSupported("audio/mp4")} · ` +
-                    `WebM Opus: ${MediaRecorder.isTypeSupported("audio/webm;codecs=opus")} · ` +
-                    `WebM: ${MediaRecorder.isTypeSupported("audio/webm")}`;
+                    "Recording complete.";
 
                 transcribeButton.disabled =
                     false;
