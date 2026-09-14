@@ -155,6 +155,9 @@ function startRecording() {
                 audioPlayer.src =
                     recordingUrl;
 
+                audioPlayer.type =
+                    mediaRecorder.mimeType;
+
                 audioPlayer.load();
 
                 audioPlayer.hidden =
