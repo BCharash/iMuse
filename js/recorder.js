@@ -72,20 +72,7 @@ function playReadyChime() {
 
 function startRecording() {
 
-    console.log(
-        "audio/mp4:",
-        MediaRecorder.isTypeSupported("audio/mp4")
-    );
 
-    console.log(
-        "audio/webm;codecs=opus:",
-        MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-    );
-
-    console.log(
-        "audio/webm:",
-        MediaRecorder.isTypeSupported("audio/webm")
-    );
 
     recordButton.disabled =
         true;
@@ -176,7 +163,10 @@ function startRecording() {
                     false;
 
                 status.textContent =
-                    "Recording complete.";
+                    "Recording complete. " +
+                    `MP4: ${MediaRecorder.isTypeSupported("audio/mp4")} · ` +
+                    `WebM Opus: ${MediaRecorder.isTypeSupported("audio/webm;codecs=opus")} · ` +
+                    `WebM: ${MediaRecorder.isTypeSupported("audio/webm")}`;
 
                 transcribeButton.disabled =
                     false;
