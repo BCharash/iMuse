@@ -72,6 +72,21 @@ function playReadyChime() {
 
 function startRecording() {
 
+    console.log(
+        "audio/mp4:",
+        MediaRecorder.isTypeSupported("audio/mp4")
+    );
+
+    console.log(
+        "audio/webm;codecs=opus:",
+        MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+    );
+
+    console.log(
+        "audio/webm:",
+        MediaRecorder.isTypeSupported("audio/webm")
+    );
+
     recordButton.disabled =
         true;
 
@@ -151,6 +166,8 @@ function startRecording() {
 
                 audioPlayer.src =
                     recordingUrl;
+
+                audioPlayer.load();
 
                 audioPlayer.hidden =
                     false;
