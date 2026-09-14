@@ -8,3 +8,4 @@ transcribeButton.addEventListener(
         window.transcribeRecording();
     }
 );
+

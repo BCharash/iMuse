@@ -4,11 +4,24 @@ const recordButton =
 const transcribeButton =
     document.getElementById("transcribeButton");
 
+const audioPlayer =
+    document.getElementById("audioPlayer");
+
+const recordingControls =
+    document.getElementById("recordingControls");
+
+const recordAgainButton =
+    document.getElementById("recordAgainButton");
+
+const deleteButton =
+    document.getElementById("deleteButton");
+
 const status =
     document.getElementById("status");
 
 let mediaRecorder;
 let audioChunks = [];
+let recordingUrl = null;
 
 function playReadyChime() {
 
@@ -57,112 +70,196 @@ function playReadyChime() {
     oscillator2.stop(now + 0.47);
 }
 
-recordButton.addEventListener(
-    "click",
-    async () => {
+function startRecording() {
 
-        if (
-            !mediaRecorder ||
-            mediaRecorder.state === "inactive"
-        ) {
+    recordButton.disabled =
+        true;
 
-            try {
+    status.textContent =
+        "Preparing microphone...";
 
-                recordButton.disabled =
-                    true;
+    navigator.mediaDevices.getUserMedia({
+        audio: true
+    })
+    .then(stream => {
 
-                status.textContent =
-                    "Preparing microphone...";
+        mediaRecorder =
+            new MediaRecorder(stream);
 
-                const stream =
-                    await navigator.mediaDevices.getUserMedia({
-                        audio: true
-                    });
+        audioChunks = [];
 
-                mediaRecorder =
-                    new MediaRecorder(stream);
+        let readySignalPlayed = false;
 
-                audioChunks = [];
+        mediaRecorder.addEventListener(
+            "dataavailable",
+            event => {
 
-                let readySignalPlayed = false;
+                audioChunks.push(
+                    event.data
+                );
 
-                mediaRecorder.addEventListener(
-                    "dataavailable",
-                    event => {
+                if (!readySignalPlayed) {
 
-                        audioChunks.push(
-                            event.data
-                        );
+                    readySignalPlayed = true;
 
-                        if (!readySignalPlayed) {
+                    playReadyChime();
 
-                            readySignalPlayed = true;
+                    recordButton.textContent =
+                        "Stop Recording";
 
-                            playReadyChime();
+                    recordButton.disabled =
+                        false;
 
-                            recordButton.textContent =
-                                "Stop Recording";
+                    status.textContent =
+                        "Ready — speak now.";
+                }
+            }
+        );
 
-                            recordButton.disabled =
-                                false;
+        mediaRecorder.addEventListener(
+            "stop",
+            () => {
 
-                            status.textContent =
-                                "Ready — speak now.";
+                stream
+                    .getTracks()
+                    .forEach(track =>
+                        track.stop()
+                    );
+
+                const audioBlob =
+                    new Blob(
+                        audioChunks,
+                        {
+                            type: "audio/webm"
                         }
-                    }
-                );
+                    );
 
-                mediaRecorder.addEventListener(
-                    "stop",
-                    () => {
+                window.lastRecording =
+                    audioBlob;
 
-                        stream
-                            .getTracks()
-                            .forEach(track =>
-                                track.stop()
-                            );
+                if (recordingUrl) {
 
-                        const audioBlob =
-                            new Blob(
-                                audioChunks,
-                                {
-                                    type: "audio/webm"
-                                }
-                            );
+                    URL.revokeObjectURL(
+                        recordingUrl
+                    );
+                }
 
-                        status.textContent =
-                            "Recording complete.";
+                recordingUrl =
+                    URL.createObjectURL(
+                        audioBlob
+                    );
 
-                        window.lastRecording =
-                            audioBlob;
+                audioPlayer.src =
+                    recordingUrl;
 
-                        transcribeButton.disabled =
-                            false;
+                audioPlayer.hidden =
+                    false;
 
-                        recordButton.textContent =
-                            "Start Recording";
-                    }
-                );
-
-                mediaRecorder.start(100);
-
-            } catch (error) {
-
-                console.error(error);
-
-                recordButton.disabled =
+                recordingControls.hidden =
                     false;
 
                 status.textContent =
-                    "Microphone access was denied or unavailable.";
-            }
+                    "Recording complete.";
 
-        } else {
+                transcribeButton.disabled =
+                    false;
+
+                recordButton.textContent =
+                    "Start Recording";
+
+                recordButton.disabled =
+                    false;
+            }
+        );
+
+        mediaRecorder.start(100);
+
+    })
+    .catch(error => {
+
+        console.error(error);
+
+        recordButton.disabled =
+            false;
+
+        status.textContent =
+            "Microphone access was denied or unavailable.";
+    });
+}
+
+recordButton.addEventListener(
+    "click",
+    () => {
+
+        if (
+            mediaRecorder &&
+            mediaRecorder.state === "recording"
+        ) {
 
             mediaRecorder.stop();
 
             recordButton.disabled =
                 true;
+
+        } else {
+
+            startRecording();
         }
     }
 );
+
+recordAgainButton.addEventListener(
+    "click",
+    () => {
+
+        audioPlayer.pause();
+
+        startRecording();
+    }
+);
+
+deleteButton.addEventListener(
+    "click",
+    () => {
+
+        audioPlayer.pause();
+
+        audioPlayer.removeAttribute(
+            "src"
+        );
+
+        audioPlayer.load();
+
+        audioPlayer.hidden =
+            true;
+
+        recordingControls.hidden =
+            true;
+
+        window.lastRecording =
+            null;
+
+        if (recordingUrl) {
+
+            URL.revokeObjectURL(
+                recordingUrl
+            );
+
+            recordingUrl =
+                null;
+        }
+
+        transcribeButton.disabled =
+            true;
+
+        recordButton.textContent =
+            "Start Recording";
+
+        recordButton.disabled =
+            false;
+
+        status.textContent =
+            "Ready to record.";
+    }
+);
+

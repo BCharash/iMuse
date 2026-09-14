@@ -130,11 +130,33 @@ button:active {
     transform: scale(0.97);
 }
 
+#audioPlayer {
+    display: block;
+    width: min(500px, 100%);
+    margin: 0 auto 14px;
+    accent-color: var(--accent);
+}
+
+#audioPlayer[hidden] {
+    display: none;
+}
+
 #recordButton {
     display: block;
     margin: 0 auto 14px;
     padding: 17px 34px;
     font-size: 18px;
+}
+
+#recordingControls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 0 auto 20px;
+}
+
+#recordingControls[hidden] {
+    display: none;
 }
 
 #transcribeButton {

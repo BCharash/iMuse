@@ -43,6 +43,24 @@
         Start Recording
     </button>
 
+    <audio
+        id="audioPlayer"
+        controls
+        hidden>
+    </audio>
+
+    <div id="recordingControls" hidden>
+
+        <button id="recordAgainButton">
+            Record Again
+        </button>
+
+        <button id="deleteButton">
+            Delete
+        </button>
+
+    </div>
+
     <div id="modelSelector">
         <label for="modelSelect">Whisper model:</label>
 
@@ -93,3 +111,4 @@
 
 </body>
 </html>
+
