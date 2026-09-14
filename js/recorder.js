@@ -87,10 +87,7 @@ function startRecording() {
 
         mediaRecorder =
             new MediaRecorder(stream);
-
-        status.textContent =
-            "Recorder format: " +
-            mediaRecorder.mimeType;
+            
 
         audioChunks = [];
 
@@ -117,8 +114,7 @@ function startRecording() {
                         false;
 
                     status.textContent =
-                        "Ready — speak now. " +
-                        mediaRecorder.mimeType;
+                        "Ready — speak now.";
                 }
             }
         );
@@ -137,7 +133,7 @@ function startRecording() {
                     new Blob(
                         audioChunks,
                         {
-                            type: "audio/webm"
+                            type: mediaRecorder.mimeType
                         }
                     );
 
