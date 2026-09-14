@@ -21,6 +21,8 @@ const transcript =
 
 let worker = null;
 let loadingModel = false;
+let loadedWhisperModel = null;
+let modelLoadPromise = null;
 
 function createWorker() {
 
@@ -49,14 +51,17 @@ function createWorker() {
                 loadingModel =
                     false;
 
+                loadedWhisperModel =
+                    message.model;
+
                 window.loadedWhisperModel =
                     message.model;
 
-                recordButton.disabled =
-                    false;
+                if (modelLoadPromise) {
 
-                status.textContent =
-                    `Whisper ${message.model} ready.`;
+                    modelLoadPromise.resolve();
+                    modelLoadPromise = null;
+                }
             }
 
             if (message.type === "transcription") {
@@ -67,7 +72,10 @@ function createWorker() {
                 transcribeButton.disabled =
                     false;
 
-                status.innerHTML =
+                recordButton.disabled =
+                    false;
+
+                status.textContent =
                     "Transcription complete.";
             }
 
@@ -77,10 +85,20 @@ function createWorker() {
                     false;
 
                 recordButton.disabled =
-                    true;
+                    false;
 
                 transcribeButton.disabled =
                     false;
+
+                if (modelLoadPromise) {
+
+                    modelLoadPromise.reject(
+                        new Error(message.message)
+                    );
+
+                    modelLoadPromise =
+                        null;
+                }
 
                 status.textContent =
                     message.message;
@@ -94,52 +112,75 @@ function createWorker() {
                 false;
 
             recordButton.disabled =
-                true;
+                false;
 
             transcribeButton.disabled =
                 false;
+
+            if (modelLoadPromise) {
+
+                modelLoadPromise.reject(
+                    new Error("Whisper worker error.")
+                );
+
+                modelLoadPromise =
+                    null;
+            }
 
             status.textContent =
                 "Whisper worker error.";
         };
 }
 
-async function loadModel(modelName) {
+function loadModel(modelName) {
 
-    loadingModel =
-        true;
+    if (
+        loadedWhisperModel === modelName
+    ) {
 
-    recordButton.disabled =
-        true;
+        return Promise.resolve();
+    }
 
-    transcribeButton.disabled =
-        true;
+    if (loadingModel) {
+
+        return modelLoadPromise.promise;
+    }
 
     if (!worker) {
 
         createWorker();
     }
 
+    loadingModel =
+        true;
+
+    status.textContent =
+        `Loading Whisper ${modelName}...`;
+
+    modelLoadPromise = {};
+
+    modelLoadPromise.promise =
+        new Promise(
+            (resolve, reject) => {
+
+                modelLoadPromise.resolve =
+                    resolve;
+
+                modelLoadPromise.reject =
+                    reject;
+            }
+        );
+
     worker.postMessage({
         type: "load",
         model: modelName
     });
+
+    return modelLoadPromise.promise;
 }
-
-window.loadWhisperModel =
-    loadModel;
-
-await loadModel(
-    modelSelect.value
-);
 
 window.transcribeRecording =
     async function () {
-
-        if (loadingModel) {
-
-            return;
-        }
 
         if (!window.lastRecording) {
 
@@ -149,16 +190,17 @@ window.transcribeRecording =
             return;
         }
 
-        if (!worker) {
-
-            status.textContent =
-                "Whisper is not ready.";
-
-            return;
-        }
+        const model =
+            modelSelect.value;
 
         const language =
             languageSelect.value;
+
+        transcribeButton.disabled =
+            true;
+
+        recordButton.disabled =
+            true;
 
         status.textContent =
             "Preparing audio...";
@@ -170,14 +212,13 @@ window.transcribeRecording =
                     window.lastRecording
                 );
 
+            await loadModel(model);
+
             status.innerHTML =
                 '<span class="transcribing-status">' +
                 '<span class="transcribing-spinner"></span>' +
                 'Transcribing…' +
                 '</span>';
-
-            transcribeButton.disabled =
-                true;
 
             worker.postMessage({
                 type: "transcribe",
@@ -189,10 +230,14 @@ window.transcribeRecording =
 
         } catch (error) {
 
-            status.textContent =
-                "Could not prepare audio.";
+            recordButton.disabled =
+                false;
 
             transcribeButton.disabled =
                 false;
+
+            status.textContent =
+                error?.message ||
+                "Could not transcribe recording.";
         }
     };

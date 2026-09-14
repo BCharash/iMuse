@@ -1,4 +1,3 @@
-
 const recordButton =
     document.getElementById("recordButton");
 
@@ -69,6 +68,9 @@ recordButton.addEventListener(
 
             try {
 
+                recordButton.disabled =
+                    true;
+
                 status.textContent =
                     "Preparing microphone...";
 
@@ -98,6 +100,12 @@ recordButton.addEventListener(
 
                             playReadyChime();
 
+                            recordButton.textContent =
+                                "Stop Recording";
+
+                            recordButton.disabled =
+                                false;
+
                             status.textContent =
                                 "Ready — speak now.";
                         }
@@ -122,11 +130,6 @@ recordButton.addEventListener(
                                 }
                             );
 
-                        console.log(
-                            "Recording complete:",
-                            audioBlob
-                        );
-
                         status.textContent =
                             "Recording complete.";
 
@@ -135,17 +138,20 @@ recordButton.addEventListener(
 
                         transcribeButton.disabled =
                             false;
+
+                        recordButton.textContent =
+                            "Start Recording";
                     }
                 );
 
                 mediaRecorder.start(100);
 
-                recordButton.textContent =
-                    "Stop Recording";
-
             } catch (error) {
 
                 console.error(error);
+
+                recordButton.disabled =
+                    false;
 
                 status.textContent =
                     "Microphone access was denied or unavailable.";
@@ -155,9 +161,8 @@ recordButton.addEventListener(
 
             mediaRecorder.stop();
 
-            recordButton.textContent =
-                "Start Recording";
+            recordButton.disabled =
+                true;
         }
     }
 );
-
