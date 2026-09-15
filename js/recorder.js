@@ -152,7 +152,28 @@ function startRecording() {
                     audioBlob
                 );
 
+                if (isPausing) {
+
+                    isPausing = false;
+
+                    recordButton.textContent =
+                        "Resume Recording";
+
+                    recordButton.disabled =
+                        false;
+
+                    pauseButton.disabled =
+                        true;
+
+                    status.textContent =
+                        "Recording paused.";
+
+                    return;
+                }
+
+
                 recordingSessionActive = true;
+
 
                 window.lastRecording =
                     audioBlob;
@@ -194,6 +215,9 @@ function startRecording() {
 
                 recordButton.disabled =
                     false;
+
+                pauseButton.disabled =
+                    true;
 
  
             }
