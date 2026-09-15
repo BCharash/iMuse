@@ -148,6 +148,11 @@ button:active {
     font-size: 18px;
 }
 
+#pauseButton {
+    display: block;
+    margin: 0 auto 14px;
+}
+
 #recordingControls {
     display: flex;
     justify-content: center;

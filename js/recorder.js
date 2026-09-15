@@ -1,6 +1,9 @@
 const recordButton =
     document.getElementById("recordButton");
 
+const pauseButton =
+    document.getElementById("pauseButton");
+
 const transcribeButton =
     document.getElementById("transcribeButton");
 
@@ -10,8 +13,6 @@ const audioPlayer =
 const recordingControls =
     document.getElementById("recordingControls");
 
-const recordAgainButton =
-    document.getElementById("recordAgainButton");
 
 const deleteButton =
     document.getElementById("deleteButton");
@@ -23,6 +24,8 @@ let mediaRecorder;
 let audioChunks = [];
 let recordingSegments = [];
 let recordingUrl = null;
+let recordingSessionActive = false;
+let isPausing = false;
 
 function playReadyChime() {
 
@@ -71,6 +74,7 @@ function playReadyChime() {
     oscillator2.stop(now + 0.47);
 }
 
+
 function startRecording() {
 
 
@@ -78,8 +82,11 @@ function startRecording() {
     recordButton.disabled =
         true;
 
+    
     status.textContent =
         "Preparing microphone...";
+
+    recordingSessionActive = true;
 
     navigator.mediaDevices.getUserMedia({
         audio: true
@@ -117,6 +124,9 @@ function startRecording() {
 
                     status.textContent =
                         "Ready — speak now.";
+
+                    pauseButton.disabled =
+                        false;
                 }
             }
         );
@@ -141,6 +151,8 @@ function startRecording() {
                 recordingSegments.push(
                     audioBlob
                 );
+
+                recordingSessionActive = true;
 
                 window.lastRecording =
                     audioBlob;
@@ -182,6 +194,8 @@ function startRecording() {
 
                 recordButton.disabled =
                     false;
+
+ 
             }
         );
 
@@ -221,19 +235,33 @@ recordButton.addEventListener(
     }
 );
 
-recordAgainButton.addEventListener(
+pauseButton.addEventListener(
     "click",
     () => {
 
-        audioPlayer.pause();
+        if (
+            mediaRecorder &&
+            mediaRecorder.state === "recording"
+        ) {
 
-        startRecording();
+            isPausing = true;
+
+            mediaRecorder.stop();
+        }
     }
 );
+
 
 deleteButton.addEventListener(
     "click",
     () => {
+
+        if (
+            mediaRecorder &&
+            mediaRecorder.state === "recording"
+        ) {
+            mediaRecorder.stop();
+        }
 
         audioPlayer.pause();
 

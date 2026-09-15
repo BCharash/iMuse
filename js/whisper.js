@@ -4,8 +4,43 @@ import { prepareAudioForWhisper } from
 const modelSelect =
     document.getElementById("modelSelect");
 
+const savedModel =
+    localStorage.getItem("iMuseModel");
+
+if (savedModel) {
+    modelSelect.value = savedModel;
+}
+
+modelSelect.addEventListener(
+    "change",
+    () => {
+        localStorage.setItem(
+            "iMuseModel",
+            modelSelect.value
+        );
+    }
+);
+
+
 const languageSelect =
     document.getElementById("languageSelect");
+
+const savedLanguage =
+    localStorage.getItem("iMuseLanguage");
+
+if (savedLanguage) {
+    languageSelect.value = savedLanguage;
+}
+
+languageSelect.addEventListener(
+    "change",
+    () => {
+        localStorage.setItem(
+            "iMuseLanguage",
+            languageSelect.value
+        );
+    }
+);
 
 const recordButton =
     document.getElementById("recordButton");
