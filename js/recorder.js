@@ -21,6 +21,7 @@ const status =
 
 let mediaRecorder;
 let audioChunks = [];
+let recordingSegments = [];
 let recordingUrl = null;
 
 function playReadyChime() {
@@ -90,6 +91,7 @@ function startRecording() {
             
 
         audioChunks = [];
+        recordingSegments = [];
 
         let readySignalPlayed = false;
 
@@ -136,6 +138,9 @@ function startRecording() {
                             type: mediaRecorder.mimeType
                         }
                     );
+                recordingSegments.push(
+                    audioBlob
+                );
 
                 window.lastRecording =
                     audioBlob;
