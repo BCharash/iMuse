@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500&display=swap');
 
 /* iMuse — visual foundation */
@@ -68,39 +67,6 @@ h1 {
     font-size: 16px;
 }
 
-#modelSelector,
-#languageSelector {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-}
-
-#modelSelector {
-    margin-bottom: 18px;
-}
-
-#languageSelector {
-    margin-bottom: 24px;
-}
-
-#modelSelector label,
-#languageSelector label {
-    font-size: 15px;
-    color: var(--muted);
-}
-
-#modelSelect,
-#languageSelect {
-    padding: 9px 14px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface);
-    color: var(--text);
-    font-family: inherit;
-    font-size: 15px;
-}
-
 button {
     border: none;
     border-radius: 999px;
@@ -164,69 +130,10 @@ button:active {
     display: none;
 }
 
-#transcribeButton {
-    display: block;
-    margin: 0 auto;
-    background: #65758b;
-    color: white;
-    border: 1px solid #65758b;
-}
-
-#transcribeButton:hover {
-    background: #506176;
-    border-color: #506176;
-}
-
-#transcribeButton:disabled {
-    background: #d6d3cd;
-    color: #99958e;
-    border-color: #d6d3cd;
-}
-
-
 #status {
     min-height: 28px;
     margin: 22px 0 42px;
     text-align: center;
     color: var(--muted);
     font-size: 15px;
-}
-
-h2 {
-    margin: 0 0 12px;
-    font-size: 22px;
-    font-weight: 400;
-}
-
-#transcript {
-    min-height: 180px;
-    padding: 22px;
-    background: rgba(255, 253, 249, 0.8);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 18px;
-    white-space: pre-wrap;
-}
-
-.transcribing-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.transcribing-spinner {
-    width: 12px;
-    height: 12px;
-    border: 2px solid #d6d3cd;
-    border-top-color: var(--accent-dark);
-    border-radius: 50%;
-    animation: transcribing-spin 0.8s linear infinite;
-}
-
-@keyframes transcribing-spin {
-    to {
-        transform: rotate(360deg);
-    }
 }
