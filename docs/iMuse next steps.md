@@ -22,17 +22,22 @@ Memora already has mature transcription, model management, file handling, transc
 
 ## Current status — 27 October 2026
 
-The following items have now been tested in the iMuse recording prototype:
+The following behaviors are implemented in the current iMuse recording prototype. The completed tests below are specific observations, not a claim of exhaustive cross-browser acceptance.
 
 - [x] Incremental IndexedDB audio persistence is in place.
 - [x] Reloading during a recording containing three spoken segments separated by two pauses allowed all three segments to be recovered and played in order.
 - [x] Repeated Pause/Resume preserved the tested segments in order.
 - [x] Completed recordings remained available after reload.
 - [x] The exported `.webm` audio file was accepted by Memora's file-open/import workflow.
+- [x] A save/download action is available for recordings.
+- [x] Automatic pause after approximately 5 seconds without detected speech has been implemented.
+- [x] A periodic beep indicates the paused state.
+- [x] Browser-aware format selection prefers M4A/MP4 with AAC when supported and falls back to a browser-supported format.
+- [x] A standalone wake-word test lab has been created to evaluate detector scores and thresholds.
 
-These tests verify the specific behaviors above; they do not establish recovery of audio that had not yet been committed to IndexedDB, survival of storage eviction, locked-screen/background recording on iOS, or every error path.
+The user has tested recording/playback on iPhone. Systematic testing is still needed for inactivity-pause accuracy, false pauses, all save/finalization paths, and format output across target browsers. These tests do not establish recovery of audio that had not yet been committed to IndexedDB, survival of storage eviction, locked-screen/background recording on iOS, or every error path.
 
-The tested `.webm` export is suitable for the current Memora import workflow. Do not rename it to `.m4a`; an extension change is not a media conversion.
+The tested `.webm` export is suitable for the current Memora import workflow. M4A/AAC is a format preference when the browser supports it, not a guarantee. Never rename WebM data to `.m4a`; an extension change is not a media conversion.
 
 ## 2. Core requirements
 
@@ -276,17 +281,17 @@ Define transitions and control behavior. Keep the session, current recorder run,
 
 Choose and test the assembly strategy on target browsers. Preserve source segments until the final output is validated and persisted. Provide retry/recovery after finalization errors.
 
-### Phase 6 — Add inactivity Pause and periodic beep
+### Phase 6 — Validate inactivity Pause and periodic beep
 
-Once manual capture and recovery are stable, add conservative inactivity detection and the paused-state beep. Test natural speech, thinking pauses, background noise, and repeated resume cycles.
+Automatic pause after approximately five seconds without detected speech and a periodic paused-state beep have been implemented. Validate them with natural speech, thinking pauses, quiet speech, background noise, and repeated resume cycles. Confirm the beep stops immediately on resume or session end.
 
 ### Phase 7 — Test headset and browser lifecycle behavior
 
 Test microphone selection, headset use, wake-lock behavior where available, screen locking, app backgrounding, browser interruption, and recovery on actual devices. Keep expectations realistic for a cross-platform web app.
 
-### Phase 8 — Investigate keyword resume
+### Phase 8 — Train and evaluate custom wake-word models
 
-Only after the core recording workflow is dependable, prototype speech recognition or local keyword spotting. Keep the feature optional and remove it if it interferes with capture, privacy, battery life, or platform stability.
+The standalone HTML lab currently tests an available detector model; it does not yet recognize custom iMuse phrases unless a model trained for them is supplied. Candidate phrases are **“iMuse,” “Hey iMuse,” and “Ready iMuse?”** Train or obtain separate custom ONNX models and compare true detections, missed detections, and false activations during ordinary speech. Test varied voices, distances, and volumes. Keep keyword resume optional, local where practical, and entirely subordinate to reliable capture and persistence.
 
 ### Phase 9 — Handoff to the unified iMuse
 
@@ -316,8 +321,8 @@ Document the tested Record behavior, storage schema, final-file format, recovery
 - [x] Resume continued the same logical recording in the tested repeated Pause/Resume scenario.
 - [x] Repeated pauses/resumes preserved the tested segments in order.
 - [ ] Final Stop finalizes the whole session.
-- [ ] Inactivity Pause is conservative and does not discard audio.
-- [ ] The periodic beep occurs only while paused and stops on resume/end.
+- [x] Inactivity Pause after approximately 5 seconds without detected speech is implemented; conservative behavior still requires systematic validation.
+- [x] A periodic beep is implemented for the paused state; verify it occurs only while paused and stops on resume/end.
 - [ ] UI status accurately represents recording, pause, persistence, and errors.
 
 ### Finalization
@@ -344,7 +349,7 @@ Document the tested Record behavior, storage schema, final-file format, recovery
 ### Scope discipline
 - [ ] No Whisper/model-loading/inference path is required by Record.
 - [x] The downloaded WebM file was accepted by Memora's existing file-open/import workflow.
-- [ ] Optional keyword detection has no effect on the core preservation guarantee.
+- [ ] Custom wake-word detection has no effect on the core preservation guarantee (custom phrase models and integration are not yet complete).
 
 ## 9. Working method
 
@@ -363,12 +368,14 @@ Document the tested Record behavior, storage schema, final-file format, recovery
 
 ## 10. Immediate next action
 
-1. Commit the current stable checkpoint, including the tested IndexedDB persistence/recovery behavior and WebM export accepted by Memora.
-2. Audit the current Delete/reset behavior and test that a deleted or abandoned session cannot be restored by late asynchronous events.
+1. Commit the current stable checkpoint, including the tested IndexedDB persistence/recovery behavior, save/download action, automatic inactivity pause, paused-state beep, and browser-aware audio-format selection.
+2. Audit Delete/reset behavior and test that a deleted or abandoned session cannot be restored by late asynchronous events.
 3. Test a clean second recording to ensure no audio, playback state, or metadata leaks from the previous session.
 4. Review finalization and persisted-data lifecycle handling, including what happens when writes or finalization fail.
-5. Continue with conservative inactivity Pause and a quiet periodic beep only after the core capture, recovery, and reset behavior is dependable.
-6. Test iPhone Safari/PWA behavior on the actual device before making claims about lock-screen/background capture or headset controls.
+5. Validate the 5-second inactivity pause with natural speech, quiet speech, thinking pauses, and background noise; verify the paused beep stops on resume/end.
+6. Record the actual MIME type, extension, playback, and Memora import result on desktop Chrome and iPhone Safari/PWA. Confirm M4A/AAC is used only where genuinely supported.
+7. Continue testing iPhone Safari/PWA lifecycle behavior before making claims about lock-screen/background capture or headset controls.
+8. Train or obtain custom ONNX wake-word models for “iMuse,” “Hey iMuse,” and “Ready iMuse?” and compare false activations and missed detections in the standalone lab. Do not integrate keyword resume until it can be shown not to interfere with audio capture or recovery.
 
 Do not repeat the already-passed multi-pause/reload recovery test unless a later code change could affect it. Keep remaining acceptance items unchecked until tested.
 

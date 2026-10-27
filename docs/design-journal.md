@@ -862,3 +862,63 @@ These results establish a useful recording-and-recovery foundation. They do **no
 Proceed with small, testable changes. First commit this stable persistence/recovery/export checkpoint. Then review and test the current Delete/reset behavior and clean start of a second session. After that, continue with the remaining recording requirements: explicit and race-safe lifecycle states, finalization validation, and—only after the core is dependable—inactivity Pause and the paused-state beep. Test iPhone Safari/PWA behavior on the actual device before making claims about background capture or headset controls.
 
 > **Capture first. Preserve continuously. Transcribe when requested.**
+
+
+---
+
+# DJ003 — Inactivity Pause, Saving, Browser Audio Formats, and Wake-Word Direction
+
+**Date:** 27 October 2026  
+**Status:** Implemented prototype capabilities and agreed research direction; see verification caveats below
+
+## 37. Recording controls and inactivity pause
+
+The recording prototype now includes manual Pause/Resume and automatic pause after approximately **5 seconds without detected speech**. The intent is to let the user think naturally without recording extended silence, while keeping the same logical session open so recording can continue.
+
+A quiet repeating beep indicates that the session is paused. It is a state cue only; it must not be interpreted as proof that the microphone is active or that every captured sample has been persisted.
+
+The inactivity detector is audio-level based and does not depend on Whisper. It should remain conservative: natural pauses, quiet speech, microphone differences, and background noise can affect detection. Further real-use testing should check false pauses and whether speech is reliably detected again when the user resumes.
+
+## 38. Saving and recovery after reopening iMuse
+
+The prototype now provides a way to save/download the recording, and it uses IndexedDB to preserve audio incrementally during capture. The recovery workflow can find and recover an interrupted recording after iMuse is restarted or reloaded, using the audio that was successfully persisted.
+
+This extends the earlier DJ002 reload test. The important distinction remains that recovery protects audio already committed to IndexedDB; it cannot guarantee preservation of audio still awaiting a write, storage that the browser later evicts, or recording that the operating system prevents the page from capturing.
+
+The saved/exported audio must remain a genuine media file with a format and extension matching its actual contents. Do not change a filename extension as a substitute for converting the media.
+
+## 39. Browser-supported recording formats, with M4A/AAC preferred
+
+The recorder now checks the browser's supported recording formats and prioritizes **M4A/MP4 with AAC** when the browser reports support for the relevant format. Where it is not supported, the recorder must fall back to a format the current browser can actually record, rather than assuming that every browser supports M4A.
+
+This is a preference, not a promise that all browsers will produce M4A. The tested WebM export remains known to be accepted by Memora's current file-open/import workflow. Format selection and actual output should be checked on each target browser/device, and the resulting MIME type and file extension must stay aligned.
+
+## 40. Wake-word research direction: “iMuse”
+
+Hands-free interaction is now a research direction, not a completed recorder feature. Candidate phrases are:
+
+- **“iMuse”** — shortest, but potentially less distinct from ordinary speech.
+- **“Hey iMuse”** — natural to say and adds a distinguishing word.
+- **“Ready iMuse?”** — longer, potentially more distinctive.
+
+The current exploration uses the open-source Heed Wake Word project and a standalone HTML test lab. The lab is useful for evaluating a supplied detector model, scores, thresholds, and triggering behavior; the demo model is not itself a model trained to recognize the custom iMuse phrases.
+
+The next meaningful step is to train or obtain a separate custom ONNX wake-word model for each candidate phrase, then compare them in the lab. Evaluation should include both successful detections and false activations during ordinary speech, across varied speaking distances, volumes, and voices. A high score on a few successful attempts is not enough to select a phrase or threshold.
+
+The eventual detector should run locally where practical, avoid sending private speech to a remote recognition service, and must never compromise recording preservation. iPhone Safari/PWA lifecycle, microphone access, CPU/battery cost, false triggers, and behavior when the screen is locked or the app is backgrounded all require real-device testing. Do not promise always-on or lock-screen wake-word behavior based on the standalone lab.
+
+## 41. Updated milestone summary
+
+The recording prototype has now progressed beyond the earlier DJ002 checkpoint:
+
+- Incremental IndexedDB persistence and recovery of persisted audio after app reload/restart.
+- Manual Pause/Resume within one logical session.
+- Automatic pause after approximately five seconds without detected speech.
+- Periodic audible cue while paused.
+- Saving/downloading a recording.
+- Browser-aware recording format selection, preferring M4A/AAC when supported and falling back to a supported format.
+- A standalone wake-word test lab and an agreed plan to evaluate custom “iMuse,” “Hey iMuse,” and “Ready iMuse?” models.
+
+The implementation of these features should not be confused with exhaustive acceptance testing. Remaining work includes systematic testing of inactivity detection, save/finalization failure paths, repeated resume behavior, MIME type and output validity across browsers, and false-positive/false-negative rates for custom wake-word models.
+
+> **Capture first. Preserve continuously. Transcribe when requested. Wake words must never put captured audio at risk.**
