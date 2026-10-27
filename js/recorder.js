@@ -118,6 +118,58 @@ function stopStream(stream) {
     if (stream) stream.getTracks().forEach(track => track.stop());
 }
 
+// Prefer a format this browser can both record and play, with M4A/AAC first.
+function createCompatibleRecorder(stream) {
+    const candidates = [
+        { mimeType: "audio/mp4;codecs=mp4a.40.2", label: "M4A/AAC" },
+        { mimeType: "audio/mp4", label: "M4A/AAC" },
+        { mimeType: "audio/webm;codecs=opus", label: "WebM/Opus" },
+        { mimeType: "audio/webm", label: "WebM" },
+        { mimeType: "audio/ogg;codecs=opus", label: "Ogg/Opus" },
+        { mimeType: "audio/ogg", label: "Ogg" }
+    ];
+    const canCheckRecording = typeof MediaRecorder.isTypeSupported === "function";
+    const audioProbe = document.createElement("audio");
+    const errors = [];
+
+    for (const candidate of candidates) {
+        if (canCheckRecording && !MediaRecorder.isTypeSupported(candidate.mimeType)) continue;
+        if (typeof audioProbe.canPlayType === "function" && !audioProbe.canPlayType(candidate.mimeType)) continue;
+        try {
+            return {
+                recorder: new MediaRecorder(stream, { mimeType: candidate.mimeType }),
+                requestedMimeType: candidate.mimeType,
+                formatLabel: candidate.label
+            };
+        } catch (error) {
+            errors.push(`${candidate.mimeType}: ${error.message || error}`);
+        }
+    }
+
+    // Last resort: let the browser choose its default if no known shared format matched.
+    try {
+        const recorder = new MediaRecorder(stream);
+        const actualMimeType = (recorder.mimeType || "").toLowerCase();
+        const formatLabel = actualMimeType.includes("mp4") || actualMimeType.includes("aac")
+            ? "M4A/AAC"
+            : actualMimeType.includes("webm") ? "WebM"
+            : actualMimeType.includes("ogg") ? "Ogg"
+            : actualMimeType || "browser default format";
+        return { recorder, requestedMimeType: "", formatLabel };
+    } catch (error) {
+        const details = errors.length ? ` Format checks: ${errors.join("; ")}.` : "";
+        throw new Error(`No compatible audio recording format could be opened.${details} ${error.message || error}`);
+    }
+}
+
+function describeAudioFormat(mimeType) {
+    const mime = (mimeType || "").toLowerCase();
+    if (mime.includes("mp4") || mime.includes("aac")) return "M4A/AAC";
+    if (mime.includes("webm")) return "WebM";
+    if (mime.includes("ogg")) return "Ogg";
+    return mimeType || "browser default format";
+}
+
 function playReadyChime() {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
@@ -141,6 +193,157 @@ function playReadyChime() {
     oscillator1.stop(now + 0.35);
     oscillator2.stop(now + 0.47);
     oscillator2.addEventListener("ended", () => audioContext.close(), { once: true });
+}
+
+const SILENCE_PAUSE_MS = 5000;
+const SILENCE_RMS_THRESHOLD = 0.05;
+const PAUSED_BEEP_INTERVAL_MS = 9000;
+
+async function setupSilenceMonitor(current) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+        console.warn("Web Audio is unavailable; automatic silence pause is disabled.");
+        return;
+    }
+
+    try {
+        const context = new AudioContextClass();
+        const source = context.createMediaStreamSource(current.stream);
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+
+        current.audioContext = context;
+        current.audioSource = source;
+        current.analyser = analyser;
+        current.audioSamples = new Float32Array(analyser.fftSize);
+        await context.resume();
+
+        current.silenceCheckTimer = window.setInterval(() => {
+            if (
+                activeSession !== current ||
+                current.discard ||
+                current.recorder.state !== "recording" ||
+                current.autoPausing
+            ) {
+                current.silenceSince = null;
+                return;
+            }
+
+            analyser.getFloatTimeDomainData(current.audioSamples);
+            let sumSquares = 0;
+            for (const sample of current.audioSamples) {
+                sumSquares += sample * sample;
+            }
+            const rms = Math.sqrt(sumSquares / current.audioSamples.length);
+
+            if (rms >= SILENCE_RMS_THRESHOLD) {
+                current.silenceSince = null;
+                return;
+            }
+
+            if (current.silenceSince === null) {
+                current.silenceSince = Date.now();
+                return;
+            }
+
+            if (Date.now() - current.silenceSince >= SILENCE_PAUSE_MS) {
+                current.autoPausing = true;
+                current.pauseReason = "silence";
+                current.silenceSince = null;
+                status.textContent = "Silence detected — pausing recording...";
+                try {
+                    current.recorder.pause();
+                } catch (error) {
+                    current.autoPausing = false;
+                    current.pauseReason = null;
+                    console.warn("Automatic silence pause failed:", error);
+                }
+            }
+        }, 100);
+    } catch (error) {
+        console.warn("Could not start silence detection; manual recording remains available:", error);
+        if (current.audioContext && current.audioContext.state !== "closed") {
+            try { await current.audioContext.close(); } catch (_) {}
+        }
+        current.audioContext = null;
+        current.audioSource = null;
+        current.analyser = null;
+        current.audioSamples = null;
+    }
+}
+
+async function playPausedBeep(current) {
+    const context = current.audioContext;
+    if (!context || context.state === "closed") return;
+
+    try {
+        if (context.state === "suspended") await context.resume();
+        if (context.state !== "running") return;
+
+        // Two distinct tones make the paused-state reminder easier to notice.
+        const now = context.currentTime;
+        const beepDuration = 0.13;
+        const gap = 0.09;
+        const frequencies = [740, 880];
+
+        for (let i = 0; i < frequencies.length; i++) {
+            const start = now + i * (beepDuration + gap);
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+
+            oscillator.type = "sine";
+            oscillator.frequency.setValueAtTime(frequencies[i], start);
+            gain.gain.setValueAtTime(0.0001, start);
+            gain.gain.linearRampToValueAtTime(0.10, start + 0.012);
+            gain.gain.setValueAtTime(0.10, start + beepDuration - 0.025);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + beepDuration);
+
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            oscillator.start(start);
+            oscillator.stop(start + beepDuration);
+            oscillator.addEventListener("ended", () => {
+                oscillator.disconnect();
+                gain.disconnect();
+            }, { once: true });
+        }
+    } catch (error) {
+        console.warn("Could not play the paused-state beep:", error);
+    }
+}
+function startPausedBeep(current) {
+    stopPausedBeep(current);
+    playPausedBeep(current);
+    current.pausedBeepTimer = window.setInterval(
+        () => playPausedBeep(current),
+        PAUSED_BEEP_INTERVAL_MS
+    );
+}
+
+function stopPausedBeep(current) {
+    if (current.pausedBeepTimer !== null && current.pausedBeepTimer !== undefined) {
+        window.clearInterval(current.pausedBeepTimer);
+        current.pausedBeepTimer = null;
+    }
+}
+
+function cleanupAudioMonitor(current) {
+    if (current.silenceCheckTimer !== null && current.silenceCheckTimer !== undefined) {
+        window.clearInterval(current.silenceCheckTimer);
+        current.silenceCheckTimer = null;
+    }
+    stopPausedBeep(current);
+    if (current.audioSource) {
+        try { current.audioSource.disconnect(); } catch (_) {}
+        current.audioSource = null;
+    }
+    if (current.audioContext && current.audioContext.state !== "closed") {
+        current.audioContext.close().catch(() => {});
+    }
+    current.audioContext = null;
+    current.analyser = null;
+    current.audioSamples = null;
 }
 
 function clearPlayback() {
@@ -414,13 +617,16 @@ async function startRecording() {
             stopStream(stream);
             return;
         }
-        const recorder = new MediaRecorder(stream);
+        const recorderChoice = createCompatibleRecorder(stream);
+        const recorder = recorderChoice.recorder;
         const id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+        const actualMimeType = recorder.mimeType || recorderChoice.requestedMimeType || "";
+        const formatLabel = describeAudioFormat(actualMimeType) || recorderChoice.formatLabel;
         const metadata = {
             id,
             state: "recording",
             startedAt: new Date().toISOString(),
-            mimeType: recorder.mimeType || "audio/webm",
+            mimeType: actualMimeType,
             chunkCount: 0,
             bytesStored: 0,
             lastPersistedAt: null,
@@ -434,12 +640,22 @@ async function startRecording() {
         }
         const current = {
             id, recorder, stream, metadata,
+            formatLabel,
             sequence: 0,
             writeQueue: Promise.resolve(),
             persistenceError: null,
             memoryChunks: [],
             discard: false,
-            stopHandled: false
+            stopHandled: false,
+            audioContext: null,
+            audioSource: null,
+            analyser: null,
+            audioSamples: null,
+            silenceCheckTimer: null,
+            silenceSince: null,
+            autoPausing: false,
+            pauseReason: null,
+            pausedBeepTimer: null
         };
         activeSession = current;
         recorder.addEventListener("dataavailable", event => {
@@ -449,7 +665,7 @@ async function startRecording() {
             current.writeQueue = current.writeQueue.then(async () => {
                 if (current.discard) return;
                 await persistChunk(current, sequence, event.data);
-                status.textContent = `Recording — ${current.metadata.chunkCount} chunks saved to this browser.`;
+                status.textContent = `Recording in ${current.formatLabel} — ${current.metadata.chunkCount} chunks saved to this browser.`;
             }).catch(error => {
                 current.persistenceError = error;
                 console.error("Audio chunk could not be persisted:", error);
@@ -472,7 +688,12 @@ async function startRecording() {
             try { await putSession(current.metadata); } catch (error) { console.error(error); }
             pauseButton.textContent = "Resume";
             pauseButton.disabled = false;
-            status.textContent = `Paused — ${current.metadata.chunkCount} chunks saved so far.`;
+            current.autoPausing = false;
+            current.silenceSince = null;
+            startPausedBeep(current);
+            status.textContent = current.pauseReason === "silence"
+                ? `Paused automatically after ${SILENCE_PAUSE_MS / 1000} seconds of silence. Press Resume when ready.`
+                : `Paused — ${current.metadata.chunkCount} chunks saved so far.`;
         });
         recorder.addEventListener("resume", async () => {
             if (activeSession !== current || current.discard) return;
@@ -480,11 +701,16 @@ async function startRecording() {
             current.metadata.lastUpdatedAt = new Date().toISOString();
             try { await putSession(current.metadata); } catch (error) { console.error(error); }
             pauseButton.textContent = "Pause";
+            stopPausedBeep(current);
+            current.silenceSince = null;
+            current.pauseReason = null;
+            current.autoPausing = false;
             status.textContent = "Recording resumed.";
         });
         recorder.addEventListener("stop", async () => {
             if (current.stopHandled) return;
             current.stopHandled = true;
+            cleanupAudioMonitor(current);
             stopStream(stream);
             if (activeSession === current) activeSession = null;
             if (current.discard) {
@@ -501,7 +727,7 @@ async function startRecording() {
                 if (current.persistenceError) throw current.persistenceError;
                 const savedChunks = await getChunks(id);
                 const parts = savedChunks.map(chunk => chunk.blob).filter(blob => blob && blob.size > 0);
-                finalBlob = new Blob(parts, { type: current.metadata.mimeType || "audio/webm" });
+                finalBlob = new Blob(parts, { type: current.metadata.mimeType || parts.find(part => part.type)?.type || "application/octet-stream" });
                 if (!finalBlob.size) throw new Error("No saved audio chunks were found.");
                 current.metadata.state = "completed";
                 current.metadata.completedAt = new Date().toISOString();
@@ -511,7 +737,7 @@ async function startRecording() {
                 status.textContent = `Recording complete. ${savedChunks.length} chunks were saved to this browser.`;
             } catch (error) {
                 console.error("Could not finalize persisted recording:", error);
-                finalBlob = new Blob(current.memoryChunks, { type: current.metadata.mimeType || "audio/webm" });
+                finalBlob = new Blob(current.memoryChunks, { type: current.metadata.mimeType || current.memoryChunks.find(part => part.type)?.type || "application/octet-stream" });
                 if (finalBlob.size) showPlayback(finalBlob, id);
                 current.metadata.state = "storage-error";
                 current.metadata.lastUpdatedAt = new Date().toISOString();
@@ -523,12 +749,13 @@ async function startRecording() {
             setReadyUI();
             await renderRecoverableSessions();
         });
+        await setupSilenceMonitor(current);
         recorder.start(250);
         recordButton.textContent = "Stop Recording";
         recordButton.disabled = false;
         pauseButton.textContent = "Pause";
         pauseButton.disabled = false;
-        status.textContent = "Recording — saving audio chunks as they arrive.";
+        status.textContent = `Recording in ${formatLabel} — saving audio chunks as they arrive.`;
         playReadyChime();
     } catch (error) {
         console.error(error);
@@ -583,6 +810,7 @@ deleteButton.addEventListener("click", async () => {
     if (current) {
         current.discard = true;
         activeSession = null;
+        cleanupAudioMonitor(current);
         try {
             if (current.recorder.state !== "inactive") current.recorder.stop();
             else stopStream(current.stream);
