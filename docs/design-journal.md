@@ -806,3 +806,59 @@ iMuse's job is to preserve the thought faithfully.
 Everything else comes afterward.
 
 > **Speak freely. iMuse listens.**
+
+
+---
+
+# DJ002 — Recording Persistence, Recovery, Pause/Resume, and Audio Export
+
+**Date:** 27 October 2026  
+**Status:** Prototype milestone — tested behaviors recorded below
+
+## 31. Scope reset: Record is independent of transcription
+
+The current iMuse prototype is now being used as a focused recording breadboard. Whisper and transcription are out of scope for this phase. The Record function must not depend on model downloads, model initialization, inference, or successful transcription.
+
+The longer-term product is one unified iMuse application, using Memora as its technical foundation. Its intended tab order is **Record → Transcribe → Edit and Combine → Search**. The prototype is used to test recording behavior and produce a reliable design handoff; it is not intended to grow a competing transcription architecture.
+
+## 32. Incremental audio persistence and recovery
+
+The prototype now writes captured audio chunks incrementally to IndexedDB and stores session information that allows the application to identify saved and interrupted recordings.
+
+**Tested result:** a recording containing three spoken segments separated by two pauses was reloaded while recording was still in progress. After reload, all three segments were recoverable and playable in the correct order. This is evidence that the chunks already persisted to IndexedDB can be recovered after a page reload.
+
+Completed recordings also remain listed after reload.
+
+This test does not prove that every sample survives every possible crash. Audio received by the browser but not yet committed to IndexedDB remains vulnerable, and browser storage can still be cleared or evicted. The implementation must distinguish data received from data whose persistence transaction has completed.
+
+## 33. Pause and resume
+
+Manual Pause/Resume has been tested with repeated pauses. The three spoken segments remained present and playable in the correct order.
+
+Pause and Resume must preserve one user-facing recording session. A pause is not the same as final Stop, and resuming must not discard earlier audio. The prototype's current implementation uses the recorder's pause/resume behavior; do not assume this proves every browser will behave identically.
+
+## 34. Audio-file export and compatibility
+
+The prototype now offers a **Download audio file** action for saved recordings and for the currently loaded recording. The exported file in the tested browser was a `.webm` file, consistent with the WebM recording format reported by the prototype.
+
+**Tested result:** the downloaded WebM file was accepted by Memora's file-open/import workflow. The user confirmed that Memora accepted it without a problem. Therefore, the current export format is usable by the existing Transcribe workflow and does not need to be converted to M4A merely to satisfy Memora.
+
+This verifies import acceptance, not every possible external player's compatibility or every browser/container combination. Keep the actual MIME type and extension aligned; never rename WebM data to `.m4a` without a real conversion.
+
+## 35. Current verified milestone
+
+The following prototype behaviors have been tested successfully:
+
+- Audio chunks are persisted incrementally to IndexedDB.
+- A page reload during a multi-segment recording allowed recovery of the three previously captured segments.
+- Repeated Pause/Resume preserved the tested segments in order.
+- Completed recordings remained available after reload.
+- A saved recording could be downloaded as WebM and accepted by Memora.
+
+These results establish a useful recording-and-recovery foundation. They do **not** yet establish guaranteed recovery from every crash, successful capture while iOS is locked or backgrounded, exhaustive browser compatibility, or a complete acceptance pass for Delete/reset and every error path.
+
+## 36. Next work
+
+Proceed with small, testable changes. First commit this stable persistence/recovery/export checkpoint. Then review and test the current Delete/reset behavior and clean start of a second session. After that, continue with the remaining recording requirements: explicit and race-safe lifecycle states, finalization validation, and—only after the core is dependable—inactivity Pause and the paused-state beep. Test iPhone Safari/PWA behavior on the actual device before making claims about background capture or headset controls.
+
+> **Capture first. Preserve continuously. Transcribe when requested.**

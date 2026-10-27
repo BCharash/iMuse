@@ -20,6 +20,20 @@ Memora already has mature transcription, model management, file handling, transc
 
 **The current iMuse development scope is audio capture only.** Remove Whisper and transcription from the design for this phase. Do not build or maintain a competing transcription/model architecture in iMuse. The completed recording must be usable by the unified application's existing Transcribe workflow.
 
+## Current status — 27 October 2026
+
+The following items have now been tested in the iMuse recording prototype:
+
+- [x] Incremental IndexedDB audio persistence is in place.
+- [x] Reloading during a recording containing three spoken segments separated by two pauses allowed all three segments to be recovered and played in order.
+- [x] Repeated Pause/Resume preserved the tested segments in order.
+- [x] Completed recordings remained available after reload.
+- [x] The exported `.webm` audio file was accepted by Memora's file-open/import workflow.
+
+These tests verify the specific behaviors above; they do not establish recovery of audio that had not yet been committed to IndexedDB, survival of storage eviction, locked-screen/background recording on iOS, or every error path.
+
+The tested `.webm` export is suitable for the current Memora import workflow. Do not rename it to `.m4a`; an extension change is not a media conversion.
+
 ## 2. Core requirements
 
 ### 2.1 Audio preservation is a prime function
@@ -41,11 +55,11 @@ Audio capture and preservation must not depend on Whisper, model downloads, infe
 
 ### 2.2 One logical session must produce one final audio file
 
-A session may contain several recorder segments because Pause ends a recorder run and Resume starts another. The final user-facing result must nevertheless be one valid, playable audio file containing all captured segments in the correct order.
+The current prototype has tested repeated `MediaRecorder.pause()` / `resume()` within the recording workflow, and the resulting saved recording preserved the tested spoken segments in order. Treat that as a tested result for this implementation, not as proof of uniform behavior across all target browsers.
 
-Do not assume that a `Blob` constructed from separate WebM/Opus or MP4/AAC recording Blobs is a valid merged media file. Media containers have headers, timing, and indexing structures; simple concatenation can produce missing audio, incorrect duration, or playback failures.
+If the implementation ever uses separate recorder runs or independently containerized files for one session, the final user-facing result must still be one valid, playable audio file containing all captured segments in the correct order. Do not assume that a `Blob` constructed from separate WebM/Opus or MP4/AAC recording Blobs is a valid merged media file. Media containers have headers, timing, and indexing structures; simple concatenation can produce missing audio, incorrect duration, or playback failures.
 
-Investigate and test the available approaches:
+Investigate and test the available approaches if separate recorder runs are required:
 
 - Format-aware media-container assembly.
 - Decode segments to audio samples, join in order, and encode a valid output file.
@@ -282,7 +296,7 @@ Document the tested Record behavior, storage schema, final-file format, recovery
 
 ### Capture integrity
 - [ ] One uninterrupted recording plays from beginning to end.
-- [ ] Multiple segments retain all audio in the correct order.
+- [x] Multiple segments retain all audio in the correct order (tested with three spoken segments separated by two pauses).
 - [ ] Distinct phrases at the beginning, middle, and end are audible.
 - [ ] Replaying a session repeatedly gives the same complete result.
 - [ ] A new session contains no previous-session audio.
@@ -292,22 +306,22 @@ Document the tested Record behavior, storage schema, final-file format, recovery
 - [ ] Audio is written incrementally while recording.
 - [ ] A chunk is marked persisted only after transaction completion.
 - [ ] Storage errors and quota problems are surfaced.
-- [ ] Reloading or terminating the browser allows recovery of persisted audio.
-- [ ] Interrupted sessions are identified on the next launch.
+- [x] Reloading during a recording allowed recovery of the audio already persisted to IndexedDB (one tested scenario; not every crash mode).
+- [x] Interrupted sessions are identified on the next launch in the tested reload scenario.
 - [ ] Recovery can retry finalization without discarding source segments.
 - [ ] The app does not claim that unpersisted data is safe.
 
 ### Pause/resume and inactivity
-- [ ] Pause closes the active segment without discarding it.
-- [ ] Resume starts another segment in the same session.
-- [ ] Repeated pauses/resumes do not lose or duplicate audio.
+- [x] Pause preserved audio in the tested repeated Pause/Resume scenario.
+- [x] Resume continued the same logical recording in the tested repeated Pause/Resume scenario.
+- [x] Repeated pauses/resumes preserved the tested segments in order.
 - [ ] Final Stop finalizes the whole session.
 - [ ] Inactivity Pause is conservative and does not discard audio.
 - [ ] The periodic beep occurs only while paused and stops on resume/end.
 - [ ] UI status accurately represents recording, pause, persistence, and errors.
 
 ### Finalization
-- [ ] The completed output is one valid, playable audio file.
+- [ ] The completed output is one valid, playable audio file, with the full recording verified from beginning to end.
 - [ ] All source segments are represented in the output, in order.
 - [ ] Duration and playback are verified, not merely inferred from Blob existence.
 - [ ] The output is safely persisted before source data is eligible for cleanup.
@@ -329,7 +343,7 @@ Document the tested Record behavior, storage schema, final-file format, recovery
 
 ### Scope discipline
 - [ ] No Whisper/model-loading/inference path is required by Record.
-- [ ] The completed audio can be handed to the unified application's existing Transcribe workflow.
+- [x] The downloaded WebM file was accepted by Memora's existing file-open/import workflow.
 - [ ] Optional keyword detection has no effect on the core preservation guarantee.
 
 ## 9. Working method
@@ -349,12 +363,13 @@ Document the tested Record behavior, storage schema, final-file format, recovery
 
 ## 10. Immediate next action
 
-1. Confirm the current repository state and current file versions.
-2. Verify the single-segment record/playback baseline.
-3. Restore and test Delete/reset and clean session start.
-4. Design the IndexedDB session/chunk model and crash-recovery path.
-5. Validate incremental persistence before implementing the new Pause/Resume model.
-6. Build and validate one final audio file from multiple segments.
-7. Only then add inactivity Pause, periodic beeps, and optional keyword-resume experiments.
+1. Commit the current stable checkpoint, including the tested IndexedDB persistence/recovery behavior and WebM export accepted by Memora.
+2. Audit the current Delete/reset behavior and test that a deleted or abandoned session cannot be restored by late asynchronous events.
+3. Test a clean second recording to ensure no audio, playback state, or metadata leaks from the previous session.
+4. Review finalization and persisted-data lifecycle handling, including what happens when writes or finalization fail.
+5. Continue with conservative inactivity Pause and a quiet periodic beep only after the core capture, recovery, and reset behavior is dependable.
+6. Test iPhone Safari/PWA behavior on the actual device before making claims about lock-screen/background capture or headset controls.
+
+Do not repeat the already-passed multi-pause/reload recovery test unless a later code change could affect it. Keep remaining acceptance items unchecked until tested.
 
 **Guiding principle: Capture first. Preserve continuously. Transcribe when requested.**
