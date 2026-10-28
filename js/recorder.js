@@ -27,6 +27,8 @@ let recordingUrl = null;
 let displayedSessionId = null;
 let startRequest = 0;
 let recoveryPanel = null;
+let microphoneInitializationInProgress = false;
+let microphoneInitializationComplete = false;
 
 function openDatabase() {
     return new Promise((resolve, reject) => {
@@ -181,34 +183,89 @@ function describeAudioFormat(mimeType) {
     return mimeType || "browser default format";
 }
 
-function playReadyChime() {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-    const audioContext = new AudioContextClass();
-    const now = audioContext.currentTime;
-    const oscillator1 = audioContext.createOscillator();
-    const oscillator2 = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    oscillator1.frequency.value = 659.25;
-    oscillator2.frequency.value = 783.99;
-    oscillator1.type = "sine";
-    oscillator2.type = "sine";
-    oscillator1.connect(gain);
-    oscillator2.connect(gain);
-    gain.connect(audioContext.destination);
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.08, now + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-    oscillator1.start(now);
-    oscillator2.start(now + 0.12);
-    oscillator1.stop(now + 0.35);
-    oscillator2.stop(now + 0.47);
-    oscillator2.addEventListener("ended", () => audioContext.close(), { once: true });
+// Play cues through the session's existing AudioContext. Reusing it avoids
+// creating a new audio context for every cue, which is more reliable on iPhone.
+async function playToneCue(current, tones) {
+    const context = current?.audioContext;
+    if (!context || context.state === "closed") return false;
+
+    try {
+        if (context.state === "suspended") await context.resume();
+        if (context.state !== "running" || current.discard) return false;
+
+        const now = context.currentTime;
+        for (const tone of tones) {
+            const start = now + (tone.delay || 0);
+            const duration = tone.duration;
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+
+            oscillator.type = "sine";
+            oscillator.frequency.setValueAtTime(tone.frequency, start);
+            if (tone.harmonic) {
+                // A very quiet octave adds definition without making the cue harsh.
+                const harmonic = context.createOscillator();
+                const harmonicGain = context.createGain();
+                harmonic.type = "sine";
+                harmonic.frequency.setValueAtTime(tone.frequency * 2, start);
+                harmonicGain.gain.setValueAtTime(0.0001, start);
+                harmonicGain.gain.linearRampToValueAtTime(tone.volume * 0.12, start + 0.018);
+                harmonicGain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+                harmonic.connect(harmonicGain);
+                harmonicGain.connect(context.destination);
+                harmonic.start(start);
+                harmonic.stop(start + duration);
+                harmonic.addEventListener("ended", () => {
+                    harmonic.disconnect();
+                    harmonicGain.disconnect();
+                }, { once: true });
+            }
+
+            gain.gain.setValueAtTime(0.0001, start);
+            gain.gain.linearRampToValueAtTime(tone.volume, start + 0.018);
+            gain.gain.setValueAtTime(tone.volume, start + duration * 0.62);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            oscillator.start(start);
+            oscillator.stop(start + duration);
+            oscillator.addEventListener("ended", () => {
+                oscillator.disconnect();
+                gain.disconnect();
+            }, { once: true });
+        }
+        // Tell the caller the tones were successfully scheduled so the startup
+        // routine waits for the two-note cue before closing this AudioContext.
+        return true;
+    } catch (error) {
+        console.warn("Could not play an iMuse audio cue:", error);
+        return false;
+    }
+}
+
+// A clear, rising perfect fifth distinguishes microphone readiness from the
+// two close, high reminder beeps used while paused. Match their gain level.
+async function playMicReadyChime(current) {
+    const played = await playToneCue(current, [
+        { frequency: 523.25, delay: 0, duration: 0.22, volume: 0.10 },
+        { frequency: 783.99, delay: 0.17, duration: 0.27, volume: 0.10 }
+    ]);
+    // Allow the short, rising pair to finish before startup continues.
+    if (played) await new Promise(resolve => window.setTimeout(resolve, 460));
+    return played;
+}
+
+// A rounded D5 confirms that recording is active. Match the paused reminder's
+// gain while keeping this cue lower and more sustained; also used on resume.
+function playRecordingStartCue(current) {
+    return playToneCue(current, [
+        { frequency: 587.33, delay: 0, duration: 0.22, volume: 0.10, harmonic: true }
+    ]);
 }
 
 const SILENCE_PAUSE_MS = 5000;
-const SILENCE_RMS_THRESHOLD = 0.05;
-const PAUSED_BEEP_INTERVAL_MS = 9000;
+const SILENCE_RMS_THRESHOLD = 0.015;
+const PAUSED_BEEP_INTERVAL_MS = 4500;
 
 
 function setWakeStatus(message) {
@@ -425,9 +482,20 @@ function handleVisibilityChange() {
     if (document.visibilityState === "visible") {
         setLifecycleStatus("iMuse is visible again; checking audio and screen wake lock.");
         if (activeSession.audioContext?.state === "suspended") {
-            activeSession.audioContext.resume().catch(error => {
+            activeSession.audioContext.resume().then(() => {
+                if (
+                    activeSession &&
+                    activeSession.recorder.state === "paused" &&
+                    wakeWord
+                ) {
+                    scheduleWakeDetectorArm(activeSession, 0);
+                }
+            }).catch(error => {
                 console.warn("Could not resume Web Audio after visibility change:", error);
+                setLifecycleStatus("Audio processing did not resume automatically. Keep iMuse visible and check microphone access.");
             });
+        } else if (activeSession.recorder.state === "paused" && wakeWord) {
+            scheduleWakeDetectorArm(activeSession, 0);
         }
         requestScreenWakeLock();
     } else {
@@ -501,6 +569,29 @@ async function setupSilenceMonitor(current) {
             ) {
                 current.silenceSince = null;
                 return;
+            }
+
+            // iOS may suspend Web Audio or temporarily mute microphone tracks
+            // when the phone locks. Do not interpret missing input as silence.
+            const microphoneTrack = current.stream.getAudioTracks()[0];
+            if (
+                context.state !== "running" ||
+                !microphoneTrack ||
+                microphoneTrack.readyState !== "live" ||
+                microphoneTrack.muted
+            ) {
+                current.silenceSince = null;
+                if (!current.micUnavailableNotice) {
+                    current.micUnavailableNotice = true;
+                    setLifecycleStatus(
+                        "Microphone/audio processing is temporarily unavailable. iPhone locking can interrupt web-app capture; unlock the phone and check that the microphone resumes."
+                    );
+                }
+                return;
+            }
+            if (current.micUnavailableNotice) {
+                current.micUnavailableNotice = false;
+                setLifecycleStatus("Microphone input has resumed. Keep iMuse visible for the most reliable wake-word listening.");
             }
 
             analyser.getFloatTimeDomainData(current.audioSamples);
@@ -894,7 +985,146 @@ async function initialize() {
     }
 }
 
+// Run a short, disposable MediaRecorder probe during app startup. This tests
+// more than constructing a recorder: start() must succeed and the browser must
+// deliver non-empty audio data. The probe is never saved or exposed as a recording.
+function verifyRecorderCanCapture(recorder) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        let settled = false;
+        let stopTimer = null;
+        let timeoutTimer = null;
+
+        const cleanup = () => {
+            if (stopTimer !== null) window.clearTimeout(stopTimer);
+            if (timeoutTimer !== null) window.clearTimeout(timeoutTimer);
+            recorder.removeEventListener("dataavailable", onData);
+            recorder.removeEventListener("error", onError);
+            recorder.removeEventListener("stop", onStop);
+        };
+        const finish = (error = null) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            if (error) reject(error);
+            else {
+                const bytes = chunks.reduce((total, chunk) => total + chunk.size, 0);
+                if (bytes > 0) resolve();
+                else reject(new Error("The browser started the recorder but produced no test audio data."));
+            }
+        };
+        const onData = event => {
+            if (event.data && event.data.size > 0) chunks.push(event.data);
+        };
+        const onError = event => finish(event.error || new Error("The recorder probe failed."));
+        const onStop = () => finish();
+
+        recorder.addEventListener("dataavailable", onData);
+        recorder.addEventListener("error", onError);
+        recorder.addEventListener("stop", onStop);
+        timeoutTimer = window.setTimeout(() => {
+            try {
+                if (recorder.state !== "inactive") recorder.stop();
+            } catch (_) {}
+            finish(new Error("The recorder did not complete its readiness test in time."));
+        }, 5000);
+
+        try {
+            recorder.start(250);
+            stopTimer = window.setTimeout(() => {
+                if (recorder.state !== "inactive") {
+                    try { recorder.stop(); }
+                    catch (error) { finish(error); }
+                }
+            }, 650);
+        } catch (error) {
+            finish(new Error(`The browser could not start audio capture: ${error.message || error}`));
+        }
+    });
+}
+
+function closeAudioContext(context) {
+    if (context && context.state !== "closed") {
+        context.close().catch(() => {});
+    }
+}
+
+async function initializeMicrophoneReadiness() {
+    if (microphoneInitializationInProgress || microphoneInitializationComplete) return;
+    microphoneInitializationInProgress = true;
+    recordButton.disabled = true;
+    status.textContent = "Checking microphone access and testing audio recording…";
+    let stream = null;
+    let audioContext = null;
+    let audioSource = null;
+    try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+            throw new Error("This browser does not provide microphone access to this page.");
+        }
+        if (typeof MediaRecorder === "undefined") {
+            throw new Error("This browser does not support MediaRecorder.");
+        }
+
+        // Request permission during app initialization, not at the moment the
+        // user wants to speak. The stream is released after this test.
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const track = stream.getAudioTracks()[0];
+        if (!track || track.readyState !== "live" || track.muted) {
+            throw new Error("The microphone permission was granted, but no live audio track is available.");
+        }
+
+        const recorderChoice = createCompatibleRecorder(stream);
+        await verifyRecorderCanCapture(recorderChoice.recorder);
+        if (track.readyState !== "live" || track.muted) {
+            throw new Error("The microphone became unavailable during the readiness test.");
+        }
+
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) throw new Error("Web Audio is not available in this browser.");
+        audioContext = new AudioContextClass();
+        audioSource = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+        audioSource.connect(analyser);
+        await audioContext.resume().catch(() => {});
+
+        // Play the ready cue only after the microphone and a real recorder
+        // capture have both passed. Safari may defer sound until a user gesture.
+        const cueSession = { audioContext, discard: false };
+        const cuePlayed = await playMicReadyChime(cueSession);
+        microphoneInitializationComplete = true;
+
+        if (audioSource) {
+            try { audioSource.disconnect(); } catch (_) {}
+            audioSource = null;
+        }
+        closeAudioContext(audioContext);
+        audioContext = null;
+        status.textContent = cuePlayed
+            ? "Ready to record. Microphone and recorder passed the startup check."
+            : "Microphone and recorder passed the startup check, but the browser blocked the startup chime. Press Start Recording when ready.";
+    } catch (error) {
+        console.warn("iMuse microphone readiness check failed:", error);
+        microphoneInitializationComplete = false;
+        status.textContent = `Microphone not ready: ${error.message || "access or recording test failed"}. Press Start Recording to retry.`;
+    } finally {
+        if (audioSource) {
+            try { audioSource.disconnect(); } catch (_) {}
+        }
+        closeAudioContext(audioContext);
+        stopStream(stream);
+        microphoneInitializationInProgress = false;
+        recordButton.disabled = false;
+    }
+}
+
 async function startRecording() {
+    recordButton.disabled = true;
+    pauseButton.disabled = true;
+
+    // A new session should not leave the previous session's player visible.
+    // The previous recording remains saved in IndexedDB.
+    clearPlayback();
+
     if (!db) {
         status.textContent = "IndexedDB is unavailable, so durable recording cannot start safely.";
         return;
@@ -957,9 +1187,31 @@ async function startRecording() {
             silenceSince: null,
             autoPausing: false,
             pauseReason: null,
-            pausedBeepTimer: null
+            pausedBeepTimer: null,
+            micUnavailableNotice: false
         };
         activeSession = current;
+        const microphoneTrack = stream.getAudioTracks()[0];
+        if (microphoneTrack) {
+            microphoneTrack.addEventListener("mute", () => {
+                if (activeSession !== current || current.discard) return;
+                current.micUnavailableNotice = true;
+                current.silenceSince = null;
+                setLifecycleStatus("The microphone track was muted. iPhone locking can interrupt web-app audio; unlock the phone and check whether input resumes.");
+            });
+            microphoneTrack.addEventListener("unmute", () => {
+                if (activeSession !== current || current.discard) return;
+                current.micUnavailableNotice = false;
+                current.silenceSince = null;
+                setLifecycleStatus("Microphone track is active again. Keep iMuse visible for the most reliable wake-word listening.");
+            });
+            microphoneTrack.addEventListener("ended", () => {
+                if (activeSession !== current || current.discard) return;
+                current.micUnavailableNotice = true;
+                current.silenceSince = null;
+                setLifecycleStatus("Microphone access ended. iMuse cannot reliably reacquire it without restarting the recording; stop and start a new recording if input does not return.");
+            });
+        }
         recorder.addEventListener("dataavailable", event => {
             if (current.discard || !event.data || !event.data.size) return;
             const sequence = current.sequence++;
@@ -1012,6 +1264,7 @@ async function startRecording() {
             current.autoPausing = false;
             setWakeStatus(`Wake-word inference is off while recording. It will listen for “${wakeWordPhrase}” after a pause.`);
             status.textContent = "Recording resumed.";
+            playRecordingStartCue(current);
         });
         recorder.addEventListener("stop", async () => {
             if (current.stopHandled) return;
@@ -1068,7 +1321,7 @@ async function startRecording() {
             ? `Wake-word inference is off while recording. It will listen for “${wakeWordPhrase}” after a pause.`
             : "Wake-word model is unavailable or still loading; manual recording controls remain available.");
         requestScreenWakeLock();
-        playReadyChime();
+        playRecordingStartCue(current);
     } catch (error) {
         console.error(error);
         stopStream(stream);
@@ -1157,4 +1410,5 @@ window.addEventListener("pagehide", () => {
 
 initialize();
 initializeWakeWord();
+initializeMicrophoneReadiness();
 setLifecycleStatus("Screen wake lock will be requested while recording, if supported.");
