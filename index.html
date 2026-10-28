@@ -61,9 +61,17 @@
     </div>
 
 
-    <div id="status">
+    <div id="status" role="status" aria-live="polite">
         Ready to record.
     </div>
+
+    <p id="wakeStatus" aria-live="polite">
+        Wake-word detector: loading the free public demo model…
+    </p>
+
+    <p id="lifecycleStatus" aria-live="polite">
+        Screen wake lock will be requested while recording, if supported.
+    </p>
 
 </main>
 
