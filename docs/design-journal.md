@@ -929,7 +929,7 @@ The implementation of these features should not be confused with exhaustive acce
 # DJ004 — Headset Button Controls and Voicute Wake-Word Findings
 
 **Date:** 28 October 2026  
-**Status:** Diagnostic findings recorded; headset-control route remains unresolved
+**Status:** Recording/wake-word prototype findings recorded; iPhone headset-control route remains unresolved
 
 ## 42. Scope and working method
 
@@ -1011,9 +1011,9 @@ The `audioSession.state` field was reported as unavailable/undefined in this env
 
 ### 45.6 Important independent clue: web device test
 
-The user has separately observed that a **web device test which plays an audible tone does respond to the first Shokz button press**. This is a key clue and must not be lost or dismissed. It establishes that at least one web-based test produces a response to the first press in this setup, but the test's exact event mechanism has not yet been identified. The current record does not establish whether it receives a direct JavaScript event, invokes a media element/media session behavior, or uses another mechanism. The test name/URL or source has not yet been recorded here.
+The user has separately observed that a **web device test which plays an audible tone does respond to the first Shokz button press**. The exact reference is https://webdevicetest.com/en/tools/media-session-key-test?utm_source=chatgpt.com, and the user has already supplied its JavaScript for review. The reference page registers Media Session handlers, plays a looping two-second tone, and sets `navigator.mediaSession.playbackState` to `playing` after `audio.play()` resolves. Its underlying reason for responding to the first press while later presses fail to reach the test reliably remains unresolved.
 
-Do not repeat the generic silent-audio, microphone-only, or `play-and-record` tests without a new hypothesis. The highest-value next step is to identify and inspect the web device test that responds on the first press, then compare its mechanism with the iMuse diagnostic.
+Do not ask the user to provide the URL or source again. Do not repeat the generic silent-audio, microphone-only, or `play-and-record` tests without a new hypothesis. The next diagnostic is to synchronize the diagnostic's playback state with the audio element: set `playbackState` to `paused` in the pause handler and back to `playing` only after successful playback/resume. Log each action and state, and test at least three consecutive presses without tearing down or recreating the media session on ordinary pause. This state mismatch is a concrete testable hypothesis, not a proven cause.
 
 ## 46. Current interpretation
 
@@ -1023,25 +1023,25 @@ The evidence currently supports these narrower conclusions:
 
 - Desktop Chrome on the MacBook can route headset media actions to the tested iMuse control logic after activation.
 - Edge on iPhone registers Media Session handlers, but the three tested approaches (handlers alone, silent media, and microphone capture with `play-and-record`) have not reliably delivered Shokz actions to those handlers.
-- The first press in the separate audible-tone web device test is a potentially important lead; its underlying mechanism is still unknown.
+- The reference web device test URL and JavaScript have been identified and reviewed. Its first-press response remains a lead, but the reason later presses fail is still unknown.
 - Safari is the user's normal iPhone browser and PWA environment. The Edge diagnostic findings must not be presented as a direct Safari test result.
 - Standalone HTML files are not usable by the user in iPhone Safari in their current workflow. A Safari diagnostic would need to be served from an accessible HTTPS page, for example a temporary GitHub Pages page, rather than asking the user to open a local standalone HTML file in Safari.
 - No production change should be made until a new route is identified and demonstrated in a small diagnostic.
 
 ## 47. Updated next steps
 
-### Priority 1 — Identify the successful web device test mechanism
+### Priority 1 — Test the playback-state synchronization hypothesis
 
-1. Obtain the exact URL, name, or source of the web device test that plays a tone on the first Shokz button press.
-2. Inspect how it detects the button or triggers the tone. Distinguish a direct JavaScript event from browser/OS media handling or audio-element behavior.
-3. Reproduce only the specific successful mechanism in a minimal diagnostic and log which event/API actually fires.
-4. Avoid re-running already-failed generic variants unless the source inspection produces a materially different hypothesis.
+1. Use the already-reviewed reference page and supplied JavaScript; do not spend time obtaining them again.
+2. In a standalone diagnostic, set `navigator.mediaSession.playbackState` to `playing` only after `audio.play()` resolves, set it to `paused` in the pause handler, and set it back to `playing` only after successful resume.
+3. Log each action, `audio.paused`, and `playbackState`; keep handlers/session alive through at least three consecutive presses without tearing down the session on ordinary pause.
+4. If repeated actions work in Edge, host the diagnostic over HTTPS and test the user's actual iPhone Safari/PWA environment. Do not ask the user to open a local HTML file in Safari.
+5. If the experiment fails, compare lifecycle details against the reference source before proposing a materially different test. Avoid re-running generic variants already tested.
 
 ### Priority 2 — Validate a real browser-only route
 
-5. If the web device test reveals a plausible reusable route, test it first in the environment where the effect was observed.
-6. Then verify the candidate route in the user's actual iPhone Safari/PWA environment. Since standalone HTML is not usable there in the user's workflow, serve the isolated diagnostic over HTTPS; do not change the production iMuse app for this test.
-7. Keep desktop Chrome on the MacBook as a known working comparison.
+6. Keep desktop Chrome on the MacBook as a known working comparison.
+7. If a repeated-action route is demonstrated in Edge, test the same isolated diagnostic in the user's actual iPhone Safari/PWA environment via HTTPS.
 8. Define a clear stop/go decision: if no new route can be demonstrated, report that honestly and discuss practical alternatives rather than cycling through the same Media Session tests.
 
 ### Priority 3 — Finish other recording requirements

@@ -3,7 +3,7 @@
 **Project:** iMuse --- browser-based automatic pause/resume experiment\
 **Document status:** Working notes from the standalone Voicute and Heed
 experiments\
-**Last updated:** 27 October 2026\
+**Last updated:** 28 October 2026\
 **Purpose:** Record what has been tested, what appears to work, the
 current design, and what still needs validation before any wake-word
 feature is incorporated into iMuse.
@@ -16,11 +16,15 @@ The intended iMuse experience is hands-free recording with automatic
 pause during silence and automatic resume when the user says a wake
 phrase.
 
-The eventual wake phrase under consideration is **"Go iMuse."** That
-phrase has not yet been trained or validated in a custom model. The
-current Voicute experiment uses a public demo wake-word model ("Hey
-Friday" when available, with "Hey Jarvis" as a fallback). Those phrases
-are temporary stand-ins, not the final product choice.
+The standalone Voicute test is implemented and its automatic
+pause/beep/listen/resume loop has been exercised. It uses a public demo
+wake-word model ("Hey Friday" when available, with "Hey Jarvis" as a
+fallback); those are temporary stand-ins, not a custom iMuse model.
+
+**No final iMuse wake phrase has been selected or validated.** "Go iMuse"
+was considered in the Voicute notes. The broader design-journal candidate
+list also includes "iMuse," "Hey iMuse," and "Ready iMuse?" A custom model
+for any of these phrases has not yet been trained or validated.
 
 The main goals are:
 
@@ -36,9 +40,13 @@ The main goals are:
     feasible.
 -   Reduce false wake-ups caused by ordinary speech or background audio.
 
-This is currently a **standalone test page**, not an implementation
-integrated into iMuse. Its success or limitations should not be treated
-as evidence that the production recording architecture is ready.
+The Heed and Voicute experiments are **implemented as standalone test
+pages**, not integrated into production iMuse. The core experimental loop
+is no longer a task to implement from scratch. The remaining work is
+comparative evaluation of false activations and missed detections,
+confirming the exact model loaded, and deciding whether a custom phrase
+model is worthwhile. These experiments do not establish that the
+production recording architecture is ready.
 
 ## 2. Intended state machine
 
@@ -312,67 +320,63 @@ wake phrases to be missed.
     standalone page is a proof of concept, not a replacement for iMuse's
     recording and recovery design.
 
-## 7. Next testing session
+## 7. Remaining evaluation
 
-The next session should focus on gathering comparable observations
-rather than changing several things at once.
+The standalone test implementation is in place. The next work is to gather
+comparable evidence, not to rebuild the pause/resume loop or add more
+features before measuring the current detector.
 
-### 7.1 Test threshold values
+### 7.1 Compare threshold values
 
 Try 0.85, 0.90, and 0.95 in the same environment, if practical. At each
 threshold:
 
-1.  Pause recording so the detector is listening.
-2.  Speak several ordinary sentences without saying the wake phrase.
-3.  Note any false activation.
-4.  Say the displayed wake phrase several times at a normal speaking
-    volume.
-5.  Note whether the recorder resumes each time and whether it misses
-    any attempts.
-6.  Repeat in a quiet room and, if relevant, with typical background
-    noise.
+1. Confirm the exact model name and phrase displayed by the page.
+2. Pause recording so the detector is listening.
+3. Speak several ordinary sentences without saying the wake phrase; count
+   any false activation.
+4. Say the displayed wake phrase several times at a normal speaking
+   volume; count successful detections and misses.
+5. Repeat in a quiet room and, if relevant, with typical background noise.
+6. Keep the microphone position, speaking distance, model, and filters
+   reasonably consistent between threshold tests.
 
-Keep the microphone position and speaking distance reasonably consistent
-between threshold tests.
+The informal report that 0.9 was "pretty good" is a useful lead, not a
+measured false-accept or miss rate.
 
-### 7.2 Record useful observations
+### 7.2 Record trial results
 
 For each run, note:
 
--   The exact model name shown on the page.
--   Threshold selected.
--   Microphone and browser/device used.
--   Approximate number of ordinary-speech trials.
--   Number of false activations.
--   Number of genuine wake-phrase attempts.
--   Number of successful genuine detections.
--   Whether the five-second silence pause behaved as expected.
--   Any detector errors or unexpected state transitions.
+- Exact model name and phrase shown by the page.
+- Threshold selected.
+- Microphone and browser/device used.
+- Number of ordinary-speech trials and false activations.
+- Number of genuine wake-phrase attempts and successful detections.
+- Whether the five-second silence pause and beep behaved as expected.
+- Any detector errors or unexpected state transitions.
 
 A simple trial log is more informative than a general impression alone.
-For example, ten successful genuine detections and zero false triggers
-is encouraging, but still too small a sample to establish production
-reliability.
+Small samples can guide further experiments but cannot establish
+production reliability.
 
-### 7.3 Confirm the state machine
+### 7.3 Confirm the existing state machine
 
-Separately verify:
+The test page already implements the intended loop. Verify that it still
+behaves as expected after changes:
 
--   Recording starts and wake inference is off.
--   Five seconds of low audio level pauses recording and produces one
-    beep.
--   Wake inference activates only after the pause.
--   Accepted wake phrase resumes recording and disables inference.
--   Silence timing resets after resume.
--   The next silence triggers another pause.
--   Manual pause, manual resume, stop recording, and stop everything
-    behave safely.
+- Recording starts and wake inference is off.
+- Five seconds of low audio level pauses recording and produces one beep.
+- Wake inference activates only after the pause.
+- An accepted wake phrase resumes recording and disables inference.
+- Silence timing resets after resume.
+- The next silence triggers another pause.
+- Manual pause, manual resume, stop recording, and stop everything behave
+  safely.
 
-### 7.4 Avoid changing multiple variables together
-
-When evaluating thresholds, keep the model, microphone, environment, and
-filters unchanged. Otherwise it will be difficult to know which change
-improved or worsened performance.
+Do not alter several variables together. Tune the confidence threshold
+separately from the silence threshold and keep the detector/model fixed
+during threshold comparisons.
 
 ## 8. Longer-term options
 
@@ -392,10 +396,12 @@ Limitations:
     environment.
 -   Public model assets and code may change unless versions are pinned.
 
-### Option B --- Create a custom "Go iMuse" model
+### Option B --- Create a custom iMuse wake-phrase model
 
-This is the likely direction if the browser-based approach remains
-promising.
+This may be worthwhile if the browser-based approach remains promising.
+The phrase is not yet selected: "Go iMuse" is one candidate from the
+Voicute notes, while "iMuse," "Hey iMuse," and "Ready iMuse?" are also
+listed in the design journal.
 
 Before committing, establish:
 
@@ -459,26 +465,23 @@ allowed to jeopardize the primary job of recording the user's audio.
 
 ## 10. Current status
 
-**Status: promising proof of concept; still under evaluation.**
+**Status: standalone wake-word prototype implemented; evaluation and phrase
+selection remain open. Production integration has not been implemented.**
 
--   [x] Standalone Heed experiment demonstrated a workable pause/resume
-    loop.
--   [x] Voicute standalone test created.
--   [x] Five-second auto-pause and beep implemented in the test.
--   [x] Wake-word inference is intended to run only while recording is
-    paused.
--   [x] False detections from ordinary speech identified.
--   [x] Higher threshold options added.
--   [x] User reports that threshold 0.9 was "pretty good."
--   [ ] Complete more false-trigger and genuine-trigger trials.
--   [ ] Confirm exact loaded model and its phrase on each test run.
--   [ ] Decide whether the public demo model is adequate for further
-    prototyping.
--   [ ] Investigate training or obtaining a custom "Go iMuse" model.
--   [ ] Validate production-grade recording durability and recovery
-    independently.
--   [ ] Make no production integration decision until the tests support
-    it.
+- [x] Standalone Heed experiment demonstrated a workable pause/resume loop.
+- [x] Voicute standalone test page implemented.
+- [x] Five-second auto-pause and beep implemented in the test.
+- [x] Wake-word inference is configured to run only while recording is paused.
+- [x] Public demo model loading/fallback behavior and threshold controls are present.
+- [x] False detections from ordinary speech identified.
+- [x] Threshold 0.9 informally appeared better than 0.8 in the user's test conditions.
+- [ ] Complete comparable false-activation and genuine-detection trials at 0.85, 0.90, and 0.95.
+- [ ] Record the exact loaded model/phrase and results for each trial.
+- [ ] Decide whether the public demo model is adequate for further prototyping.
+- [ ] Select a final iMuse wake phrase and investigate training/obtaining a custom model.
+- [ ] Validate resource use, microphone behavior, and lifecycle on target devices, especially iPhone Safari/PWA.
+- [ ] Validate that any future integration cannot compromise audio persistence, recovery, or finalization.
+- [ ] Make no production integration decision until the tests support it.
 
 ------------------------------------------------------------------------
 
