@@ -49,66 +49,75 @@ The user inspected and supplied the page's JavaScript previously. The page regis
 
 In the user's iPhone Edge test, silent and audible sessions behaved alike: the first Shokz press reached the page and logged `ACTION FIRED: pause (#1)`, followed by an audio `pause` event. Later presses were not logged by the page and appeared to be routed to Music. The logged user agent was `EdgiOS/155.0.4283.61` on iOS 26.7.2, so these are Edge results, not direct Safari results.
 
-This is meaningful evidence that the page can receive at least one command. It does not yet explain why later commands stop reaching it, nor prove that the route can control a recording session.
+This was meaningful evidence that the page could receive at least one command, but did not explain why later commands stopped reaching it.
 
-## 4. Current hypotheses — not established facts
+### Successful near-silent keep-alive tests
 
-### Hypothesis A: playback state is not synchronized after pause
+A separate keep-alive diagnostic deliberately ignored pause commands and kept its audio actively playing. The user received repeated `pause` events and `nexttrack` / `previoustrack` actions. This showed that repeated commands can reach JavaScript when the media element remains playing.
 
-In the iMuse diagnostic, the `pause` handler calls `audio.pause()` but does not set `navigator.mediaSession.playbackState` to `"paused"`. The page can therefore report `"playing"` while its audio element is paused.
+The subsequent recording-control simulation used a looping tone and mapped Media Session actions to a simulated recording state. Repeated commands were received, but the simulation did not keep the audio state synchronized with the simulated recording state; the tone stayed playing after the simulated session was marked Finished.
 
-That is a concrete state-management defect worth correcting in the diagnostic. It is **not yet proven** to cause iOS/Edge to route subsequent presses to Music.
+The latest **minimum-volume** test further confirmed that audio does not need to be meaningfully audible for this to work. It used a generated waveform amplitude of 0.01% of full scale, with the audio element's volume property at 1% and `muted=false`. The log showed:
+- 7 `pause` actions received.
+- 3 `nexttrack` actions received.
+- 2 `previoustrack` actions received.
+- No independent audio interruption reported in the supplied log.
 
-### Hypothesis B: iOS/browser media-control routing changes after the first press
+Several commands after the simulation was marked Finished were correctly logged but ignored by the simulation's state logic. This is evidence that repeated event delivery works at near-silent volume while playback remains active. It does **not** yet prove how to maintain command delivery while switching between simulated Recording and Paused, nor does it validate Safari.
 
-The first command may be routed to the page, after which the browser or operating system may treat the page's media session as inactive or choose Music as the target. This fits the observations but is not proven. Other lifecycle or browser-routing causes remain possible.
+## 4. Current conclusions and remaining unknowns
 
-### What is not established
+### Supported by the tests
 
-- That iOS blocks all web-based headset controls.
-- That Safari behaves the same as Edge.
-- That the reference page uses a distinct direct JavaScript headset API. The available clue currently points to Media Session/audio playback, but the exact cause of the first-versus-subsequent press behavior remains unresolved.
-- That recreating the audio element or reinitializing the whole session will solve the problem.
+- Repeated headset media-button commands can reach JavaScript in Edge on this iPhone when a looping media element remains actively playing.
+- The media element can be near-silent; a normally audible tone is not required in the tested setup.
+- Pause, next-track, and previous-track actions can be distinguished by Media Session handlers.
+- Desktop Chrome on the user's MacBook has a working headset-control route that should be preserved.
 
-## 5. Next steps
+### Still unknown
 
-### Step 1 — Make one focused standalone experiment
+- Whether Edge/Safari continues delivering commands when the simulated recording alternates between Recording and Paused while the keep-alive audio continues playing.
+- Whether Safari on iOS behaves the same as Edge.
+- Whether the exact same approach remains reliable during actual microphone capture, and across a long recording.
+- Whether any browser/iOS lifecycle events interrupt the media element or microphone capture during screen locking, app switching, or other interruptions.
 
-Do not repeat the silent-versus-audible comparison, microphone-only test, or `play-and-record` test unless a new hypothesis requires it.
+Do not treat the successful Edge diagnostic as proof of Safari support or production readiness.
 
-Modify a copy of the existing standalone diagnostic—not production iMuse—to keep playback state synchronized:
+## 5. Updated plan
 
-- After `audio.play()` resolves, set Media Session state to `"playing"`.
-- In the `pause` handler, pause the element and set state to `"paused"`.
-- In the `play` handler, resume the element and set state to `"playing"` only after playback succeeds.
-- Log the received action, `audio.paused`, and `navigator.mediaSession.playbackState` after each transition.
-- Do not clear handlers or stop/recreate the session after an ordinary pause. Keep the session alive for the repeated-press test.
+### Step 1 — Test simulated Recording/Paused transitions with audio kept playing
 
-Test three or more presses in sequence. The key outcome is whether subsequent commands reach the page, not merely whether a tone can be heard. If this does not improve routing, record that result and move to the next hypothesis rather than layering on more changes.
+Make one focused change to the standalone simulation only; do not modify production iMuse yet.
 
-### Step 2 — Inspect lifecycle only if Step 1 fails
+- Keep the near-silent media element playing continuously.
+- Map each `pause` action to toggle the **simulated** state between Recording and Paused.
+- Do not call `audio.pause()` or change Media Session playback state to `"paused"` when the simulated recording pauses.
+- Log each action, the simulated state before and after, `audio.paused`, and `navigator.mediaSession.playbackState`.
+- Keep `nexttrack` as a simulated Finish action, but test repeated pause/resume toggles before finishing.
+- Keep the **Copy log** control.
 
-Compare the reference page and diagnostic lifecycle in detail: handler registration timing, audio-element lifetime, playback-state updates, metadata, pause/resume behavior, and whether any code clears handlers or ends playback. Use the JavaScript already supplied/inspected; do not ask the user to extract or resend it.
+Test several Recording → Paused → Recording transitions, followed by a finish action. Confirm that the audio element remains playing and every command continues to reach JavaScript. This isolates whether the keep-alive approach supports state toggling without confusing recording state with media playback state.
 
-If a new, evidence-based lifecycle difference is found, test that one difference in the standalone diagnostic. Avoid full audio-session reinitialization unless simpler tests show that the session actually becomes inactive and reinitialization restores routing.
+### Step 2 — Validate on iPhone Safari
 
-### Step 3 — Stop/go decision
+If Step 1 succeeds in Edge, host the same minimal diagnostic over HTTPS and test it in iPhone Safari. Do not ask the user to open a local standalone HTML file in Safari. The Safari result is required before calling the route validated for the user's normal iPhone browser/PWA environment.
 
-If the standalone can receive repeated actions reliably in Edge, consider the route promising but not yet validated for Safari. Then host the same minimal diagnostic on HTTPS and have the user open the URL in iPhone Safari. Do not ask the user to open a local standalone HTML file in Safari.
+### Step 3 — Production design if validation succeeds
 
-If no repeated-command route can be demonstrated, state that plainly and weigh alternatives, including keeping headset controls as a desktop-only capability or using the separately explored spoken wake-word approach. Do not integrate an unproven workaround into production.
+Use **two platform-specific pathways with one shared recording controller/state machine**:
 
-### Step 4 — Production integration only after proof
+- **iPhone/iOS pathway:** keep the near-silent media element playing through both actual Recording and Paused states. Pause/resume the `MediaRecorder` independently; do not pause the keep-alive element merely because recording pauses. Finish should safely finalize the recording, then stop and release the keep-alive media session.
+- **Desktop Chrome pathway:** preserve the existing working headset-control behavior. Do not introduce persistent keep-alive audio on desktop unless testing demonstrates that it is necessary.
+- Keep platform detection and the media-session policy isolated, while reusing the same start/pause/resume/finalize recording functions. Avoid maintaining two independent recording implementations.
 
-If repeated controls work in a diagnostic and Safari validation supports the approach, integrate through a platform-aware design:
+Before production integration, verify that pause/resume/finish actions cannot lose, duplicate, or prematurely discard audio; verify finalization produces a playable file and preserves source data until validation succeeds. Also test actual microphone capture, long-session behavior, and relevant lifecycle interruptions.
 
-- Keep the working desktop Chrome path.
-- Detect the runtime/platform at initialization and use a separate mobile pathway only if evidence requires it.
-- Reuse the existing recording controller and state machine rather than creating a second recording implementation.
-- Ensure pause/resume/finish actions cannot lose, duplicate, or prematurely discard audio.
-- Validate that finalization produces one playable file and preserves source data until validation succeeds.
-- Remove diagnostic UI/logging when testing is complete.
+### Step 4 — Stop/go decision and cleanup
+
+If the simulation or Safari validation fails, document the observed failure and reassess the pathway before touching production. Do not add layers of speculative workarounds. Once testing is complete and any proven behavior is integrated, remove temporary diagnostic UI and logging from production code.
 
 ## 6. Immediate decision
 
-The next action is **not** to rewrite iMuse, repeat generic media tests, or reinitialize the entire audio system. It is to correct the diagnostic's playback-state synchronization and test repeated button presses while leaving the media session alive. This is a small experiment based on a concrete defect, with an explicit caveat that its causal role is unproven.
+The latest minimum-volume test changes the working hypothesis: the most promising iPhone pathway is to **keep a near-silent media element actively playing even when the recorder is paused**, while keeping the recorder's state separate from the media session's playback state. The next test is to verify repeated simulated Recording/Paused toggles with that keep-alive audio left running.
+
+The desktop pathway should remain unchanged. Production integration is still gated on the transition test and an HTTPS-hosted Safari test.
