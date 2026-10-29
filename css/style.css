@@ -137,3 +137,9 @@ button:active {
     color: var(--muted);
     font-size: 15px;
 }
+
+/* Desktop-only headset control preference */
+.headset-control-option { text-align: center; margin: 0 auto 20px; }
+.headset-control-option[hidden] { display: none; }
+.headset-control-option label { cursor: pointer; }
+.headset-control-option input { accent-color: var(--accent); }

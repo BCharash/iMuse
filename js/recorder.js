@@ -23,6 +23,18 @@ function assessDeviceClass() {
 }
 
 const deviceClass = assessDeviceClass();
+const headsetControlOption = document.getElementById("headsetControlOption");
+const headsetControlToggle = document.getElementById("headsetControlToggle");
+let headsetControlsEnabled = deviceClass === "desktop";
+if (headsetControlOption) headsetControlOption.hidden = deviceClass !== "desktop";
+if (headsetControlToggle) {
+    headsetControlToggle.checked = headsetControlsEnabled;
+    headsetControlToggle.addEventListener("change", () => {
+        headsetControlsEnabled = deviceClass === "desktop" && headsetControlToggle.checked;
+        if (!headsetControlsEnabled) stopHeadsetMediaSession();
+        else if (activeSession) startHeadsetMediaSession();
+    });
+}
 window.deviceClass = deviceClass;
 
 const WAKE_THRESHOLD = 0.9;
@@ -280,203 +292,11 @@ function playRecordingStartCue(current) {
 }
 
 
-// Keep a real (silent) HTML media session active while recording so supported
+// Keep a silent HTML media session active on desktop, when enabled, so supported
 // headset media buttons can be routed to this page. This is started only from
 // the user's Start Recording action, never on page load.
 let headsetMediaElement = null;
 let headsetMediaUrl = null;
-
-// Temporary, visible diagnostics for the iPhone headset-control investigation.
-// These report browser behavior without changing recording or audio-session policy.
-let headsetDiagnosticPanel = null;
-let headsetDiagnosticDetails = null;
-let headsetSilentPlayingLogged = false;
-const headsetDiagnosticEvents = [];
-const HEADSET_DIAGNOSTIC_MAX_EVENTS = 250;
-
-function getHeadsetDiagnosticSnapshot() {
-    const recorderState = activeSession?.recorder?.state || "no active session";
-    return [
-        "=== iMuse headset diagnostic snapshot ===",
-        `Captured: ${new Date().toLocaleString()}`,
-        `User agent: ${navigator.userAgent}`,
-        `deviceClass: ${deviceClass}`,
-        `Environment: ${getHeadsetEnvironmentSummary()}`,
-        `Recorder state: ${recorderState}`,
-        `Session metadata state: ${activeSession?.metadata?.state || "none"}`,
-        `Record button: text=${JSON.stringify(recordButton?.textContent || "")}, disabled=${Boolean(recordButton?.disabled)}`,
-        `Pause button: text=${JSON.stringify(pauseButton?.textContent || "")}, disabled=${Boolean(pauseButton?.disabled)}`,
-        `Status text: ${status?.textContent || ""}`,
-        `MediaSession playbackState: ${navigator.mediaSession?.playbackState || "unavailable"}`,
-        `Silent audio: exists=${Boolean(headsetMediaElement)}, paused=${headsetMediaElement?.paused ?? "n/a"}, readyState=${headsetMediaElement?.readyState ?? "n/a"}, error=${headsetMediaElement?.error?.code ?? "none"}`,
-        "",
-        "=== Event history (oldest first) ===",
-        ...headsetDiagnosticEvents
-    ].join("\n");
-}
-
-function recordHeadsetDiagnostic(message) {
-    createHeadsetDiagnosticPanel();
-    // The looping silent WAV can emit PLAYING repeatedly. Keep only its first
-    // event so it cannot push the actual headset/recorder events out of view.
-    if (message === "Silent media element emitted PLAYING.") {
-        if (headsetSilentPlayingLogged) return;
-        headsetSilentPlayingLogged = true;
-    }
-
-    headsetDiagnosticEvents.push(`${new Date().toLocaleTimeString()} — ${message}`);
-    if (headsetDiagnosticEvents.length > HEADSET_DIAGNOSTIC_MAX_EVENTS) {
-        headsetDiagnosticEvents.splice(0, headsetDiagnosticEvents.length - HEADSET_DIAGNOSTIC_MAX_EVENTS);
-    }
-    if (headsetDiagnosticDetails) {
-        headsetDiagnosticDetails.textContent = headsetDiagnosticEvents.join("\n");
-    }
-}
-
-function createHeadsetDiagnosticPanel() {
-    if (headsetDiagnosticPanel) return;
-    headsetDiagnosticPanel = document.createElement("section");
-    headsetDiagnosticPanel.id = "headsetDiagnostics";
-    Object.assign(headsetDiagnosticPanel.style, {
-        marginTop: "0.75rem", padding: "0.75rem", border: "1px solid #888",
-        borderRadius: "0.5rem", fontSize: "0.9rem", overflowWrap: "anywhere"
-    });
-
-    const heading = document.createElement("strong");
-    heading.textContent = "Headset diagnostics (temporary)";
-
-    const controls = document.createElement("div");
-    Object.assign(controls.style, { display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.5rem" });
-
-    const activateButton = document.createElement("button");
-    activateButton.type = "button";
-    activateButton.textContent = "Activate headset controls";
-    activateButton.addEventListener("click", () => {
-        recordHeadsetDiagnostic("User clicked Activate headset controls.");
-        startHeadsetMediaSession();
-    });
-
-    const copyButton = document.createElement("button");
-    copyButton.type = "button";
-    copyButton.textContent = "Copy diagnostics";
-    copyButton.addEventListener("click", async () => {
-        const report = getHeadsetDiagnosticSnapshot();
-        try {
-            if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
-            await navigator.clipboard.writeText(report);
-            copyButton.textContent = "Copied diagnostics";
-        } catch (error) {
-            const field = document.createElement("textarea");
-            field.value = report;
-            field.readOnly = true;
-            Object.assign(field.style, {
-                display: "block", width: "100%", height: "12rem", marginTop: "0.5rem",
-                fontFamily: "monospace", fontSize: "0.8rem", boxSizing: "border-box"
-            });
-            const previous = headsetDiagnosticPanel.querySelector("#headsetDiagnosticsCopyFallback");
-            if (previous) previous.remove();
-            field.id = "headsetDiagnosticsCopyFallback";
-            copyButton.insertAdjacentElement("afterend", field);
-            field.focus();
-            field.select();
-            copyButton.textContent = "Report selected — copy it";
-            recordHeadsetDiagnostic(`Clipboard API unavailable (${error?.name || "error"}); displayed a selectable report instead.`);
-        }
-    });
-
-    const clearButton = document.createElement("button");
-    clearButton.type = "button";
-    clearButton.textContent = "Clear history";
-    clearButton.addEventListener("click", () => {
-        headsetDiagnosticEvents.length = 0;
-        headsetSilentPlayingLogged = false;
-        recordHeadsetDiagnostic("Diagnostic history cleared by user.");
-    });
-
-    controls.append(activateButton, copyButton, clearButton);
-    headsetDiagnosticDetails = document.createElement("pre");
-    headsetDiagnosticDetails.id = "headsetDiagnosticsDetails";
-    Object.assign(headsetDiagnosticDetails.style, {
-        marginTop: "0.5rem", whiteSpace: "pre-wrap", overflowWrap: "anywhere",
-        maxHeight: "18rem", overflowY: "auto", fontFamily: "monospace", fontSize: "0.8rem"
-    });
-    headsetDiagnosticPanel.append(heading, controls, headsetDiagnosticDetails);
-    const anchor = lifecycleStatus || status;
-    anchor.insertAdjacentElement("afterend", headsetDiagnosticPanel);
-    headsetDiagnosticDetails.textContent = headsetDiagnosticEvents.join("\n");
-}
-
-function getHeadsetEnvironmentSummary() {
-    const mediaSessionSupported = "mediaSession" in navigator;
-    const audioSession = navigator.audioSession;
-    const audioSessionSummary = audioSession
-        ? `audioSession API available (type: ${audioSession.type || "not exposed"})`
-        : "audioSession API unavailable";
-    return `MediaSession: ${mediaSessionSupported ? "available" : "unavailable"}; ` +
-        `${audioSessionSummary}; page ${document.visibilityState}.`;
-}
-
-const MOBILE_HEADSET_KEEPALIVE_MP3_BASE64 = [
-    "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",
-    "xP8Zyw2oAJ/EyN9Tq9LlpI1nHK72tfvU539Hz9rHOtYlFWf2oq+5OkGEJg9kGoBBpCATBYBfMAjBJjBQICE02INQMAeDPjFNAJEwH8AsMAuADQMARF0VLnVn",
-    "7tNj9q3T+lvsn/7/80LE8hSAmbDqD/yIXVvu3/K3qnXJ/X0+67Itv9//0oVez/WrUf/4aqm7QntZ22RkjA3OWEfVdbY2TrQY4j2y5FBVNNcvOrUCAEL8mCoJ",
-    "iAIhoNALiJ3oKRkdAvwBIVIIBAFFUk00GKL/80DE/BcYlbDyD/yIQjkrHgIDArF4SGoHCqO5cLBLRkhaTEM/OER28YMnjb6x1fZZrjcayr+OXibs5r4gcWIp",
-    "EceQeRLtI0k48QWIp0keSc8i0jzknseWZwz3Jdz2v1UaHBhhxoBgV//zQsT6GGsNqACXxMgKLs5gBrrxOs0mEMOf9YqnTBU9lOS4KxDBQwLjprUGcM2h/jU1",
-    "KxAE3NXILBEEpuDU4EYulkrIzFsxgPksR1dbC608zRdd1l1oCgkJQ0DYSCoBAQlIhoJBUYBSpP/zQMT0I9ld7ADumOVJHgkMHlkMY14xX9SUMa96vjBxVKGM",
-    "cPUWQlrIxfx6CkEhCNHTgykkymEkkV0uVMiTuNkzDCNlILtcJE9jNKomRUmAX86EeONqJJqTdKNbJWG74VUTlRWmmmiq//NCxL8gqQoQBN4Y4PVVTT9NFX8q",
-    "pt2mi/8qTEFNRTMuMTAwqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NAxJgS",
-    "gL2AKEvSOaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",
-    "qqqqqqqqqqo=",
-].join("");
-
-function createMobileHeadsetKeepAliveBlob() {
-    // This valid, one-second MP3 contains a very low-level tone. The element is
-    // also played at 1% volume and is never muted, keeping iOS media controls
-    // routable without intentionally producing audible output.
-    const binary = atob(MOBILE_HEADSET_KEEPALIVE_MP3_BASE64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return new Blob([bytes], { type: "audio/mpeg" });
-}
 
 function createSilentWaveBlob() {
     const sampleRate = 8000;
@@ -504,20 +324,20 @@ function createSilentWaveBlob() {
 }
 
 function updateHeadsetPlaybackState(state) {
+    if (deviceClass !== "desktop") return;
     if (!("mediaSession" in navigator)) return;
     try {
         navigator.mediaSession.playbackState = state;
-        recordHeadsetDiagnostic(`playbackState set to "${state}".`);
+
     } catch (error) {
-        recordHeadsetDiagnostic(`playbackState "${state}" failed: ${error.name || "Error"}: ${error.message || error}`);
         console.debug("Could not update headset media-session state:", error);
     }
 }
 
 function startHeadsetMediaSession() {
-    recordHeadsetDiagnostic(`Start requested. ${getHeadsetEnvironmentSummary()}`);
+    if (!headsetControlsEnabled) return;
     if (!("mediaSession" in navigator)) {
-        recordHeadsetDiagnostic("Cannot start media session: navigator.mediaSession is absent.");
+
         return;
     }
     try {
@@ -534,32 +354,12 @@ function startHeadsetMediaSession() {
             headsetMediaElement.style.pointerEvents = "none";
             headsetMediaElement.style.left = "-10px";
             headsetMediaElement.style.bottom = "0";
-            const keepAliveBlob = deviceClass === "mobile"
-                ? createMobileHeadsetKeepAliveBlob()
-                : createSilentWaveBlob();
+            const keepAliveBlob = createSilentWaveBlob();
             headsetMediaUrl = URL.createObjectURL(keepAliveBlob);
-            headsetMediaElement.volume = deviceClass === "mobile" ? 0.01 : 1;
+            headsetMediaElement.volume = 1;
             headsetMediaElement.muted = false;
             headsetMediaElement.src = headsetMediaUrl;
-            recordHeadsetDiagnostic(
-                `Prepared ${deviceClass === "mobile" ? "near-silent MP3" : "silent WAV"} keep-alive (deviceClass=${deviceClass}, element volume=${headsetMediaElement.volume}, muted=${headsetMediaElement.muted}).`
-            );
             document.body.appendChild(headsetMediaElement);
-            headsetMediaElement.addEventListener("playing", () => {
-                recordHeadsetDiagnostic("Silent media element emitted PLAYING.");
-            });
-            headsetMediaElement.addEventListener("pause", () => {
-                recordHeadsetDiagnostic("Silent media element emitted PAUSE.");
-            });
-            headsetMediaElement.addEventListener("ended", () => {
-                recordHeadsetDiagnostic("Silent media element emitted ENDED.");
-            });
-            headsetMediaElement.addEventListener("error", () => {
-                recordHeadsetDiagnostic(`Silent media element ERROR (code ${headsetMediaElement?.error?.code || "unknown"}).`);
-            });
-            headsetMediaElement.addEventListener("loadedmetadata", () => {
-                recordHeadsetDiagnostic(`Silent WAV metadata loaded (duration ${headsetMediaElement?.duration || "unknown"}s).`);
-            });
         }
         navigator.mediaSession.metadata = typeof MediaMetadata === "function"
             ? new MediaMetadata({
@@ -568,24 +368,18 @@ function startHeadsetMediaSession() {
                 album: "Recording controls"
             })
             : null;
-        recordHeadsetDiagnostic(`Silent media element prepared (paused=${headsetMediaElement.paused}, readyState=${headsetMediaElement.readyState}).`);
+
         const playPromise = headsetMediaElement.play();
-        if (playPromise && typeof playPromise.then === "function") {
-            playPromise.then(() => {
-                recordHeadsetDiagnostic(`Silent media play() RESOLVED (paused=${headsetMediaElement?.paused}, readyState=${headsetMediaElement?.readyState}).`);
-            }).catch(error => {
-                recordHeadsetDiagnostic(`Silent media play() REJECTED: ${error.name || "Error"}: ${error.message || error}`);
+        if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(error => {
                 console.warn("iMuse headset media session could not start audio playback:", error);
                 setLifecycleStatus(
                     "Headset media controls may be unavailable because the browser did not start its media session. Recording can still be used normally."
                 );
             });
-        } else {
-            recordHeadsetDiagnostic("Silent media play() returned no promise.");
         }
         updateHeadsetPlaybackState("playing");
     } catch (error) {
-        recordHeadsetDiagnostic(`Media-session startup threw: ${error.name || "Error"}: ${error.message || error}`);
         console.warn("Could not start iMuse headset media session:", error);
     }
 }
@@ -629,7 +423,7 @@ function stopHeadsetMediaSession() {
         URL.revokeObjectURL(headsetMediaUrl);
         headsetMediaUrl = null;
     }
-    updateHeadsetPlaybackState("none");
+    if (deviceClass === "desktop") updateHeadsetPlaybackState("none");
 }
 
 function resumeOrStartFromHeadset() {
@@ -639,8 +433,10 @@ function resumeOrStartFromHeadset() {
     }
     if (activeSession.recorder.state === "paused") {
         try {
-            keepHeadsetMediaAudioPlaying();
-            updateHeadsetPlaybackState("playing");
+            if (headsetControlsEnabled) {
+                keepHeadsetMediaAudioPlaying();
+                updateHeadsetPlaybackState("playing");
+            }
             activeSession.recorder.resume();
         } catch (error) {
             console.warn("Headset resume failed:", error);
@@ -652,20 +448,14 @@ function resumeOrStartFromHeadset() {
 function pauseFromHeadset() {
     const current = activeSession;
     if (!current) {
-        recordHeadsetDiagnostic("Pause action received with no active recording; starting recording from headset.");
+
         startRecording();
         return;
     }
     if (current.recorder.state !== "recording") return;
     try {
         current.recorder.pause();
-        if (deviceClass === "mobile") {
-            // On mobile, keep the media element actively playing so repeated
-            // headset commands continue to reach Media Session handlers.
-            keepHeadsetMediaAudioPlaying();
-            updateHeadsetPlaybackState("playing");
-        } else {
-            // Preserve the already-working desktop behavior.
+        if (headsetControlsEnabled) {
             pauseHeadsetMediaAudio();
             updateHeadsetPlaybackState("paused");
         }
@@ -675,7 +465,7 @@ function pauseFromHeadset() {
     }
 }
 
-function finalizeFromHeadset() {
+function finalizeRecording() {
     const current = activeSession;
     if (!current || !["recording", "paused"].includes(current.recorder.state)) return;
     recordButton.disabled = true;
@@ -683,11 +473,11 @@ function finalizeFromHeadset() {
     current.metadata.state = "finalizing";
     current.metadata.lastUpdatedAt = new Date().toISOString();
     putSession(current.metadata).catch(error => console.error("Could not mark session finalizing:", error));
-    status.textContent = "Finalizing recording from headset command...";
+    status.textContent = "Finalizing recording...";
     try {
         current.recorder.stop();
     } catch (error) {
-        console.error("Headset stop failed:", error);
+        console.error("Recording stop failed:", error);
         recordButton.disabled = false;
         pauseButton.disabled = current.recorder.state !== "recording" && current.recorder.state !== "paused";
         status.textContent = `Could not stop recording from the headset: ${error.message || error}`;
@@ -695,28 +485,29 @@ function finalizeFromHeadset() {
 }
 
 function initializeHeadsetMediaActions() {
-    recordHeadsetDiagnostic(`Registering headset actions. ${getHeadsetEnvironmentSummary()}`);
+    if (deviceClass !== "desktop") return;
+
     if (!("mediaSession" in navigator) || typeof navigator.mediaSession.setActionHandler !== "function") {
-        recordHeadsetDiagnostic("Media Session action handlers are NOT supported here.");
+
         setLifecycleStatus("This browser does not support Media Session headset controls. On-screen recording controls remain available.");
         return;
     }
     const handlers = {
         play: resumeOrStartFromHeadset,
         pause: pauseFromHeadset,
-        stop: finalizeFromHeadset,
-        nexttrack: finalizeFromHeadset,
+        stop: finalizeRecording,
+        nexttrack: finalizeRecording,
         previoustrack: resumeOrStartFromHeadset
     };
     for (const [action, handler] of Object.entries(handlers)) {
         try {
             navigator.mediaSession.setActionHandler(action, () => {
-                recordHeadsetDiagnostic(`HEADSET ACTION FIRED: "${action}" (recorder state: ${activeSession?.recorder?.state || "no active session"}).`);
+                if (!headsetControlsEnabled) return;
                 handler();
             });
-            recordHeadsetDiagnostic(`Handler "${action}" registered.`);
+
         } catch (error) {
-            recordHeadsetDiagnostic(`Handler "${action}" registration FAILED: ${error.name || "Error"}: ${error.message || error}`);
+
             // Individual actions vary by browser; keep every supported action.
             console.debug(`Media Session action "${action}" is not supported:`, error);
         }
@@ -935,7 +726,7 @@ async function releaseScreenWakeLock() {
 }
 
 function handleVisibilityChange() {
-    recordHeadsetDiagnostic(`Visibility changed: ${document.visibilityState}; recorder state: ${activeSession?.recorder?.state || "no active session"}.`);
+
     if (!activeSession) {
         setLifecycleStatus("Screen wake lock will be requested while recording, if supported.");
         return;
@@ -1579,7 +1370,7 @@ async function initializeMicrophoneReadiness() {
 }
 
 async function startRecording() {
-    startHeadsetMediaSession();
+    if (headsetControlsEnabled) startHeadsetMediaSession();
     recordButton.disabled = true;
     pauseButton.disabled = true;
 
@@ -1653,7 +1444,7 @@ async function startRecording() {
             micUnavailableNotice: false
         };
         activeSession = current;
-        recordHeadsetDiagnostic(`Microphone stream acquired (track state: ${stream.getAudioTracks()[0]?.readyState || "unknown"}); recorder state: ${recorder.state}.`);
+
         const microphoneTrack = stream.getAudioTracks()[0];
         if (microphoneTrack) {
             microphoneTrack.addEventListener("mute", () => {
@@ -1676,13 +1467,13 @@ async function startRecording() {
             });
         }
         recorder.addEventListener("start", () => {
-            recordHeadsetDiagnostic(`MediaRecorder emitted START event (state: ${recorder.state}).`);
+
         });
         recorder.addEventListener("dataavailable", event => {
             if (current.discard || !event.data || !event.data.size) return;
             const sequence = current.sequence++;
             if (sequence === 0) {
-                recordHeadsetDiagnostic(`First non-empty audio chunk received (${event.data.size} bytes, type: ${event.data.type || "unknown"}).`);
+
             }
             current.memoryChunks.push(event.data);
             current.writeQueue = current.writeQueue.then(async () => {
@@ -1711,11 +1502,7 @@ async function startRecording() {
             try { await putSession(current.metadata); } catch (error) { console.error(error); }
             pauseButton.textContent = "Resume";
             pauseButton.disabled = false;
-            if (deviceClass === "mobile") {
-                // Recorder pause and media-session playback are separate on mobile.
-                keepHeadsetMediaAudioPlaying();
-                updateHeadsetPlaybackState("playing");
-            } else {
+            if (headsetControlsEnabled) {
                 pauseHeadsetMediaAudio();
                 updateHeadsetPlaybackState("paused");
             }
@@ -1734,8 +1521,10 @@ async function startRecording() {
             current.metadata.lastUpdatedAt = new Date().toISOString();
             try { await putSession(current.metadata); } catch (error) { console.error(error); }
             pauseButton.textContent = "Pause";
-            keepHeadsetMediaAudioPlaying();
-            updateHeadsetPlaybackState("playing");
+            if (headsetControlsEnabled) {
+                keepHeadsetMediaAudioPlaying();
+                updateHeadsetPlaybackState("playing");
+            }
             stopPausedBeep(current);
             clearWakeDetectorTimers(current);
             current.silenceSince = null;
@@ -1792,20 +1581,20 @@ async function startRecording() {
         });
         await setupSilenceMonitor(current);
         recorder.start(250);
-        recordHeadsetDiagnostic(`MediaRecorder STARTED (state: ${recorder.state}); silent element paused=${headsetMediaElement?.paused ?? "absent"}; playbackState=${navigator.mediaSession?.playbackState || "unavailable"}.`);
+
         recordButton.textContent = "Stop Recording";
         recordButton.disabled = false;
         pauseButton.textContent = "Pause";
         pauseButton.disabled = false;
         status.textContent = `Recording in ${formatLabel} — saving audio chunks as they arrive.`;
-        recordHeadsetDiagnostic(`Recording UI updated (record button: ${recordButton.textContent}, disabled=${recordButton.disabled}; pause button: ${pauseButton.textContent}, disabled=${pauseButton.disabled}).`);
+
         setWakeStatus(wakeWord
             ? `Wake-word inference is off while recording. It will listen for “${wakeWordPhrase}” after a pause.`
             : "Wake-word model is unavailable or still loading; manual recording controls remain available.");
         requestScreenWakeLock();
         playRecordingStartCue(current);
     } catch (error) {
-        recordHeadsetDiagnostic(`Recording startup FAILED: ${error.name || "Error"}: ${error.message || error}`);
+
         console.error(error);
         stopStream(stream);
         recordButton.disabled = false;
@@ -1820,7 +1609,7 @@ recordButton.addEventListener("click", () => {
         startRecording();
         return;
     }
-    finalizeFromHeadset();
+    finalizeRecording();
 });
 
 pauseButton.addEventListener("click", () => {
@@ -1883,9 +1672,8 @@ window.addEventListener("pagehide", () => {
     }
 });
 
-recordHeadsetDiagnostic(`Diagnostic build loaded. deviceClass=${deviceClass}; user agent: ${navigator.userAgent}`);
 initialize();
 initializeWakeWord();
 initializeMicrophoneReadiness();
 setLifecycleStatus("Screen wake lock will be requested while recording, if supported.");
-initializeHeadsetMediaActions();
+if (deviceClass === "desktop") initializeHeadsetMediaActions();
