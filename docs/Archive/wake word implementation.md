@@ -326,7 +326,7 @@ wake phrases to be missed.
     standalone page is a proof of concept, not a replacement for iMuse's
     recording and recovery design.
 
-## 7. Remaining evaluation
+## 7. Historical evaluation plan (deferred)
 
 The standalone test implementation is in place. The next work is to gather
 comparable evidence, not to rebuild the pause/resume loop or add more
@@ -435,10 +435,9 @@ microphone, environment, and trial log. Do not compare only on a
 subjective "seems better" basis if a production choice depends on
 reliability.
 
-## 9. Production requirements before integration into iMuse
+## 9. Production integration review criteria (historical checklist; verify against current code)
 
-No decision has been made to integrate this test into iMuse. Before
-doing so, the implementation should be reviewed for:
+These criteria were written for the original standalone prototype. The newer pause-only iMuse development path is described at the beginning of this document; verify its actual implementation against current source files. Any further changes should be reviewed for:
 
 -   **Recording durability:** preserve captured audio as it is created
     and make crash recovery as robust as browser storage permits.
@@ -469,10 +468,9 @@ The detector should remain an optional convenience feature until its
 reliability and failure modes are well understood. It must not be
 allowed to jeopardize the primary job of recording the user's audio.
 
-## 10. Current status
+## 10. Historical standalone-prototype status (superseded)
 
-**Status: standalone wake-word prototype implemented; evaluation and phrase
-selection remain open. Production integration has not been implemented.**
+**Historical status:** Standalone wake-word prototype implemented; evaluation and phrase selection remained open at that stage. This is not a statement about the current iMuse prototype. See the current decision at the top; verify current integration against source code.
 
 - [x] Standalone Heed experiment demonstrated a workable pause/resume loop.
 - [x] Voicute standalone test page implemented.
@@ -487,7 +485,7 @@ selection remain open. Production integration has not been implemented.**
 - [ ] Select a final iMuse wake phrase and investigate training/obtaining a custom model.
 - [ ] Validate resource use, microphone behavior, and lifecycle on target devices, especially iPhone Safari/PWA.
 - [ ] Validate that any future integration cannot compromise audio persistence, recovery, or finalization.
-- [ ] Make no production integration decision until the tests support it.
+- [ ] Historical gate: evaluate reliability before expanding production integration; not a current instruction to remove or rebuild the existing pause-only pathway.
 
 ------------------------------------------------------------------------
 
@@ -533,7 +531,7 @@ against the actual file before relying on them after future edits.
                                       external CDN/GitHub-hosted
                                       resources
 
-  Production integration              Not implemented
+  Production integration              Historical standalone-test status; verify current code
   -----------------------------------------------------------------------
 
 ## Appendix B --- Interpretation cautions
@@ -553,3 +551,9 @@ against the actual file before relying on them after future edits.
 -   This document records the evidence currently available. Items not
     tested are explicitly left as open questions rather than treated as
     established facts.
+
+## Appendix C — Future command-listener handoff (deferred)
+
+The current wake-word detector recognizes a trigger phrase; it does not transcribe or interpret general spoken commands. A proposed future flow is wake-word detection followed by a bounded command-capture window, on-demand recognition through the unified Memora/Whisper infrastructure, command validation, and an explicit state-machine action. This is a design proposal, **not an implemented or validated command listener**. Do not run a second independent Whisper stack in the Record tab. Keep the original recording path and persisted audio independent of command inference, and always retain manual controls. The present pause-only policy disables wake inference during active recording; any future continuous-listening mode requires separate tests of resource contention, fidelity, and recording recovery.
+
+The recent A/B spectrum screening used two different speech performances. The enabled trial reported 166 wake predictions without inference errors. It did not establish sample-identical audio, absence of dropouts, or causal spectral differences attributable to Voicute.

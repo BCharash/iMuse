@@ -7,6 +7,22 @@
 
 The earlier investigations below are preserved as technical history, **not as an active instruction to implement iPhone headset support**. A desktop-only opt-in headset pathway was subsequently implemented in iMuse and the user reported that it seemed to work, with some variable responsiveness. Mobile headset controls were intentionally removed/disabled because reliable routing during microphone capture was not demonstrated. The user also observed similar button limitations while recording in iPhone Voice Memos. Near-silent keep-alive experiments were useful diagnostics but did not validate a production mobile route. Preserve the desktop behavior and defer further iPhone investigation. Do not add silent/near-silent playback to mobile production code without fresh evidence and explicit agreement. Earlier proposed 'next tests' in this document are historical, not current priorities.
 
+## Principal finding — iPhone microphone capture and headset media controls
+
+**Observed limitation:** On the tested iPhone 12 Pro Max (iOS 26.7.2), Bluetooth Shokz media-button presses did **not reliably reach browser JavaScript while the microphone was actively capturing audio**. This is the central reason mobile headset control was deferred, not a failure to register Media Session handlers or a general inability of the headset buttons to generate commands.
+
+**Evidence and boundaries:**
+
+- In iPhone Edge, microphone-only `MediaRecorder` capture succeeded and Media Session action handlers were registered, but headset presses did not produce the expected action logs.
+- Setting `navigator.audioSession.type = "play-and-record"` was accepted and microphone chunks were captured, yet headset presses still did not reach the registered handlers.
+- Outside that microphone-recording configuration, separate diagnostics with a continuously playing near-silent audio element delivered repeated `pause`, `nexttrack`, and `previoustrack` actions. Thus the buttons and JavaScript action-handling mechanism *can* work under some iPhone conditions; this does **not** establish that they work during actual microphone recording.
+- The user observed similar media-button limitations while recording in Apple's Voice Memos. This supports the concern that the issue is broader than iMuse, but is not a controlled test of the underlying iOS mechanism.
+- The detailed browser experiments above were conducted in **Edge on iPhone**, not a validated production Safari/PWA recording session. Do not generalize the exact failure mode to every browser, iOS release, headset, or audio-session configuration.
+
+**Interpretation, not proven mechanism:** Activating microphone capture appears to change iOS/Bluetooth audio-session or media-control routing/ownership in a way that prevents dependable delivery of headset transport commands to the browser. We did **not** establish which internal iOS component is responsible, nor prove that the microphone invariably blocks media commands. Describe this as a reproducible limitation in the tested setup, **not** a documented universal iOS rule.
+
+**Engineering consequence:** Preserve the desktop opt-in controls. Leave mobile headset integration disabled/deferred. Do not treat a silent/near-silent playback workaround as validated during microphone recording, and do not compromise audio capture, persistence, or finalization to force media-button support. If revisited, test headset-command delivery **with actual microphone capture active**, comparing against the same configuration without capture, and then validate Safari/PWA separately.
+
 ## 1. Goal
 
 Determine whether a Bluetooth headset's physical media button can reliably control iMuse recording in an iPhone browser/PWA, while preserving the known-working desktop behavior. Keep iMuse as a cross-platform web app; do not move to a native iOS app merely to solve this without first establishing the browser limitations.
@@ -87,9 +103,9 @@ Several commands after the simulation was marked Finished were correctly logged 
 
 Do not treat the successful Edge diagnostic as proof of Safari support or production readiness.
 
-## 5. Updated plan
+## 5. Historical proposed validation plan (deferred; not current work)
 
-### Step 1 — Test simulated Recording/Paused transitions with audio kept playing
+### Historical Step 1 — Test simulated Recording/Paused transitions with audio kept playing
 
 Make one focused change to the standalone simulation only; do not modify production iMuse yet.
 
@@ -102,11 +118,11 @@ Make one focused change to the standalone simulation only; do not modify product
 
 Test several Recording → Paused → Recording transitions, followed by a finish action. Confirm that the audio element remains playing and every command continues to reach JavaScript. This isolates whether the keep-alive approach supports state toggling without confusing recording state with media playback state.
 
-### Step 2 — Validate on iPhone Safari
+### Historical Step 2 — Validate on iPhone Safari
 
 If Step 1 succeeds in Edge, host the same minimal diagnostic over HTTPS and test it in iPhone Safari. Do not ask the user to open a local standalone HTML file in Safari. The Safari result is required before calling the route validated for the user's normal iPhone browser/PWA environment.
 
-### Step 3 — Production design if validation succeeds
+### Historical Step 3 — Production design if validation succeeds
 
 Use **two platform-specific pathways with one shared recording controller/state machine**:
 
@@ -116,12 +132,16 @@ Use **two platform-specific pathways with one shared recording controller/state 
 
 Before production integration, verify that pause/resume/finish actions cannot lose, duplicate, or prematurely discard audio; verify finalization produces a playable file and preserves source data until validation succeeds. Also test actual microphone capture, long-session behavior, and relevant lifecycle interruptions.
 
-### Step 4 — Stop/go decision and cleanup
+### Historical Step 4 — Stop/go decision and cleanup
 
 If the simulation or Safari validation fails, document the observed failure and reassess the pathway before touching production. Do not add layers of speculative workarounds. Once testing is complete and any proven behavior is integrated, remove temporary diagnostic UI and logging from production code.
 
-## 6. Immediate decision
+## 6. Historical working hypothesis (superseded by current decision)
 
 The latest minimum-volume test changes the working hypothesis: the most promising iPhone pathway is to **keep a near-silent media element actively playing even when the recorder is paused**, while keeping the recorder's state separate from the media session's playback state. The next test is to verify repeated simulated Recording/Paused toggles with that keep-alive audio left running.
 
 The desktop pathway should remain unchanged. Production integration is still gated on the transition test and an HTTPS-hosted Safari test.
+
+## 7. Handoff for future investigation
+
+Current disposition: preserve the opt-in desktop pathway, which worked in the reported MacBook test but later showed variable responsiveness. Do not assume mobile headset control is available. The near-silent keep-alive route was only demonstrated in Edge diagnostics, not as a Safari/PWA recording solution. If the project later reopens this investigation, begin with the recorded observations above and the then-current production code; require fresh user approval before adding keep-alive audio. Recording durability and finalization remain non-negotiable.
