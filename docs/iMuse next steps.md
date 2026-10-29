@@ -1,6 +1,6 @@
 # iMuse next steps
 
-**Planning note — updated 29 October 2026**  
+**Planning note — updated 29 October 2026 (integration handoff)**  
 **Status:** Remaining work and verification plan. This document does not authorize code changes by itself.
 
 ## 1. Purpose and scope
@@ -44,6 +44,19 @@ The following behaviors are implemented in the current iMuse recording prototype
 The user has tested recording/playback on iPhone, and a multi-segment recording was recovered and played after reload in the documented test. Remaining work is verification, not rebuilding the already implemented persistence, pause/resume, auto-pause, beep, save/export, format-selection, or wake-word test-lab features. Still needed: Delete/reset and clean-session checks; systematic inactivity-pause tests; full saved-file/finalization validation; format checks across target browsers; wake-word false-trigger/missed-trigger measurements; and iPhone Safari/PWA headset testing if a plausible route emerges. Existing tests do not prove survival of uncommitted audio, storage eviction, locked-screen/background recording on iOS, or every error path.
 
 The tested `.webm` export is suitable for Memora's current import workflow. M4A/AAC is a preference when supported, not a guarantee. Never rename WebM data to `.m4a`; an extension change is not media conversion.
+
+
+## Integration readiness update — 29 October 2026 (supersedes older priorities below)
+
+**Current decision: begin the Record-to-Memora integration design.** The user has already confirmed: selected saved-session deletion affects only that recording; starting a new recording preserves earlier sessions; Delete is hidden during active recording; an interrupted recording was recovered after reloading during speech, including automatic and manual pause/resume. The user accepts losing a brief tail of speech immediately before an unexpected interruption. IndexedDB remains the recording journal; no OPFS migration or speculative re-architecture is requested.
+
+The MacBook GitHub Pages `Permission denied` microphone incident was resolved by changing Chrome's site permission; localhost and iPhone worked. It was not a Git/code change.
+
+**Do not repeat these accepted UI tests as mandatory pre-integration gates.** Earlier unchecked checklist items below are a historical comprehensive wishlist, not evidence of a known defect. Specific media-file validation and storage edge cases can be investigated if integration exposes an actual issue. Prior assistant reporting of a valid recovered M4A is not an independently reproduced file audit in this document.
+
+**Next action:** inspect the current iMuse and Memora source files supplied by the user; map Memora's established desktop/iPhone save/open pathways; define and implement a minimal non-destructive Record → Transcribe handoff, with a stable file/blob, actual MIME type/extension, session identity, and recovery status. Keep Record independent of Whisper. Preserve the original IndexedDB recording after import/transcription. See `iMuse Memora integration handoff.md`.
+
+**Deferred:** iPhone headset media controls, continuous wake inference while recording, Whisper-tiny voice commands, and rebuilding existing Memora file-handling features.
 
 ## 2. Core requirements
 
@@ -357,14 +370,14 @@ Desktop headset controls: retain the existing opt-in desktop-only pathway, test 
 - Keep the Record work, model-registry overhaul, and final repository replacement as distinct stages.
 - This plan does not authorize code changes by itself; confirm the current repository and immediate next action before implementation.
 
-## 10. Immediate next action
+## 10. Immediate next action — integration
 
-1. Confirm the current working iMuse repository checkpoint and obtain the latest files for any code edits.
-2. Inspect and test Delete/reset and a fresh second session; avoid speculative changes.
-3. Verify final-file assembly, persisted-source retention on failure, and recovery edge cases.
-4. Check whether quiet speech is mistakenly treated as inactivity and whether paused beeps stop on resume.
-5. Draft the Record-to-Transcribe integration contract for Memora, then plan the merge.
+1. Obtain the latest user-supplied **iMuse and Memora source files** before editing any code. Do not treat the journal as a current-code substitute.
+2. Review Memora's existing desktop and iPhone file open/save/import pathways, and iMuse's current IndexedDB recovery and recording-export interface.
+3. Agree a minimal Record → Transcribe contract: audio Blob/file, actual MIME type and extension, optional duration and session ID, and completed vs. interrupted/recovered status.
+4. Integrate without automatically deleting the original IndexedDB recording; avoid duplicate model or file-handling systems.
+5. Test one normal recording and one recovered recording through the unified Transcribe workflow. Fix only issues demonstrated by these tests.
 
-**Not next:** more iPhone headset work, continuous Voicute while recording, or Whisper tiny voice commands. These are explicitly deferred.
+**Not next:** broad re-testing of already accepted Delete/start/reload behaviors, speculative OPFS migration, iPhone headset experiments, continuous Voicute while recording, or Whisper tiny spoken commands.
 
-**Guiding principle:** Capture first. Preserve continuously. Transcribe later. Optional controls must not jeopardize original audio.
+**Guiding principle:** Capture first. Preserve continuously. Hand off non-destructively. Reuse Memora.

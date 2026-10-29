@@ -1092,3 +1092,33 @@ Desktop MacBook Chrome headset control was demonstrated and a desktop-only opt-i
 ## 53. Documentation policy
 
 This journal is the chronological history and decision record. The separate **iMuse next steps.md** is the current actionable checklist and should remain. The specialized wake-word and headset reports preserve detailed experimental evidence; they may be archived rather than kept as active top-level planning documents. Their historical detail need not be duplicated verbatim here. Earlier DJ001–DJ004 entries are historical snapshots, not current implementation status: read DJ005 and the latest next-steps plan for current priorities.
+
+---
+
+# DJ006 — Recording Recovery Acceptance and Memora Integration Handoff
+
+**Date:** 29 October 2026  
+**Status:** User-confirmed acceptance decisions and integration direction; no source-code changes made.
+
+## 54. Recovery is acceptable for the product's needs
+
+The user intentionally reloaded the GitHub Pages iMuse recording page in the middle of speaking after exercising automatic silence pause and manual Pause/Resume. iMuse recovered a recording and the user supplied an exported `.m4a` file with audible speech from before the interruption, including speech after pause/resume. The user explicitly stated that losing a short period of speech immediately before a crash/reload is **not critical**. The acceptance objective is preservation of the already persisted recording and recovery of usable audio, not zero lost milliseconds at the moment of an abrupt interruption.
+
+The assistant previously reported a successful technical media-file examination (AAC/M4A, about 21 seconds, no reported decode errors). **That report is a prior conversational assessment, not an independently reproduced verification in this document**; the receiving agent should verify the artifact directly if rigorous container certification becomes necessary. Do not claim universal media validity, zero loss, or guaranteed storage survival from this one example.
+
+IndexedDB remains the chosen incremental storage mechanism. Do not migrate to OPFS or add a complex media-remuxing pipeline solely because theoretical failure cases exist. Revisit only when a demonstrated problem justifies the change. Browser origin data can still be cleared/evicted, and data not yet committed may be lost.
+
+## 55. User-confirmed Delete and session semantics
+
+The user confirmed that **Delete Saved Session deletes only the selected saved recording**, and **starting a new recording leaves existing saved recordings intact**. The Delete control is **hidden while a recording is in progress**. Therefore, a proposed user-interface test of pressing Delete during active recording was inapplicable; do not present it as an outstanding normal-UI requirement. This does not by itself prove all internal asynchronous cleanup paths, but those hypothetical cases should not block integration absent an observed failure or a specific code-review finding.
+
+## 56. GitHub Pages microphone permission incident
+
+On the MacBook, localhost microphone capture worked and the iPhone site worked, while the MacBook GitHub Pages deployment displayed `Microphone not ready: Permission denied. Press Start Recording to retry.` Changing Chrome's **site-specific microphone permission** restored functionality. There were no local Git changes. This was a browser-origin permission issue, **not evidence of a recorder regression**. The reason the permission changed was not established.
+
+## 57. Integration decision
+
+Proceed toward unifying iMuse Record with Memora. **Reuse Memora's existing desktop/mobile file-save and file-load pathways**, rather than building a competing file-management implementation inside Record. Keep Record independent of Whisper and Memora's model lifecycle. Transfer a completed or recovered audio artifact and its metadata non-destructively to Memora's Transcribe workflow. Do not delete the IndexedDB source merely because it was handed off or transcribed.
+
+Treat earlier DJ005 and next-steps instructions to repeat broad Delete/reset, multi-segment recovery, or generic media-assembly tests as superseded where the user has already confirmed the intended behavior. A narrow review of the actual integration boundary remains appropriate. The companion `iMuse Memora integration handoff.md` is the current agent-facing brief; `iMuse next steps.md` is the current action list. Historical journal entries remain intact.
+
