@@ -9,6 +9,22 @@ const status = document.getElementById("status");
 const wakeStatus = document.getElementById("wakeStatus");
 const lifecycleStatus = document.getElementById("lifecycleStatus");
 
+// Assess the device class once during startup. Keep this vocabulary aligned with
+// Memora: every device is classified as either "mobile" or "desktop".
+function assessDeviceClass() {
+    const mobileHint = navigator.userAgentData?.mobile;
+    if (typeof mobileHint === "boolean") return mobileHint ? "mobile" : "desktop";
+
+    const userAgent = navigator.userAgent || "";
+    const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile|IEMobile|Opera Mini/i.test(userAgent);
+    // iPadOS can request a desktop-style user agent, so also check touch support.
+    const ipadOSDesktopMode = /Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1;
+    return mobileUserAgent || ipadOSDesktopMode ? "mobile" : "desktop";
+}
+
+const deviceClass = assessDeviceClass();
+window.deviceClass = deviceClass;
+
 const WAKE_THRESHOLD = 0.9;
 const WAKE_DETECT_COOLDOWN_MS = 1500;
 let wakeWord = null;
@@ -284,6 +300,7 @@ function getHeadsetDiagnosticSnapshot() {
         "=== iMuse headset diagnostic snapshot ===",
         `Captured: ${new Date().toLocaleString()}`,
         `User agent: ${navigator.userAgent}`,
+        `deviceClass: ${deviceClass}`,
         `Environment: ${getHeadsetEnvironmentSummary()}`,
         `Recorder state: ${recorderState}`,
         `Session metadata state: ${activeSession?.metadata?.state || "none"}`,
@@ -399,6 +416,68 @@ function getHeadsetEnvironmentSummary() {
         `${audioSessionSummary}; page ${document.visibilityState}.`;
 }
 
+const MOBILE_HEADSET_KEEPALIVE_MP3_BASE64 = [
+    "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",
+    "xP8Zyw2oAJ/EyN9Tq9LlpI1nHK72tfvU539Hz9rHOtYlFWf2oq+5OkGEJg9kGoBBpCATBYBfMAjBJjBQICE02INQMAeDPjFNAJEwH8AsMAuADQMARF0VLnVn",
+    "7tNj9q3T+lvsn/7/80LE8hSAmbDqD/yIXVvu3/K3qnXJ/X0+67Itv9//0oVez/WrUf/4aqm7QntZ22RkjA3OWEfVdbY2TrQY4j2y5FBVNNcvOrUCAEL8mCoJ",
+    "iAIhoNALiJ3oKRkdAvwBIVIIBAFFUk00GKL/80DE/BcYlbDyD/yIQjkrHgIDArF4SGoHCqO5cLBLRkhaTEM/OER28YMnjb6x1fZZrjcayr+OXibs5r4gcWIp",
+    "EceQeRLtI0k48QWIp0keSc8i0jzknseWZwz3Jdz2v1UaHBhhxoBgV//zQsT6GGsNqACXxMgKLs5gBrrxOs0mEMOf9YqnTBU9lOS4KxDBQwLjprUGcM2h/jU1",
+    "KxAE3NXILBEEpuDU4EYulkrIzFsxgPksR1dbC608zRdd1l1oCgkJQ0DYSCoBAQlIhoJBUYBSpP/zQMT0I9ld7ADumOVJHgkMHlkMY14xX9SUMa96vjBxVKGM",
+    "cPUWQlrIxfx6CkEhCNHTgykkymEkkV0uVMiTuNkzDCNlILtcJE9jNKomRUmAX86EeONqJJqTdKNbJWG74VUTlRWmmmiq//NCxL8gqQoQBN4Y4PVVTT9NFX8q",
+    "pt2mi/8qTEFNRTMuMTAwqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NAxJgS",
+    "gL2AKEvSOaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",
+    "qqqqqqqqqqo=",
+].join("");
+
+function createMobileHeadsetKeepAliveBlob() {
+    // This valid, one-second MP3 contains a very low-level tone. The element is
+    // also played at 1% volume and is never muted, keeping iOS media controls
+    // routable without intentionally producing audible output.
+    const binary = atob(MOBILE_HEADSET_KEEPALIVE_MP3_BASE64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: "audio/mpeg" });
+}
+
 function createSilentWaveBlob() {
     const sampleRate = 8000;
     const sampleCount = 2000; // 250 ms of digital silence
@@ -455,8 +534,16 @@ function startHeadsetMediaSession() {
             headsetMediaElement.style.pointerEvents = "none";
             headsetMediaElement.style.left = "-10px";
             headsetMediaElement.style.bottom = "0";
-            headsetMediaUrl = URL.createObjectURL(createSilentWaveBlob());
+            const keepAliveBlob = deviceClass === "mobile"
+                ? createMobileHeadsetKeepAliveBlob()
+                : createSilentWaveBlob();
+            headsetMediaUrl = URL.createObjectURL(keepAliveBlob);
+            headsetMediaElement.volume = deviceClass === "mobile" ? 0.01 : 1;
+            headsetMediaElement.muted = false;
             headsetMediaElement.src = headsetMediaUrl;
+            recordHeadsetDiagnostic(
+                `Prepared ${deviceClass === "mobile" ? "near-silent MP3" : "silent WAV"} keep-alive (deviceClass=${deviceClass}, element volume=${headsetMediaElement.volume}, muted=${headsetMediaElement.muted}).`
+            );
             document.body.appendChild(headsetMediaElement);
             headsetMediaElement.addEventListener("playing", () => {
                 recordHeadsetDiagnostic("Silent media element emitted PLAYING.");
@@ -572,8 +659,16 @@ function pauseFromHeadset() {
     if (current.recorder.state !== "recording") return;
     try {
         current.recorder.pause();
-        pauseHeadsetMediaAudio();
-        updateHeadsetPlaybackState("paused");
+        if (deviceClass === "mobile") {
+            // On mobile, keep the media element actively playing so repeated
+            // headset commands continue to reach Media Session handlers.
+            keepHeadsetMediaAudioPlaying();
+            updateHeadsetPlaybackState("playing");
+        } else {
+            // Preserve the already-working desktop behavior.
+            pauseHeadsetMediaAudio();
+            updateHeadsetPlaybackState("paused");
+        }
     } catch (error) {
         console.warn("Headset pause failed:", error);
         status.textContent = `Could not pause recording from the headset: ${error.message || error}`;
@@ -1616,8 +1711,14 @@ async function startRecording() {
             try { await putSession(current.metadata); } catch (error) { console.error(error); }
             pauseButton.textContent = "Resume";
             pauseButton.disabled = false;
-            pauseHeadsetMediaAudio();
-            updateHeadsetPlaybackState("paused");
+            if (deviceClass === "mobile") {
+                // Recorder pause and media-session playback are separate on mobile.
+                keepHeadsetMediaAudioPlaying();
+                updateHeadsetPlaybackState("playing");
+            } else {
+                pauseHeadsetMediaAudio();
+                updateHeadsetPlaybackState("paused");
+            }
             current.autoPausing = false;
             current.silenceSince = null;
             current.wakeDetectorEnabled = false;
@@ -1782,7 +1883,7 @@ window.addEventListener("pagehide", () => {
     }
 });
 
-recordHeadsetDiagnostic(`Diagnostic build loaded. User agent: ${navigator.userAgent}`);
+recordHeadsetDiagnostic(`Diagnostic build loaded. deviceClass=${deviceClass}; user agent: ${navigator.userAgent}`);
 initialize();
 initializeWakeWord();
 initializeMicrophoneReadiness();
