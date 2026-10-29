@@ -1,7 +1,11 @@
 # iMuse Headset Control
 
-**Last updated:** 28 October 2026  
-**Status:** Investigation in progress; no production-code change authorized or made.
+**Last updated:** 29 October 2026  
+**Status:** Research archived; desktop-only opt-in implementation subsequently tested, mobile integration deferred.
+
+## Current decision — 29 October 2026
+
+The earlier investigations below are preserved as technical history, **not as an active instruction to implement iPhone headset support**. A desktop-only opt-in headset pathway was subsequently implemented in iMuse and the user reported that it seemed to work, with some variable responsiveness. Mobile headset controls were intentionally removed/disabled because reliable routing during microphone capture was not demonstrated. The user also observed similar button limitations while recording in iPhone Voice Memos. Near-silent keep-alive experiments were useful diagnostics but did not validate a production mobile route. Preserve the desktop behavior and defer further iPhone investigation. Do not add silent/near-silent playback to mobile production code without fresh evidence and explicit agreement. Earlier proposed 'next tests' in this document are historical, not current priorities.
 
 ## 1. Goal
 

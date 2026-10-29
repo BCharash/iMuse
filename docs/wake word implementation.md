@@ -3,12 +3,18 @@
 **Project:** iMuse --- browser-based automatic pause/resume experiment\
 **Document status:** Working notes from the standalone Voicute and Heed
 experiments\
-**Last updated:** 28 October 2026\
+**Last updated:** 29 October 2026\
 **Purpose:** Record what has been tested, what appears to work, the
 current design, and what still needs validation before any wake-word
 feature is incorporated into iMuse.
 
 ------------------------------------------------------------------------
+
+## Current decision — 29 October 2026
+
+This document is a **technical research archive**, not the current development queue. The pause-only Voicute wake workflow has progressed beyond the early standalone tests and is used in the current iMuse development path, subject to verification against the latest source. Automatic inactivity pause does not require a voice command. Keep wake inference disabled during active recording. Full voice-command recognition (proposed on-demand Whisper tiny) and continuous Voicute listening while recording are **deferred until after integration with Memora**. The public demo phrase is provisional. The A/B spectrum screening experiment showed 166 wake predictions during the enabled trial without reported inference errors, but did not establish identical acoustic fidelity or absence of dropouts. No further wake research is an immediate prerequisite for the Record/Memora integration.
+
+The older statements below about 'not integrated into production' describe the status of the original standalone experiments and may no longer reflect the current iMuse prototype. The current next-steps document and design-journal DJ005 supersede them.
 
 ## 1. Objective
 

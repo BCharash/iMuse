@@ -1054,3 +1054,41 @@ The evidence currently supports these narrower conclusions:
 14. Test Safari/PWA lifecycle behavior on the actual iPhone before making claims about background, locked-screen, or always-on behavior.
 
 **Guiding principle:** Capture first. Preserve continuously. Hands-free controls are valuable only if they are reliable and cannot put captured audio at risk.
+
+
+---
+
+# DJ005 — Record Stabilization, Headset Scope, Wake-Word Deferral, and Fidelity Screening
+
+**Date:** 29 October 2026  
+**Status:** Current decisions and observations; no production code change authorized by this entry.
+
+## 48. Current product scope
+
+The immediate objective is to stabilize iMuse's independent Record tab and prepare its eventual integration into Memora. Record must never depend on Whisper, a wake-word model, external services, or transcription succeeding. Capture integrity, incremental IndexedDB persistence, recovery, and one valid final audio file take precedence over convenience features. Memora supplies the unified application's Transcribe, Edit and Combine, Search, and model-management capabilities.
+
+## 49. Wake-word state and deferred voice commands
+
+The present intended workflow is: record speech; automatically pause after inactivity; provide a periodic paused-state beep; listen for the temporary Voicute wake phrase while paused; resume on a recognized phrase; stop wake inference when recording resumes. This does not require wake inference while recording is active. The public phrase is provisional, and detection quality and final custom phrase remain open. The pause-only pathway has been exercised in the user's current iMuse work; do not describe it solely as a standalone experiment without checking the latest code.
+
+Full spoken command recognition (pause/resume/stop) is **deferred until after integration with Memora**. Proposed later design: a lightweight wake detector, then short on-demand Whisper tiny command recognition using Memora's shared model registry and resource manager; strict command validation; no continuous Whisper transcription; optional non-destructive exclusion of command audio. Continuous wake inference during active recording is also deferred. None of this may compromise original audio or storage reliability.
+
+## 50. Preliminary Voicute-on recording-fidelity screen
+
+A standalone spectrum A/B lab was used with Voicute off (A) and continuously listening (B). A lasted about 38.6 seconds; B about 48.7 seconds and logged 166 wake predictions, zero detections, and no reported inference errors. Both used the same microphone settings (48 kHz, mono, Opus, echo cancellation, noise suppression, automatic gain control). The broad spectral measurements differed, but the spoken material and duration were not identical, and the user's reading was relatively monotonic. **This is not evidence of acoustic equivalence or proof of zero dropouts.** It is an encouraging preliminary screen only. A controlled fidelity and transcription-accuracy experiment is postponed until continuous wake listening is needed for command recognition. No production change is justified by this lab alone.
+
+## 51. Headset decision
+
+Desktop MacBook Chrome headset control was demonstrated and a desktop-only opt-in pathway was subsequently implemented in the working iMuse prototype; the user reported that this seemed to work, although responsiveness can vary. Mobile headset control was deliberately removed/disabled after tests failed to establish dependable iPhone button routing during microphone capture; the user observed comparable limitations in Apple's Voice Memos. Earlier near-silent playback experiments demonstrated partial event delivery in Edge but did not establish a usable production route. Do **not** treat further iPhone headset experiments as the next development priority. If revisited, test independently without changing the stable desktop pathway or capture code.
+
+## 52. Reasonable immediate development
+
+1. Preserve a stable checkpoint and verify Delete/reset, including stale asynchronous callbacks, microphone release, playback object URL cleanup, and a clean subsequent session.
+2. Audit completed-file finalization and IndexedDB recovery/error handling, including source preservation on failure and confirmation of durable transactions before success messages. Test only the unverified edge cases rather than repeating passed tests without cause.
+3. Check quiet-speech behavior of the five-second auto-pause threshold and paused beep, because premature pause can omit material Whisper might otherwise recognize.
+4. Write a precise Record-to-Transcribe handoff contract for the unified app: file/blob format and MIME type, session identity, duration, storage ownership, recovery status, and transfer without deleting the original audio. Keep model logic in Memora.
+5. Once these are satisfactory, plan the repository integration; do not implement a second transcription stack.
+
+## 53. Documentation policy
+
+This journal is the chronological history and decision record. The separate **iMuse next steps.md** is the current actionable checklist and should remain. The specialized wake-word and headset reports preserve detailed experimental evidence; they may be archived rather than kept as active top-level planning documents. Their historical detail need not be duplicated verbatim here. Earlier DJ001–DJ004 entries are historical snapshots, not current implementation status: read DJ005 and the latest next-steps plan for current priorities.

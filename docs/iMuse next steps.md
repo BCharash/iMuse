@@ -1,6 +1,6 @@
 # iMuse next steps
 
-**Planning note — updated 28 October 2026**  
+**Planning note — updated 29 October 2026**  
 **Status:** Remaining work and verification plan. This document does not authorize code changes by itself.
 
 ## 1. Purpose and scope
@@ -20,7 +20,10 @@ Memora already has mature transcription, model management, file handling, transc
 
 **The current iMuse development scope is audio capture only.** Remove Whisper and transcription from the design for this phase. Do not build or maintain a competing transcription/model architecture in iMuse. The completed recording must be usable by the unified application's existing Transcribe workflow.
 
-## Current status — 28 October 2026
+
+> **Current decision (29 October 2026):** The immediate focus is Record reliability and the Memora handoff. Desktop-only opt-in headset controls have been implemented and tentatively tested. Mobile headset controls are disabled. Pause-only Voicute listening is the present design; continuous listening and Whisper tiny spoken commands are deferred until after Memora integration. Historical sections below document earlier research and must not override this decision.
+
+## Current status — 29 October 2026
 
 The following behaviors are implemented in the current iMuse recording prototype. The completed tests below are specific observations, not a claim of exhaustive cross-browser acceptance.
 
@@ -36,7 +39,7 @@ The following behaviors are implemented in the current iMuse recording prototype
 - [x] A standalone wake-word test lab has been implemented using the Voicute browser detector, alongside the earlier Heed experiment.
 - [x] Desktop Chrome headset controls work on the MacBook after activation: the headset pause button starts recording when idle, pause/resume controls the active recording, and next-track finalizes/saves.
 - [x] The web-device-test URL and JavaScript have been identified and reviewed; this is no longer a task to obtain the source.
-- [ ] iPhone headset routing remains unresolved. Edge on iPhone has not reliably delivered repeated button presses to the registered Media Session handlers; the separate audible-tone test's first-press response remains a lead to explain.
+- [x] Mobile headset-control integration deferred/disabled. The desktop-only opt-in path was implemented and reported to work; mobile headset button routing during capture was not reliable. Further iPhone research is optional, not a blocker.
 
 The user has tested recording/playback on iPhone, and a multi-segment recording was recovered and played after reload in the documented test. Remaining work is verification, not rebuilding the already implemented persistence, pause/resume, auto-pause, beep, save/export, format-selection, or wake-word test-lab features. Still needed: Delete/reset and clean-session checks; systematic inactivity-pause tests; full saved-file/finalization validation; format checks across target browsers; wake-word false-trigger/missed-trigger measurements; and iPhone Safari/PWA headset testing if a plausible route emerges. Existing tests do not prove survival of uncommitted audio, storage eviction, locked-screen/background recording on iOS, or every error path.
 
@@ -255,60 +258,27 @@ Delete/reset must:
 
 Starting a new session must not display or reuse audio from the previous session. Since transcription is out of scope for this phase, remove obsolete Whisper-specific controls and code as part of a deliberate, reviewed change rather than leaving misleading buttons or unused code behind.
 
-## 7. Remaining work — in priority order
+## 7. Remaining work — current priority order (29 October 2026)
 
-The core prototype features listed above are already implemented. Do not repeat implementation work or the successful multi-pause/reload test without a specific reason. Focus on the following unresolved items.
+### Priority 1 — Delete/reset and clean-session safety
 
-### Priority 1 — Explain and test iPhone headset-button routing
+Review the latest supplied source before changing code. Confirm that deleting a session stops capture, prevents late callbacks from resurrecting state, clears audio/player/object URLs and metadata, handles persisted data according to the defined deletion policy, and allows a completely clean next recording. Restore any missing delete improvements if they were lost when uncommitted work was discarded.
 
-The headset-control implementation works in desktop Chrome on the MacBook after activation. Preserve that path as the known-working comparison; do not destabilize it while investigating iPhone behavior.
+### Priority 2 — Final audio integrity, durability, and recovery
 
-The reference web device test has already been identified and its JavaScript supplied and reviewed:
-<https://webdevicetest.com/en/tools/media-session-key-test?utm_source=chatgpt.com>
+Verify correct ordering and playback across pauses; MIME type and extension; Memora import; transaction-complete persistence reporting; recovery of unfinished/finalizing sessions; and preservation of source chunks on failure. Existing successful three-segment reload and WebM import tests remain valid observations, not blanket guarantees. Test error cases not yet covered.
 
-Known observations:
-- The separate audible-tone test responds to the first Shokz button press.
-- Edge on iPhone 12 Pro Max / iOS 26.7.2 registered Media Session handlers, but repeated presses did not reliably reach those handlers in the tested variants.
-- The tested variants included handler registration alone, valid silent MP3 playback, microphone-only capture, and microphone capture with `audioSession.type = "play-and-record"`.
-- An earlier generated silent WAV was rejected as unsupported; that was a failed media test, not evidence about event routing.
-- These Edge results do not establish what Safari will do.
+### Priority 3 — Quiet speech and inactivity-pause behavior
 
-Next diagnostic:
-1. In the standalone diagnostic only, keep `navigator.mediaSession.playbackState` synchronized with the media element: set it to `"playing"` only after `audio.play()` resolves; set it to `"paused"` in the pause handler; and set it back to `"playing"` after a successful resume.
-2. Log the action and resulting element/playback states. Keep handlers and the session alive through at least three consecutive button presses; do not tear down or recreate the session on ordinary pause.
-3. If repeated actions work in Edge, serve the diagnostic over HTTPS and test in the user's actual iPhone Safari/PWA environment. Do not ask the user to open a local HTML file in Safari.
-4. If this test fails, compare the reference page's lifecycle and state handling against the diagnostic before proposing a materially different experiment. Do not repeat generic variants already tested.
-5. Do not change production iMuse code until a route is demonstrated. If no route can be demonstrated, record that conclusion and discuss realistic alternatives.
+Check that the five-second inactivity threshold does not prematurely pause during low-volume speech, especially speech important to Whisper. Confirm paused beeps stop promptly on resume/finish. Tune only on observed evidence. Provide Settings controls for silence duration and thresholds later if justified.
 
-The playback-state mismatch is a hypothesis worth testing, not an established explanation.
+### Priority 4 — Record-to-Memora integration contract
 
-### Priority 2 — Verify recording integrity and recovery edge cases
+Specify the completed audio artifact, MIME type, duration, metadata, persistent ownership, recovery state, and non-destructive handoff to Memora's existing Transcribe workflow. Keep recording independent of Whisper. Preserve Memora's model registry and resource management as the future single source of truth.
 
-The following are implemented and have passed specific tests: incremental IndexedDB persistence, recovery/playback of three spoken segments after reload, repeated Pause/Resume, save/download, and WebM import into Memora. The remaining tests are:
+### Deferred — headset and voice commands
 
-- Audit Delete/reset and then record a clean second session. Confirm late asynchronous events cannot restore deleted state, and that old audio, playback, metadata, and UI do not leak into the new session.
-- Verify the final saved file from beginning to end, including distinct phrases across segments, ordering, repeat playback, actual MIME type and matching extension, and Memora import.
-- Exercise finalization failure and recovery. Confirm source data remains available until the final output is validated and persisted.
-- Check that persistence errors and quota failures are surfaced and that data is only described as durable after the IndexedDB transaction completes.
-- Avoid repeating the already-passed multi-segment reload scenario unless a code change affects that path.
-
-### Priority 3 — Validate inactivity pause and paused beep
-
-Automatic pause after approximately five seconds without detected speech and the periodic paused-state beep are implemented. Test with natural thinking pauses, quiet speech, typical background noise, and repeated resume cycles. Confirm the beep only occurs while paused and stops immediately on resume or session end. Tune behavior only in response to observed failures.
-
-### Priority 4 — Evaluate the implemented wake-word test lab
-
-The standalone Heed and Voicute experiments exist; the Voicute page implements the auto-pause/beep/listen/resume loop using a public demo model. Do not treat the public demo phrase as the final iMuse wake phrase, and do not describe the detector as integrated into production iMuse.
-
-- Confirm the exact model and phrase displayed by the test page for each run.
-- Compare thresholds 0.85, 0.90, and 0.95 using both ordinary-speech trials and genuine wake-phrase attempts, recording false activations and missed detections.
-- Keep model, microphone, environment, and filters unchanged while comparing thresholds.
-- Decide later whether to train or obtain a custom iMuse phrase model. The final phrase has not been selected; “Go iMuse” appears in the Voicute notes, while the design journal also lists “iMuse,” “Hey iMuse,” and “Ready iMuse?” as candidates.
-- Do not integrate wake-word detection until accuracy, device behavior, and its effect on audio preservation have been evaluated.
-
-### Priority 5 — Document the handoff before integration
-
-When the recording prototype's remaining acceptance tests are complete, document its verified behavior, storage/recovery model, final audio format, browser limitations, and test results. The later unified iMuse integration, repository migration, and Memora model-registry overhaul remain separate stages.
+Desktop headset controls: retain the existing opt-in desktop-only pathway, test regressions as needed. iPhone headset: disabled/deferred; prior near-silent keep-alive tests did not establish a dependable production route. Pause-only Voicute wake listening: retain current behavior. Continuous wake listening, rigorous fidelity/transcription benchmarking, custom phrase selection, and Whisper tiny command recognition: defer until after unified-app integration.
 
 ## 8. Acceptance checklist
 
@@ -389,11 +359,12 @@ When the recording prototype's remaining acceptance tests are complete, document
 
 ## 10. Immediate next action
 
-1. Run the focused standalone playback-state synchronization experiment described under Priority 1. The reference URL and JavaScript are already known; do not spend time obtaining them again.
-2. Test at least three consecutive Shokz button presses while keeping the media session and handlers alive. Record each action, `audio.paused`, and `navigator.mediaSession.playbackState`.
-3. If repeated actions work in Edge, host the isolated diagnostic over HTTPS and test actual iPhone Safari/PWA behavior. If they do not, inspect lifecycle differences from the reference before choosing another hypothesis.
-4. Keep production iMuse unchanged until the iPhone route is demonstrated.
-5. In parallel, the next recording-validation work is Delete/reset plus a clean second session, followed by full-file integrity/finalization checks and systematic inactivity-pause/beep tests.
-6. Continue wake-word threshold evaluation separately; the standalone test lab is implemented, but the custom phrase, reliability measurements, and production integration are not complete.
+1. Confirm the current working iMuse repository checkpoint and obtain the latest files for any code edits.
+2. Inspect and test Delete/reset and a fresh second session; avoid speculative changes.
+3. Verify final-file assembly, persisted-source retention on failure, and recovery edge cases.
+4. Check whether quiet speech is mistakenly treated as inactivity and whether paused beeps stop on resume.
+5. Draft the Record-to-Transcribe integration contract for Memora, then plan the merge.
 
-**Guiding principle: Capture first. Preserve continuously. Hands-free controls must be evidence-led and must never jeopardize captured audio.**
+**Not next:** more iPhone headset work, continuous Voicute while recording, or Whisper tiny voice commands. These are explicitly deferred.
+
+**Guiding principle:** Capture first. Preserve continuously. Transcribe later. Optional controls must not jeopardize original audio.
