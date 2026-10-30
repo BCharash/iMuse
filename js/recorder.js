@@ -25,7 +25,8 @@ function assessDeviceClass() {
 const deviceClass = assessDeviceClass();
 const headsetControlOption = document.getElementById("headsetControlOption");
 const headsetControlToggle = document.getElementById("headsetControlToggle");
-let headsetControlsEnabled = deviceClass === "desktop";
+// Opt-in on desktop: browser APIs cannot reliably detect a connected headset.
+let headsetControlsEnabled = false;
 if (headsetControlOption) headsetControlOption.hidden = deviceClass !== "desktop";
 if (headsetControlToggle) {
     headsetControlToggle.checked = headsetControlsEnabled;
