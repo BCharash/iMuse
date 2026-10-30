@@ -1122,3 +1122,84 @@ Proceed toward unifying iMuse Record with Memora. **Reuse Memora's existing desk
 
 Treat earlier DJ005 and next-steps instructions to repeat broad Delete/reset, multi-segment recovery, or generic media-assembly tests as superseded where the user has already confirmed the intended behavior. A narrow review of the actual integration boundary remains appropriate. The companion `iMuse Memora integration handoff.md` is the current agent-facing brief; `iMuse next steps.md` is the current action list. Historical journal entries remain intact.
 
+---
+
+# DJ007 — Heed + TensorFlow Command Laboratory and Voice-Control Integration Decision
+
+**Date:** 30 October 2026  
+**Status:** Laboratory findings and accepted architecture; integration not yet implemented in production
+
+## 58. Purpose and scope
+
+The experiment investigated a small, local, two-stage spoken-control system for iMuse: a wake-word detector (Heed, temporarily recognizing **“Hey Doc”**) followed by TensorFlow.js Speech Commands recognition of the model's existing **“Go”** and **“Stop”** classes. The eventual wake phrase is **“Hey iMuse”**, contingent on obtaining and validating an appropriate custom wake model. No claim is made that the temporary model recognizes “Hey iMuse.”
+
+This research replaces the earlier *proposed* Whisper-tiny command recognizer as the **current preferred design**. Whisper remains the independent Transcribe function in the unified Memora-based application; it must not be required for recording or commands. The older Voicute paused-state prototype remains historical evidence, not the current command architecture.
+
+## 59. Laboratory implementation
+
+The standalone `iMuseCmd.html` experiment used Heed to detect the wake phrase and TensorFlow Speech Commands (`speechCommands.create('BROWSER_FFT')`) for short commands. The observed implementation loaded the command model in advance, then enabled its listener following a recognized wake word, with an audible “Yes” acknowledgment. TensorFlow listened with `probabilityThreshold: 0` and `invokeCallbackOnNoiseAndUnknown: true`; the `overlapFactor` was made selectable to study callback cadence. The laboratory included spoken-event markers, scores, callback timing, and JSON diagnostic export.
+
+The relevant test settings included approximately **Go 0.60**, **Stop 0.85**, and an adjustable Heed threshold. The wake threshold was varied extensively during one iPhone experiment; it is not a controlled optimum. These are laboratory settings, not universally validated production defaults. In the eventual app, thresholds should be configurable through Settings, with appropriate safeguards against accidental Stop.
+
+## 60. Timing problem and overlap experiments
+
+An earlier diagnostic showed a marked Go utterance at 16:16:30.793 UTC, a callback at 16:16:30.943 reporting very low Go probability, and the next logged callback at 16:16:35.639 reporting Go at approximately 99.25%. Recognition followed the marker by about 4.85 seconds, with no intervening callback in that log. This suggested a callback-cadence/scheduling problem, but the data cannot prove the late positive callback represented the first utterance rather than another sound.
+
+Subsequent comparative observations reported in the conversation:
+
+| Metric | MacBook overlap 0.50 | MacBook overlap 0.75 | iPhone overlap 0.75 | iPhone overlap 0.90 |
+|---|---:|---:|---:|---:|
+| Median TensorFlow callback interval | 643 ms | 257 ms | 540 ms | 104 ms |
+| Longest callback gap | 2.09 s | 0.97 s | 6.64 s | 4.18 s |
+| Callback gaps over 1 s | 5 | 0 | 19 | 30 |
+| Go recognitions observed | 10 | 10 | 14 | 26 |
+| Stop recognitions observed | — | — | 1 | 8 |
+
+MacBook median marked-Go recognition delay improved from about **992 ms at 0.50** to **609 ms at 0.75**. iPhone at 0.75 had about **666 ms** median marked-Go delay. These are descriptive results from different runs, not a controlled latency study. Counts of gaps cannot be compared without normalizing for run duration, callback volume, and command-mode boundaries. Some measured intervals may span listener transitions. The user reported **MacBook 0.75 was perfect** in practice, and **iPhone 0.90 gave very good Go recognition**, with occasional missed wake words and more missed Stop commands. Thus the provisional integration configurations are **0.75 for MacBook/desktop and 0.90 for iPhone/mobile**, subject to actual-device testing and fallback. Do not generalize these settings to every desktop or phone.
+
+In the iPhone 0.90 exploration, the log was described as containing **49 marked Hey Doc utterances and 34 wake recognitions**; because sensitivity was repeatedly changed (101 threshold-change events), that difference is **not** a measured false-negative rate. Stop had 12 marked utterances and 8 recognized commands; some unrecognized scores included about 0.835 and 0.722, below the then-used 0.85 threshold. Lowering Stop's threshold could increase accidental termination, so retain the conservative threshold pending in-app evaluation.
+
+## 61. Architectural decision: wake phrase enters command mode
+
+**Accepted by user:** “Hey Doc” (later “Hey iMuse”) is an *attention/wake phrase*, not an instruction to start, resume, or stop on its own. A recognized wake phrase while recording **immediately pauses** the recording, then enables TensorFlow recognition of **Go** or **Stop**. **Go** resumes the same recording; **Stop** finalizes it. When idle, optional enabled wake listening enters command mode without recording, and **Go starts a new recording**; Stop leaves the app idle. When already paused, wake recognition enters command mode and Go resumes the current session. Manual controls and inactivity pause continue to work independently.
+
+Keep the recording lifecycle separate from the recognizer lifecycle. Heed is the normal listening detector; TensorFlow command inference runs **only in command mode**, not as a permanent second high-duty listener. A shared microphone stream/Web Audio fan-out is preferred if supported and shown safe; avoid opening competing microphone streams unnecessarily. Acknowledge commands only when the state transition actually succeeds. If command mode times out or fails, **remain paused** for an existing session and provide manual controls; do not silently resume or finalize. If idle, return to idle. Explicitly define how the user re-enters command mode while paused and how the listener returns to Heed after an unrecognized command. Avoid both recognizers competing for the same speech.
+
+### State transition contract
+
+| Recording state before wake | On recognized wake | Go in command mode | Stop in command mode | No valid command / timeout |
+|---|---|---|---|---|
+| Idle (voice start enabled) | Command mode; no recording yet | Start new recording | Return idle | Return idle |
+| Recording | Pause capture safely, then command mode | Resume existing session | Finalize existing session | Remain paused |
+| Paused (manual/auto/voice) | Command mode | Resume existing session | Finalize existing session | Remain paused |
+
+Do not mistake *automatic silence pause* for final Stop. Ensure a late TensorFlow callback cannot start/resume/stop a different session; associate each command-listening episode with a session ID, state version, and listener-generation token. Suppress duplicate commands during transitions and finalization.
+
+## 62. Important unresolved issue: wake words contaminating recordings
+
+A recognized wake phrase while recording may already have been captured and committed to IndexedDB before Heed signals recognition. If the user repeats “Hey Doc” four times and only the fourth is detected, **the first three attempts are ordinary recorded audio**. Pausing on successful detection prevents subsequent Go/Stop speech from entering the recording but does **not** remove previously captured or missed wake attempts. Do not claim the voice-command scheme solves this automatically.
+
+**Safety-first decision:** retain original captured chunks durably and unchanged. Consider a separate, reversible command-audio exclusion/cleanup layer later, using validated audio boundaries or optional post-processing. Do not erase fixed multi-second windows based on recognition timestamps, particularly when callbacks can be delayed. Do not remove audio solely because a classifier guessed a wake word; that risks deleting legitimate thought. Improving first-attempt wake detection reduces, but does not eliminate, this issue. It is an acknowledged product limitation at first integration, not a reason to delay integrating a safe control pathway.
+
+## 63. Recording safety and coexistence requirements
+
+1. Recording, chunk persistence, IndexedDB recovery, pause/resume, finalization, and manual controls must function **with voice control off, loading, or failed**.
+2. No recognizer, audio processing branch, model load, or UI acknowledgment may block durable chunk writes or cause the application to claim capture continues when it has stopped.
+3. Test microphone coexistence, audible fidelity, dropouts, latency, CPU load, and resource cleanup on actual MacBook Chrome and iPhone Safari/PWA; the standalone lab did not validate capture fidelity under the integrated load.
+4. A pause triggered by Heed must use the recorder's existing supported transition, preserve the same session, and wait for the appropriate state acknowledgment before accepting Go/Stop.
+5. Audio command prompts/beeps should not contaminate the saved recording; any necessary audio routing and timing must be tested, not assumed.
+6. Microphone permission and iOS foreground/suspension limitations still apply. Idle voice-start is optional, enabled only by explicit user action and while the app can actually listen; no lock-screen/background guarantee.
+7. Desktop-only opt-in headset controls remain a separate pathway. Mobile headset buttons remain disabled/deferred. Neither may interfere with voice control or recording persistence.
+
+## 64. Source organization decision
+
+**All TensorFlow command-recognition implementation and its supporting files must live in a dedicated subfolder**, provisionally `js/voice/tensorflow/` (or an equivalent self-contained subfolder agreed after inspecting current source). Keep the main application root uncluttered. A parallel `js/voice/wake/` folder may isolate the Heed adapter; a small `js/voice/` coordinator can implement the state machine. Avoid duplicate copies of TensorFlow or the model assets. The precise tree and URLs must be confirmed against the latest iMuse/Memora code, service-worker/cache policy, and hosting base path before editing. Model download/cache and offline behavior must be explicitly tested; CDN use is not automatically offline.
+
+## 65. Integration recommendation and remaining targeted tests
+
+**Proceed to source audit and incremental iMuse integration rather than another broad standalone overlap laboratory.** First preserve a working commit, obtain the latest current code, map the recorder and existing voice interfaces, and implement the isolated voice-control module behind an opt-in toggle. Integrate one transition at a time: paused-state wake → Go/Stop; active-recording wake → pause → Go/Stop; optional idle wake → Go starts recording. Run a narrow in-app regression suite after each step. Maintain the provisional platform-specific overlaps as configuration, not hardcoded assumptions about all devices.
+
+Further tests are *targeted integration acceptance*, not open-ended research: missed/false wakes during natural recording, accidental Stop prevention, command timeout, listener teardown/restart, recording preservation and recovery with inference enabled, microphone interruptions, and a short actual-iPhone Safari/PWA trial. Train/obtain and separately validate “Hey iMuse” before changing the wake phrase in production. Do not reopen iPhone headset experiments or substitute Whisper tiny for TensorFlow without new evidence.
+
+**Guiding principle:** Wake enters command mode; Go and Stop act on recording state. Capture and recoverability always win over hands-free convenience.
+
