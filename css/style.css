@@ -138,12 +138,6 @@ button:active {
     font-size: 15px;
 }
 
-/* Desktop-only headset control preference */
-.headset-control-option { text-align: center; margin: 0 auto 20px; }
-.headset-control-option[hidden] { display: none; }
-.headset-control-option label { cursor: pointer; }
-.headset-control-option input { accent-color: var(--accent); }
-
 /* Stage 1: settings and microphone status. Existing recording controls unchanged. */
 #settingsButton {display:block;margin:0 auto 14px;background:transparent;color:var(--accent-dark);border:1px solid var(--border);padding:9px 22px}
 .settings-panel {max-width:520px;margin:12px auto 22px;padding:18px;background:var(--surface);border:1px solid var(--border);border-radius:16px}

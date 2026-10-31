@@ -28,26 +28,6 @@ function assessDeviceClass() {
 }
 
 const deviceClass = assessDeviceClass();
-const headsetControlOption = document.getElementById("headsetControlOption");
-const headsetControlToggle = document.getElementById("headsetControlToggle");
-// Opt-in on desktop: browser APIs cannot reliably detect a connected headset.
-let headsetControlsEnabled = deviceClass === "desktop" && getSettings().headsetControls;
-if (headsetControlOption) headsetControlOption.hidden = deviceClass !== "desktop";
-if (headsetControlToggle) {
-    headsetControlToggle.checked = headsetControlsEnabled;
-    headsetControlToggle.addEventListener("change", () => {
-        headsetControlsEnabled = deviceClass === "desktop" && headsetControlToggle.checked;
-        if (!headsetControlsEnabled) stopHeadsetMediaSession();
-        else if (activeSession) startHeadsetMediaSession();
-    });
-}
-window.addEventListener("imuse-settings-changed", event => {
-    const enabled = deviceClass === "desktop" && event.detail.headsetControls;
-    if (enabled === headsetControlsEnabled) return;
-    headsetControlsEnabled = enabled;
-    if (!enabled) stopHeadsetMediaSession();
-    else if (activeSession) startHeadsetMediaSession();
-});
 window.addEventListener("imuse-settings-changed", event => {
     const next = event.detail.wakeEngine;
     const threshold = next === "heed" ? event.detail.wakeThreshold : event.detail.voicuteThreshold;
@@ -318,179 +298,6 @@ async function playMicReadyChime(current) {
     return played;
 }
 
-// Keep a silent HTML media session active on desktop, when enabled, so supported
-// headset media buttons can be routed to this page. This is started only from
-// the user's Start Recording action, never on page load.
-let headsetMediaElement = null;
-let headsetMediaUrl = null;
-
-function createSilentWaveBlob() {
-    const sampleRate = 8000;
-    const sampleCount = 2000; // 250 ms of digital silence
-    const bytes = new ArrayBuffer(44 + sampleCount);
-    const view = new DataView(bytes);
-    const writeText = (offset, value) => {
-        for (let i = 0; i < value.length; i++) view.setUint8(offset + i, value.charCodeAt(i));
-    };
-    writeText(0, "RIFF");
-    view.setUint32(4, 36 + sampleCount, true);
-    writeText(8, "WAVE");
-    writeText(12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true); // PCM
-    view.setUint16(22, 1, true); // mono
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate, true); // byte rate
-    view.setUint16(32, 1, true); // block align
-    view.setUint16(34, 8, true); // 8-bit PCM
-    writeText(36, "data");
-    view.setUint32(40, sampleCount, true);
-    new Uint8Array(bytes, 44).fill(128); // unsigned PCM midpoint = silence
-    return new Blob([bytes], { type: "audio/wav" });
-}
-
-function updateHeadsetPlaybackState(state) {
-    if (deviceClass !== "desktop") return;
-    if (!("mediaSession" in navigator)) return;
-    try {
-        navigator.mediaSession.playbackState = state;
-
-    } catch (error) {
-        console.debug("Could not update headset media-session state:", error);
-    }
-}
-
-function startHeadsetMediaSession() {
-    if (!headsetControlsEnabled) return;
-    if (!("mediaSession" in navigator)) {
-
-        return;
-    }
-    try {
-        if (!headsetMediaElement) {
-            headsetMediaElement = document.createElement("audio");
-            headsetMediaElement.loop = true;
-            headsetMediaElement.preload = "auto";
-            headsetMediaElement.setAttribute("playsinline", "");
-            headsetMediaElement.setAttribute("aria-hidden", "true");
-            headsetMediaElement.style.position = "fixed";
-            headsetMediaElement.style.width = "1px";
-            headsetMediaElement.style.height = "1px";
-            headsetMediaElement.style.opacity = "0";
-            headsetMediaElement.style.pointerEvents = "none";
-            headsetMediaElement.style.left = "-10px";
-            headsetMediaElement.style.bottom = "0";
-            const keepAliveBlob = createSilentWaveBlob();
-            headsetMediaUrl = URL.createObjectURL(keepAliveBlob);
-            headsetMediaElement.volume = 1;
-            headsetMediaElement.muted = false;
-            headsetMediaElement.src = headsetMediaUrl;
-            document.body.appendChild(headsetMediaElement);
-        }
-        navigator.mediaSession.metadata = typeof MediaMetadata === "function"
-            ? new MediaMetadata({
-                title: "iMuse recording",
-                artist: "iMuse",
-                album: "Recording controls"
-            })
-            : null;
-
-        const playPromise = headsetMediaElement.play();
-        if (playPromise && typeof playPromise.catch === "function") {
-            playPromise.catch(error => {
-                console.warn("iMuse headset media session could not start audio playback:", error);
-                setLifecycleStatus(
-                    "Headset media controls may be unavailable because the browser did not start its media session. Recording can still be used normally."
-                );
-            });
-        }
-        updateHeadsetPlaybackState("playing");
-    } catch (error) {
-        console.warn("Could not start iMuse headset media session:", error);
-    }
-}
-
-function keepHeadsetMediaAudioPlaying() {
-    if (!headsetMediaElement) return;
-    try {
-        const playPromise = headsetMediaElement.play();
-        if (playPromise && typeof playPromise.catch === "function") {
-            playPromise.catch(error => {
-                console.debug("Could not resume iMuse headset media audio:", error);
-            });
-        }
-    } catch (error) {
-        console.debug("Could not resume iMuse headset media audio:", error);
-    }
-}
-
-function pauseHeadsetMediaAudio() {
-    if (!headsetMediaElement) return;
-    try {
-        headsetMediaElement.pause();
-    } catch (error) {
-        console.debug("Could not pause iMuse headset media audio:", error);
-    }
-}
-
-function stopHeadsetMediaSession() {
-    if (headsetMediaElement) {
-        try {
-            headsetMediaElement.pause();
-            headsetMediaElement.removeAttribute("src");
-            headsetMediaElement.load();
-            headsetMediaElement.remove();
-        } catch (error) {
-            console.debug("Could not stop headset media session audio:", error);
-        }
-        headsetMediaElement = null;
-    }
-    if (headsetMediaUrl) {
-        URL.revokeObjectURL(headsetMediaUrl);
-        headsetMediaUrl = null;
-    }
-    if (deviceClass === "desktop") updateHeadsetPlaybackState("none");
-}
-
-function resumeOrStartFromHeadset() {
-    if (!activeSession) {
-        startRecording();
-        return;
-    }
-    if (activeSession.recorder.state === "paused") {
-        try {
-            if (headsetControlsEnabled) {
-                keepHeadsetMediaAudioPlaying();
-                updateHeadsetPlaybackState("playing");
-            }
-            activeSession.recorder.resume();
-        } catch (error) {
-            console.warn("Headset resume failed:", error);
-            status.textContent = `Could not resume recording from the headset: ${error.message || error}`;
-        }
-    }
-}
-
-function pauseFromHeadset() {
-    const current = activeSession;
-    if (!current) {
-
-        startRecording();
-        return;
-    }
-    if (current.recorder.state !== "recording") return;
-    try {
-        current.recorder.pause();
-        if (headsetControlsEnabled) {
-            pauseHeadsetMediaAudio();
-            updateHeadsetPlaybackState("paused");
-        }
-    } catch (error) {
-        console.warn("Headset pause failed:", error);
-        status.textContent = `Could not pause recording from the headset: ${error.message || error}`;
-    }
-}
-
 function finalizeRecording() {
     closeCommandWindow();
     const current = activeSession;
@@ -507,37 +314,7 @@ function finalizeRecording() {
         console.error("Recording stop failed:", error);
         recordButton.disabled = false;
         pauseButton.disabled = current.recorder.state !== "recording" && current.recorder.state !== "paused";
-        status.textContent = `Could not stop recording from the headset: ${error.message || error}`;
-    }
-}
-
-function initializeHeadsetMediaActions() {
-    if (deviceClass !== "desktop") return;
-
-    if (!("mediaSession" in navigator) || typeof navigator.mediaSession.setActionHandler !== "function") {
-
-        setLifecycleStatus("This browser does not support Media Session headset controls. On-screen recording controls remain available.");
-        return;
-    }
-    const handlers = {
-        play: resumeOrStartFromHeadset,
-        pause: pauseFromHeadset,
-        stop: finalizeRecording,
-        nexttrack: finalizeRecording,
-        previoustrack: resumeOrStartFromHeadset
-    };
-    for (const [action, handler] of Object.entries(handlers)) {
-        try {
-            navigator.mediaSession.setActionHandler(action, () => {
-                if (!headsetControlsEnabled) return;
-                handler();
-            });
-
-        } catch (error) {
-
-            // Individual actions vary by browser; keep every supported action.
-            console.debug(`Media Session action "${action}" is not supported:`, error);
-        }
+        status.textContent = `Could not stop recording: ${error.message || error}`;
     }
 }
 
@@ -621,12 +398,22 @@ function closeCommandWindow() {
     if (commandInterval !== null) clearInterval(commandInterval);
     commandInterval = null;
     commandIndicator.hidden = true;
+    // Restore the pause reminder only after command listening has ended.
+    // A closed window must not restart beeps after Stop, Resume, or Delete.
+    const pausedSession = activeSession;
+    if (pausedSession && !pausedSession.discard && pausedSession.recorder.state === "paused" &&
+        pausedSession.metadata.state !== "finalizing") {
+        startPausedBeep(pausedSession);
+    }
     const model = commandModel;
     void stopCommands(model).catch(error => console.warn("Cannot stop command listener:", error));
 }
 async function handleWakeDetected(current) {
     if (!getSettings().audioCommands || commandActive || activeSession !== current || !current.wakeDetectorEnabled) return;
     commandActive = true;
+    // Silence the periodic double beep throughout the wake acknowledgement,
+    // model preparation, and Go/Stop listening window.
+    stopPausedBeep(current);
     const generation = ++commandGeneration;
     clearWakeDetectorTimers(current);
     const wasRecording = current.recorder.state === "recording";
@@ -1032,12 +819,14 @@ async function setupSilenceMonitor(current) {
 
 async function playPausedBeep(current) {
     const context = current.audioContext;
-    if (!context || context.state === "closed") return;
+    if (!context || context.state === "closed" || commandActive ||
+        activeSession !== current || current.recorder.state !== "paused") return;
 
     // Keep wake-word detection active while the reminder tone plays.
     try {
         if (context.state === "suspended") await context.resume();
-        if (context.state !== "running") return;
+        if (context.state !== "running" || commandActive ||
+            activeSession !== current || current.recorder.state !== "paused") return;
 
         // Two distinct tones make the paused-state reminder easier to notice.
         const now = context.currentTime;
@@ -1072,6 +861,8 @@ async function playPausedBeep(current) {
 }
 function startPausedBeep(current) {
     stopPausedBeep(current);
+    if (commandActive || activeSession !== current || current.discard ||
+        current.recorder.state !== "paused") return;
     playPausedBeep(current);
     current.pausedBeepTimer = window.setInterval(
         () => playPausedBeep(current),
@@ -1446,7 +1237,6 @@ function closeAudioContext(context) {
 }
 
 async function startRecording() {
-    if (headsetControlsEnabled) startHeadsetMediaSession();
     recordButton.disabled = true;
     pauseButton.disabled = true;
 
@@ -1580,10 +1370,6 @@ async function startRecording() {
             try { await putSession(current.metadata); } catch (error) { console.error(error); }
             pauseButton.textContent = "Resume";
             pauseButton.disabled = false;
-            if (headsetControlsEnabled) {
-                pauseHeadsetMediaAudio();
-                updateHeadsetPlaybackState("paused");
-            }
             current.autoPausing = false;
             current.silenceSince = null;
             if (!commandActive) scheduleWakeDetectorArm(current, 0);
@@ -1605,10 +1391,6 @@ async function startRecording() {
             current.metadata.lastUpdatedAt = new Date().toISOString();
             try { await putSession(current.metadata); } catch (error) { console.error(error); }
             pauseButton.textContent = "Pause";
-            if (headsetControlsEnabled) {
-                keepHeadsetMediaAudioPlaying();
-                updateHeadsetPlaybackState("playing");
-            }
             stopPausedBeep(current);
             if (!commandActive) scheduleWakeDetectorArm(current, 0);
             current.silenceSince = null;
@@ -1626,7 +1408,6 @@ async function startRecording() {
             closeCommandWindow();
             cleanupAudioMonitor(current);
             stopStream(stream);
-            stopHeadsetMediaSession();
             if (activeSession === current) activeSession = null;
             setAudioCommandsToggleLocked(false);
             releaseScreenWakeLock();
@@ -1733,7 +1514,6 @@ deleteButton.addEventListener("click", async () => {
         activeSession = null;
         setAudioCommandsToggleLocked(false);
         cleanupAudioMonitor(current);
-        stopHeadsetMediaSession();
         releaseScreenWakeLock();
         setWakeStatus("Wake-word detector stopped because the recording was deleted.");
         try {
@@ -1770,7 +1550,6 @@ initialize();
 initializeWakeWord();
 // Microphone is acquired only when recording begins; no startup readiness capture.
 setLifecycleStatus("Screen wake lock will be requested while recording, if supported.");
-if (deviceClass === "desktop") initializeHeadsetMediaActions();
 
 // Cache short response files without opening the microphone.
 void prepareSpokenResponses();
