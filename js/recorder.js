@@ -1140,9 +1140,85 @@ async function renderRecoverableSessions() {
         const note = document.createElement("p");
         note.textContent = "Deleted recordings remain in browser storage until permanently deleted. Browser storage is not a guaranteed backup.";
         section.appendChild(note);
+        const selectionBar = document.createElement("div");
+        selectionBar.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;margin:.75rem 0";
+        const selectAllLabel = document.createElement("label");
+        selectAllLabel.style.cssText = "display:inline-flex;align-items:center;gap:.35rem";
+        const selectAll = document.createElement("input");
+        selectAll.type = "checkbox";
+        selectAll.setAttribute("aria-label", "Select all recently deleted recordings");
+        selectAllLabel.append(selectAll, document.createTextNode("Select all"));
+        const selectionCount = document.createElement("span");
+        const deleteSelectedButton = document.createElement("button");
+        deleteSelectedButton.type = "button";
+        deleteSelectedButton.textContent = "Delete selected permanently";
+        const selectedIds = new Set();
+        const selectionBoxes = [];
+        function updateSelection() {
+            selectionCount.textContent = `${selectedIds.size} selected`;
+            deleteSelectedButton.disabled = selectedIds.size === 0;
+            selectAll.checked = selectedIds.size === deletedSessions.length;
+            selectAll.indeterminate = selectedIds.size > 0 && selectedIds.size < deletedSessions.length;
+        }
+        selectAll.addEventListener("change", () => {
+            selectedIds.clear();
+            for (const checkbox of selectionBoxes) {
+                checkbox.checked = selectAll.checked;
+                if (checkbox.checked) selectedIds.add(checkbox.value);
+            }
+            updateSelection();
+        });
+        deleteSelectedButton.addEventListener("click", async () => {
+            const ids = [...selectedIds];
+            if (!ids.length) return;
+            if (!window.confirm(`Permanently delete ${ids.length} selected recording${ids.length === 1 ? "" : "s"} and all their saved audio? This cannot be undone.`)) return;
+            deleteSelectedButton.disabled = true;
+            selectAll.disabled = true;
+            for (const checkbox of selectionBoxes) checkbox.disabled = true;
+            let deleted = 0;
+            const failures = [];
+            for (const id of ids) {
+                try {
+                    const current = await getSession(id);
+                    if (!current || current.state !== "deleted") throw new Error("Recording is no longer in Recently Deleted.");
+                    await deleteSessionData(id);
+                    if (displayedSessionId === id) clearPlayback();
+                    deleted++;
+                } catch (error) {
+                    console.error("Could not permanently delete selected recording:", error);
+                    failures.push(id);
+                }
+            }
+            status.textContent = failures.length
+                ? `${deleted} recording(s) permanently deleted; ${failures.length} could not be deleted and remain available.`
+                : `${deleted} recording(s) permanently deleted.`;
+            try {
+                await renderRecoverableSessions();
+            } catch (error) {
+                console.error("Could not refresh recordings after deletion:", error);
+                status.textContent += " Refresh the page to update the list.";
+                selectAll.disabled = false;
+                for (const checkbox of selectionBoxes) checkbox.disabled = false;
+                updateSelection();
+            }
+        });
+        selectionBar.append(selectAllLabel, selectionCount, deleteSelectedButton);
+        section.appendChild(selectionBar);
+        updateSelection();
         for (const item of deletedSessions) {
             const row = document.createElement("div");
             row.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem";
+            const selectionBox = document.createElement("input");
+            selectionBox.type = "checkbox";
+            selectionBox.value = item.id;
+            selectionBox.setAttribute("aria-label", `Select recording from ${formatDate(item.startedAt)} for permanent deletion`);
+            selectionBox.addEventListener("change", () => {
+                if (selectionBox.checked) selectedIds.add(item.id);
+                else selectedIds.delete(item.id);
+                updateSelection();
+            });
+            selectionBoxes.push(selectionBox);
+            row.appendChild(selectionBox);
             const label = document.createElement("span");
             label.style.flex = "1 1 12rem";
             label.textContent = `${formatDate(item.startedAt)} — deleted ${formatDate(item.deletedAt)}`;
