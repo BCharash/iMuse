@@ -578,6 +578,32 @@ async function initializeWakeWord() {
 // Voice command state is independent of MediaRecorder state.
 const commandIndicator = document.getElementById("commandListening");
 const commandCountdown = document.getElementById("commandCountdown");
+const commandTimerProgress = document.getElementById("commandTimerProgress");
+const commandTimerHand = document.getElementById("commandTimerHand");
+function updateCommandTimer(remainingFraction) {
+    if (!commandTimerProgress) return;
+    const fraction = Math.max(0, Math.min(1, remainingFraction));
+    const cx = 20, cy = 20, radius = 17;
+    if (fraction >= 0.99999) {
+        commandTimerProgress.setAttribute("d", `M ${cx} ${cy-radius} A ${radius} ${radius} 0 1 1 ${cx} ${cy+radius} A ${radius} ${radius} 0 1 1 ${cx} ${cy-radius} Z`);
+        commandTimerHand.setAttribute("visibility", "hidden");
+    } else if (fraction <= 0) {
+        commandTimerProgress.setAttribute("d", "");
+        commandTimerHand.setAttribute("visibility", "hidden");
+    } else {
+        // The blue sector shrinks from its clockwise edge; its boundary travels
+        // counterclockwise toward 12 o'clock as the command window expires.
+        const angle = -Math.PI / 2 + fraction * 2 * Math.PI;
+        const x = cx + radius * Math.cos(angle);
+        const y = cy + radius * Math.sin(angle);
+        const largeArc = fraction > 0.5 ? 1 : 0;
+        commandTimerProgress.setAttribute("d", `M ${cx} ${cy} L ${cx} ${cy-radius} A ${radius} ${radius} 0 ${largeArc} 1 ${x} ${y} Z`);
+        commandTimerHand.setAttribute("x2", String(x));
+        commandTimerHand.setAttribute("y2", String(y));
+        commandTimerHand.setAttribute("visibility", "visible");
+    }
+}
+
 let commandActive = false, commandGeneration = 0, commandInterval = null;
 let commandModel = null, commandStream = null;
 // Spoken responses are serialized by one dedicated audio manager.
@@ -630,7 +656,7 @@ async function handleWakeDetected(current) {
         const seconds = getSettings().commandWindow;
         const expiresAt = performance.now() + seconds * 1000;
         commandIndicator.hidden = false;
-        commandCountdown.textContent = `${Math.ceil(seconds)} s`;
+        updateCommandTimer(1);
         await startCommands(commandModel, commandStream, effectiveOverlap(deviceClass), scores => {
             if (generation !== commandGeneration || !commandActive || performance.now() >= expiresAt) return;
             const settings = getSettings();
@@ -648,7 +674,7 @@ async function handleWakeDetected(current) {
         commandInterval = setInterval(() => {
             if (generation !== commandGeneration || !commandActive) return;
             const remaining = Math.max(0, (expiresAt - performance.now()) / 1000);
-            commandCountdown.textContent = `${Math.ceil(remaining)} s`;
+            updateCommandTimer(remaining / seconds);
             if (remaining === 0) {
                 closeCommandWindow();
                 if (activeSession === current) scheduleWakeDetectorArm(current, 0);

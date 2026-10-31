@@ -174,3 +174,10 @@ button:active {
 .microphone-choice-controls { display:flex; gap:8px; align-items:center; margin-top:6px; }
 .microphone-choice-controls select { flex:1; min-width:0; padding:9px; border:1px solid var(--border); border-radius:8px; }
 .microphone-choice-controls button { padding:9px 12px; }
+
+/* Compact solid pie countdown; blue area shrinks counterclockwise. */
+.command-listening { display: flex; align-items: center; justify-content: center; gap: 9px; }
+.command-timer { width: 28px; height: 28px; flex: 0 0 28px; }
+.command-timer-track { fill: var(--surface); stroke: var(--border); stroke-width: 1; }
+.command-timer-progress { fill: #9bdcf5; stroke: none; }
+.command-timer-hand { stroke: #35424b; stroke-width: 0.85; }

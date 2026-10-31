@@ -51,7 +51,7 @@
     <p id="microphoneStatus" class="microphone-status" role="status">Microphone: inactive (not listening)</p>
 
     <div id="recordingStatusGroup">
-    <div id="commandListening" class="command-listening" hidden role="status" aria-live="polite">Listening for Go or Stop <span id="commandCountdown"></span></div>
+    <div id="commandListening" class="command-listening" hidden role="status" aria-live="polite">Listening for Go or Stop <svg id="commandCountdown" class="command-timer" viewBox="0 0 40 40" aria-hidden="true"><circle class="command-timer-track" cx="20" cy="20" r="17"></circle><path id="commandTimerProgress" class="command-timer-progress"></path><line id="commandTimerHand" class="command-timer-hand" x1="20" y1="20" x2="20" y2="3" visibility="hidden"></line></svg></div>
     <div id="status" role="status" aria-live="polite">Ready to record.</div>
     <p id="wakeStatus" aria-live="polite">Wake-word detector: loading…</p>
     <p id="lifecycleStatus" aria-live="polite">Screen wake lock will be requested while recording, if supported.</p>
