@@ -48,10 +48,13 @@
     </button>
 
 
-    <div id="headsetControlOption" class="headset-control-option" hidden>
-        <label for="headsetControlToggle">
-            <input type="checkbox" id="headsetControlToggle"> Headset controls
-        </label>
+    <p id="microphoneStatus" class="microphone-status" role="status">Microphone: not yet identified</p>
+
+    <div id="recordingStatusGroup">
+    <div id="commandListening" class="command-listening" hidden role="status" aria-live="polite">Listening for Go or Stop <span id="commandCountdown"></span></div>
+    <div id="status" role="status" aria-live="polite">Ready to record.</div>
+    <p id="wakeStatus" aria-live="polite">Wake-word detector: loading…</p>
+    <p id="lifecycleStatus" aria-live="polite">Screen wake lock will be requested while recording, if supported.</p>
     </div>
 
     <audio
@@ -67,20 +70,28 @@
     </div>
 
 
-    <div id="status" role="status" aria-live="polite">
-        Ready to record.
-    </div>
 
-    <p id="wakeStatus" aria-live="polite">
-        Wake-word detector: loading the free public demo model…
-    </p>
-
-    <p id="lifecycleStatus" aria-live="polite">
-        Screen wake lock will be requested while recording, if supported.
-    </p>
+    <button id="settingsButton" type="button" aria-expanded="false" aria-controls="settingsPanel">Settings</button>
+    <section id="settingsPanel" class="settings-panel" hidden aria-label="Voice control settings">
+        <h2>Settings</h2>
+        <label id="headsetControlOption" class="settings-check" hidden><input type="checkbox" id="headsetControlToggle"> Headset controls (desktop)</label>
+        <label class="settings-check"><input type="checkbox" id="audioCommandsToggle"> Audio commands</label>
+        <div id="voiceSettings">
+            <label>Wake-word engine <select id="wakeEngine"><option value="voicute">Voicute — Hey Friday</option><option value="heed">Heed — Hey Doc</option></select></label>
+            <label id="voicuteThresholdRow">Voicute threshold <output id="voicuteThresholdValue"></output><input type="range" id="voicuteThreshold" min="0.3" max="0.95" step="0.01"></label>
+            <label id="heedThresholdRow">Heed threshold <output id="wakeThresholdValue"></output><input type="range" id="wakeThreshold" min="0.3" max="0.99" step="0.001"></label>
+            <label>Command listening window (seconds) <output id="commandWindowValue"></output><input type="range" id="commandWindow" min="2" max="15" step="1"></label>
+            <label>Go threshold <output id="goThresholdValue"></output><input type="range" id="goThreshold" min="0.3" max="0.99" step="0.01"></label>
+            <label>Stop threshold <output id="stopThresholdValue"></output><input type="range" id="stopThreshold" min="0.3" max="0.99" step="0.01"></label>
+            <label>TensorFlow overlap <select id="overlapFactor"><option value="auto">Automatic (desktop 0.75 / mobile 0.90)</option><option value="0.5">0.50</option><option value="0.75">0.75</option><option value="0.9">0.90</option></select></label>
+        </div>
+        <p class="settings-note">Settings are saved on this device. Wake phrases enter the Go/Stop command window during recording or pause.</p>
+    </section>
+    <section id="savedRecordingsLocation" aria-label="Saved recordings"></section>
 
 </main>
 
+<script type="module" src="js/settings.js"></script>
 <script
     type="module"
     src="js/recorder.js">

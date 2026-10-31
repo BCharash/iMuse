@@ -1,4 +1,7 @@
-import { loadVoicuteWakeWord } from "./wake-word.js";
+import { loadVoicuteWakeWord } from "./voicute/voicute-adapter.js";
+import { loadHeedWakeWord } from "./heed/heed-adapter.js";
+import { getSettings, effectiveOverlap } from "./settings.js";
+import { loadCommands, startCommands, stopCommands } from "./tensorflow/commands-adapter.js";
 
 const recordButton = document.getElementById("recordButton");
 const pauseButton = document.getElementById("pauseButton");
@@ -26,7 +29,7 @@ const deviceClass = assessDeviceClass();
 const headsetControlOption = document.getElementById("headsetControlOption");
 const headsetControlToggle = document.getElementById("headsetControlToggle");
 // Opt-in on desktop: browser APIs cannot reliably detect a connected headset.
-let headsetControlsEnabled = false;
+let headsetControlsEnabled = deviceClass === "desktop" && getSettings().headsetControls;
 if (headsetControlOption) headsetControlOption.hidden = deviceClass !== "desktop";
 if (headsetControlToggle) {
     headsetControlToggle.checked = headsetControlsEnabled;
@@ -36,9 +39,40 @@ if (headsetControlToggle) {
         else if (activeSession) startHeadsetMediaSession();
     });
 }
+window.addEventListener("imuse-settings-changed", event => {
+    const enabled = deviceClass === "desktop" && event.detail.headsetControls;
+    if (enabled === headsetControlsEnabled) return;
+    headsetControlsEnabled = enabled;
+    if (!enabled) stopHeadsetMediaSession();
+    else if (activeSession) startHeadsetMediaSession();
+});
+window.addEventListener("imuse-settings-changed", event => {
+    const next = event.detail.wakeEngine;
+    const threshold = next === "heed" ? event.detail.wakeThreshold : event.detail.voicuteThreshold;
+    if (!event.detail.audioCommands) {
+        closeCommandWindow();
+        if (activeSession) clearWakeDetectorTimers(activeSession);
+        setWakeStatus("Audio commands disabled.");
+    }
+    if (next !== selectedWakeEngine) {
+        closeCommandWindow();
+        selectedWakeEngine = next;
+        WAKE_THRESHOLD = threshold;
+        if (activeSession) clearWakeDetectorTimers(activeSession);
+        wakeWord = null;
+        void initializeWakeWord();
+    } else if (threshold !== WAKE_THRESHOLD) {
+        WAKE_THRESHOLD = threshold;
+        wakeWord?.engine?.setThreshold?.(threshold);
+    }
+    if (event.detail.audioCommands && activeSession && !commandActive && wakeWord) {
+        scheduleWakeDetectorArm(activeSession, 0);
+    }
+});
 window.deviceClass = deviceClass;
 
-const WAKE_THRESHOLD = 0.9;
+let WAKE_THRESHOLD = getSettings().voicuteThreshold;
+let selectedWakeEngine = getSettings().wakeEngine;
 const WAKE_DETECT_COOLDOWN_MS = 1500;
 let wakeWord = null;
 let wakeWordPhrase = "Hey Friday";
@@ -154,6 +188,15 @@ async function deleteSessionData(id) {
     const chunkStore = transaction.objectStore(CHUNK_STORE);
     for (const chunk of chunks) chunkStore.delete([id, chunk.sequence]);
     await transactionDone(transaction);
+}
+
+function displayActiveMicrophone(stream) {
+    const output = document.getElementById("microphoneStatus");
+    if (!output) return;
+    const track = stream?.getAudioTracks()?.[0];
+    if (!track) { output.textContent = "Microphone: unavailable"; return; }
+    const name = track.label?.trim() || "Default microphone (browser did not provide a name)";
+    output.textContent = `Microphone: ${name}`;
 }
 
 function stopStream(stream) {
@@ -467,6 +510,7 @@ function pauseFromHeadset() {
 }
 
 function finalizeRecording() {
+    closeCommandWindow();
     const current = activeSession;
     if (!current || !["recording", "paused"].includes(current.recorder.state)) return;
     recordButton.disabled = true;
@@ -529,25 +573,108 @@ function setLifecycleStatus(message) {
 }
 
 async function initializeWakeWord() {
-    setWakeStatus("Wake-word detector: loading the free Voicute demo model…");
+ const engineName=selectedWakeEngine;
+ WAKE_THRESHOLD=engineName==="heed"?getSettings().wakeThreshold:getSettings().voicuteThreshold;
+ wakeWordLoadError=null;
+ setWakeStatus(`Wake-word detector: loading ${engineName}…`);
+ try {
+  const loaded=engineName==="heed"
+   ?await loadHeedWakeWord({threshold:WAKE_THRESHOLD,onStatus:setWakeStatus})
+   :await loadVoicuteWakeWord({threshold:WAKE_THRESHOLD,onStatus:setWakeStatus});
+  if(selectedWakeEngine!==engineName)return;
+  wakeWord=loaded;
+  wakeWordPhrase=loaded.phrase;
+  setWakeStatus(`Wake-word detector ready: ${engineName} — “${wakeWordPhrase}” (threshold ${WAKE_THRESHOLD.toFixed(2)}).`);
+  if(activeSession && getSettings().audioCommands)scheduleWakeDetectorArm(activeSession,0);
+ }catch(error){
+  if(selectedWakeEngine!==engineName)return;
+  wakeWordLoadError=error;
+  setWakeStatus(`Wake-word detector unavailable: ${error.message||error}. Manual controls remain available.`);
+ }
+}
+
+// Voice command state is independent of MediaRecorder state.
+const commandIndicator = document.getElementById("commandListening");
+const commandCountdown = document.getElementById("commandCountdown");
+let commandActive = false, commandGeneration = 0, commandInterval = null;
+let commandModel = null, commandStream = null;
+const responseFiles = {
+    pause: "audio/pause.wav", yes: "audio/yes.wav", recording: "audio/recording.wav",
+    newRecording: "audio/new-recording.wav", stopped: "audio/recording-stopped.wav"
+};
+async function sayResponse(name) {
+    const sound = new Audio(responseFiles[name]);
     try {
-        wakeWord = await loadVoicuteWakeWord({
-            threshold: WAKE_THRESHOLD,
-            onStatus: setWakeStatus
+        await new Promise((resolve, reject) => {
+            sound.onended = resolve;
+            sound.onerror = () => reject(new Error(`Cannot play ${responseFiles[name]}`));
+            sound.play().catch(reject);
         });
-        wakeWordPhrase = wakeWord.phrase || "the loaded wake phrase";
-        setWakeStatus(
-            `Wake-word detector ready: say “${wakeWordPhrase}” after iMuse pauses. Threshold ${WAKE_THRESHOLD.toFixed(2)}.`
-        );
-        if (activeSession && activeSession.recorder.state === "paused") {
-            scheduleWakeDetectorArm(activeSession, 0);
-        }
+    } catch (error) { console.warn("Voice response unavailable:", error); }
+}
+function closeCommandWindow() {
+    commandActive = false;
+    ++commandGeneration;
+    if (commandInterval !== null) clearInterval(commandInterval);
+    commandInterval = null;
+    commandIndicator.hidden = true;
+    const model = commandModel;
+    void stopCommands(model).catch(error => console.warn("Cannot stop command listener:", error));
+}
+async function handleWakeDetected(current) {
+    if (!getSettings().audioCommands || commandActive || activeSession !== current || !current.wakeDetectorEnabled) return;
+    commandActive = true;
+    const generation = ++commandGeneration;
+    clearWakeDetectorTimers(current);
+    const wasRecording = current.recorder.state === "recording";
+    if (wasRecording) {
+        try { current.recorder.pause(); } catch (error) { console.warn("Wake pause failed", error); }
+    }
+    setWakeStatus(`Detected “${wakeWordPhrase}”; preparing Go / Stop.`);
+    // Keep the paused reminder; the voice response completes before the command timer starts.
+    await sayResponse(wasRecording ? "pause" : "yes");
+    if (generation !== commandGeneration || !commandActive || activeSession !== current) return;
+    try {
+        commandModel = await loadCommands();
+        if (generation !== commandGeneration || !commandActive) return;
+        commandStream = current.stream;
+        const seconds = getSettings().commandWindow;
+        const expiresAt = performance.now() + seconds * 1000;
+        commandIndicator.hidden = false;
+        commandCountdown.textContent = `${seconds.toFixed(1)} s`;
+        await startCommands(commandModel, commandStream, effectiveOverlap(deviceClass), scores => {
+            if (generation !== commandGeneration || !commandActive || performance.now() >= expiresAt) return;
+            const settings = getSettings();
+            const command = scores.top === "go" && scores.go >= settings.goThreshold ? "go"
+                : scores.top === "stop" && scores.stop >= settings.stopThreshold ? "stop" : null;
+            if (!command) return;
+            closeCommandWindow();
+            if (command === "go") {
+                void (async () => {
+                    await sayResponse("recording");
+                    if (activeSession === current && current.recorder.state === "paused") current.recorder.resume();
+                })();
+            } else {
+                finalizeRecording();
+                void sayResponse("stopped");
+            }
+        });
+        if (generation !== commandGeneration || !commandActive) return;
+        commandInterval = setInterval(() => {
+            if (generation !== commandGeneration || !commandActive) return;
+            const remaining = Math.max(0, (expiresAt - performance.now()) / 1000);
+            commandCountdown.textContent = `${remaining.toFixed(1)} s`;
+            if (remaining === 0) {
+                closeCommandWindow();
+                if (activeSession === current) scheduleWakeDetectorArm(current, 0);
+                setWakeStatus(`Command timed out. Listening for “${wakeWordPhrase}”.`);
+            }
+        }, 100);
     } catch (error) {
-        wakeWordLoadError = error;
-        console.warn("Voicute wake-word model could not be loaded:", error);
-        setWakeStatus(
-            `Wake-word detector unavailable (${error.message || "model load failed"}). Recording and manual controls remain available.`
-        );
+        console.warn("TensorFlow command recognition failed:", error);
+        closeCommandWindow();
+        if (activeSession === current) scheduleWakeDetectorArm(current, 0);
+        setWakeStatus(`Go / Stop unavailable: ${error.message || error}. Manual controls remain available.`);
     }
 }
 
@@ -557,7 +684,7 @@ function resetWakeAudioBuffer(current) {
     if (current.wakeRing) current.wakeRing.fill(0);
     if (wakeWord?.engine?.reset) {
         try { wakeWord.engine.reset(); } catch (error) {
-            console.warn("Could not reset Voicute inference state:", error);
+            console.warn("Could not reset wake inference state:", error);
         }
     }
 }
@@ -568,8 +695,8 @@ function scheduleWakeDetectorArm(current, delayMs = 650) {
         window.clearTimeout(current.wakeRearmTimer);
         current.wakeRearmTimer = null;
     }
-    if (!wakeWord || !current.wakeRing) {
-        setWakeStatus(wakeWordLoadError
+    if (!getSettings().audioCommands || !wakeWord || !current.wakeRing) {
+        setWakeStatus(!getSettings().audioCommands ? "Audio commands disabled." : wakeWordLoadError
             ? "Wake-word detector unavailable; use Resume manually."
             : "Wake-word detector is loading; use Resume manually if needed.");
         return;
@@ -579,14 +706,14 @@ function scheduleWakeDetectorArm(current, delayMs = 650) {
         if (
             activeSession !== current ||
             current.discard ||
-            current.recorder.state !== "paused" ||
-            !wakeWord
+            !["paused", "recording"].includes(current.recorder.state) ||
+            !wakeWord || !getSettings().audioCommands || commandActive
         ) return;
 
         resetWakeAudioBuffer(current);
         current.wakeDetectorEnabled = true;
         setWakeStatus(
-            `Listening for “${wakeWordPhrase}” while paused (threshold ${WAKE_THRESHOLD.toFixed(2)}).`
+            `Listening for “${wakeWordPhrase}” (threshold ${WAKE_THRESHOLD.toFixed(2)}).`
         );
     }, delayMs);
 }
@@ -598,13 +725,25 @@ async function runWakeWordInference(current, sampleRate) {
         current.wakeInferenceBusy ||
         activeSession !== current ||
         current.discard ||
-        current.recorder.state !== "paused" ||
+        !["paused", "recording"].includes(current.recorder.state) ||
         !current.wakeRing
     ) return;
 
     const engine = wakeWord.engine;
     current.wakeInferenceBusy = true;
     try {
+        if(selectedWakeEngine==="heed"){
+          const needed=2048;
+          if(current.wakeCollectedSamples<needed)return;
+          const raw=new Float32Array(needed);
+          const start=(current.wakeRingPos-needed+current.wakeRing.length)%current.wakeRing.length;
+          for(let i=0;i<needed;i++)raw[i]=current.wakeRing[(start+i)%current.wakeRing.length];
+          const result=await engine.consume(raw,sampleRate);
+          if(result?.triggered && current.wakeDetectorEnabled && activeSession === current) {
+            void handleWakeDetected(current);
+          }
+          return;
+        }
         const samplesNeededAt16k = engine.audioSamplesNeeded();
         const needed = Math.ceil(samplesNeededAt16k * sampleRate / 16000);
         if (current.wakeCollectedSamples < needed || needed <= 0 || needed > current.wakeRing.length) return;
@@ -636,7 +775,7 @@ async function runWakeWordInference(current, sampleRate) {
             !result ||
             !current.wakeDetectorEnabled ||
             activeSession !== current ||
-            current.recorder.state !== "paused"
+            !["paused", "recording"].includes(current.recorder.state)
         ) return;
 
         const probability = Number(result.prob) || 0;
@@ -650,28 +789,12 @@ async function runWakeWordInference(current, sampleRate) {
             result.sigmoid
         );
 
-        if (detected && activeSession === current && current.recorder.state === "paused") {
-            current.wakeDetectorEnabled = false;
-            if (current.wakeRearmTimer !== null) {
-                window.clearTimeout(current.wakeRearmTimer);
-                current.wakeRearmTimer = null;
-            }
-            stopPausedBeep(current);
-            setWakeStatus(
-                `Detected “${detected}” (${Math.round(probability * 100)}%); resuming recording.`
-            );
-            status.textContent = `Wake phrase detected — resuming recording.`;
-            if (navigator.vibrate) navigator.vibrate(60);
-            try {
-                current.recorder.resume();
-            } catch (error) {
-                console.warn("Wake-word resume failed:", error);
-                setWakeStatus(`Wake phrase detected, but resume failed: ${error.message || error}`);
-            }
+        if (detected && activeSession === current && current.wakeDetectorEnabled) {
+            void handleWakeDetected(current);
         }
     } catch (error) {
         current.wakeDetectorEnabled = false;
-        console.warn("Voicute inference failed:", error);
+        console.warn("Wake-word inference failed:", error);
         setWakeStatus(`Wake-word inference stopped after an error: ${error.message || error}. Use Resume manually.`);
     } finally {
         current.wakeInferenceBusy = false;
@@ -738,7 +861,7 @@ function handleVisibilityChange() {
             activeSession.audioContext.resume().then(() => {
                 if (
                     activeSession &&
-                    activeSession.recorder.state === "paused" &&
+                    ["paused", "recording"].includes(activeSession.recorder.state) &&
                     wakeWord
                 ) {
                     scheduleWakeDetectorArm(activeSession, 0);
@@ -747,7 +870,7 @@ function handleVisibilityChange() {
                 console.warn("Could not resume Web Audio after visibility change:", error);
                 setLifecycleStatus("Audio processing did not resume automatically. Keep iMuse visible and check microphone access.");
             });
-        } else if (activeSession.recorder.state === "paused" && wakeWord) {
+        } else if (["paused", "recording"].includes(activeSession.recorder.state) && wakeWord) {
             scheduleWakeDetectorArm(activeSession, 0);
         }
         requestScreenWakeLock();
@@ -807,7 +930,7 @@ async function setupSilenceMonitor(current) {
                 current.wakeRingPos = (current.wakeRingPos + 1) % current.wakeRing.length;
             }
             current.wakeCollectedSamples += input.length;
-            if (current.wakeDetectorEnabled && current.recorder.state === "paused") {
+            if (current.wakeDetectorEnabled && ["paused", "recording"].includes(current.recorder.state)) {
                 runWakeWordInference(current, context.sampleRate);
             }
         };
@@ -997,7 +1120,16 @@ function clearPlayback() {
     }
 }
 
+function setAudioCommandsToggleLocked(locked) {
+    const toggle = document.getElementById("audioCommandsToggle");
+    if (toggle) {
+        toggle.disabled = locked;
+        toggle.title = locked ? "Stop this recording before changing Audio commands." : "";
+    }
+}
+
 function setReadyUI() {
+    setAudioCommandsToggleLocked(false);
     recordButton.textContent = "Start Recording";
     recordButton.disabled = false;
     pauseButton.textContent = "Pause";
@@ -1103,7 +1235,7 @@ function ensureRecoveryPanel() {
     heading.textContent = "Saved recordings";
     heading.style.fontSize = "1.1rem";
     recoveryPanel.appendChild(heading);
-    status.insertAdjacentElement("afterend", recoveryPanel);
+    document.getElementById("savedRecordingsLocation").appendChild(recoveryPanel);
     return recoveryPanel;
 }
 
@@ -1321,6 +1453,7 @@ async function initializeMicrophoneReadiness() {
         // Request permission during app initialization, not at the moment the
         // user wants to speak. The stream is released after this test.
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        displayActiveMicrophone(stream);
         const track = stream.getAudioTracks()[0];
         if (!track || track.readyState !== "live" || track.muted) {
             throw new Error("The microphone permission was granted, but no live audio track is available.");
@@ -1390,6 +1523,7 @@ async function startRecording() {
     let stream;
     try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        displayActiveMicrophone(stream);
         if (requestId !== startRequest) {
             stopStream(stream);
             return;
@@ -1445,6 +1579,8 @@ async function startRecording() {
             micUnavailableNotice: false
         };
         activeSession = current;
+        // Freeze voice-command preference throughout this recording session.
+        setAudioCommandsToggleLocked(true);
 
         const microphoneTrack = stream.getAudioTracks()[0];
         if (microphoneTrack) {
@@ -1509,12 +1645,11 @@ async function startRecording() {
             }
             current.autoPausing = false;
             current.silenceSince = null;
-            current.wakeDetectorEnabled = false;
-            scheduleWakeDetectorArm(current, 0);
+            if (!commandActive) scheduleWakeDetectorArm(current, 0);
             startPausedBeep(current);
             status.textContent = current.pauseReason === "silence"
-                ? `Paused automatically after ${SILENCE_PAUSE_MS / 1000} seconds of silence. Say “${wakeWordPhrase}” to resume, or press Resume.`
-                : `Paused — ${current.metadata.chunkCount} chunks saved so far. Say “${wakeWordPhrase}” to resume, or press Resume.`;
+                ? `Paused automatically after ${SILENCE_PAUSE_MS / 1000} seconds of silence. Say “${wakeWordPhrase}” for voice commands, or press Resume.`
+                : `Paused — ${current.metadata.chunkCount} chunks saved so far. Say “${wakeWordPhrase}” for voice commands, or press Resume.`;
         });
         recorder.addEventListener("resume", async () => {
             if (activeSession !== current || current.discard) return;
@@ -1527,21 +1662,23 @@ async function startRecording() {
                 updateHeadsetPlaybackState("playing");
             }
             stopPausedBeep(current);
-            clearWakeDetectorTimers(current);
+            if (!commandActive) scheduleWakeDetectorArm(current, 0);
             current.silenceSince = null;
             current.pauseReason = null;
             current.autoPausing = false;
-            setWakeStatus(`Wake-word inference is off while recording. It will listen for “${wakeWordPhrase}” after a pause.`);
+            if (!commandActive) setWakeStatus(`Listening for “${wakeWordPhrase}” while recording.`);
             status.textContent = "Recording resumed.";
             playRecordingStartCue(current);
         });
         recorder.addEventListener("stop", async () => {
             if (current.stopHandled) return;
             current.stopHandled = true;
+            closeCommandWindow();
             cleanupAudioMonitor(current);
             stopStream(stream);
             stopHeadsetMediaSession();
             if (activeSession === current) activeSession = null;
+            setAudioCommandsToggleLocked(false);
             releaseScreenWakeLock();
             setWakeStatus("Wake-word detector idle. Start a recording to test it.");
             if (current.discard) {
@@ -1589,9 +1726,8 @@ async function startRecording() {
         pauseButton.disabled = false;
         status.textContent = `Recording in ${formatLabel} — saving audio chunks as they arrive.`;
 
-        setWakeStatus(wakeWord
-            ? `Wake-word inference is off while recording. It will listen for “${wakeWordPhrase}” after a pause.`
-            : "Wake-word model is unavailable or still loading; manual recording controls remain available.");
+        if (getSettings().audioCommands) scheduleWakeDetectorArm(current, 0);
+        else setWakeStatus("Audio commands disabled; manual controls available.");
         requestScreenWakeLock();
         playRecordingStartCue(current);
     } catch (error) {
@@ -1601,6 +1737,7 @@ async function startRecording() {
         recordButton.disabled = false;
         recordButton.textContent = "Start Recording";
         pauseButton.disabled = true;
+        if (!activeSession) setAudioCommandsToggleLocked(false);
         status.textContent = `Could not start durable recording: ${error.message || "microphone unavailable"}`;
     }
 }
@@ -1616,6 +1753,7 @@ recordButton.addEventListener("click", () => {
 pauseButton.addEventListener("click", () => {
     const current = activeSession;
     if (!current) return;
+    closeCommandWindow();
     try {
         if (current.recorder.state === "recording") {
             current.recorder.pause();
@@ -1634,11 +1772,13 @@ pauseButton.addEventListener("click", () => {
 
 deleteButton.addEventListener("click", async () => {
     startRequest++;
+    closeCommandWindow();
     const current = activeSession;
     const savedSessionId = current ? current.id : displayedSessionId;
     if (current) {
         current.discard = true;
         activeSession = null;
+        setAudioCommandsToggleLocked(false);
         cleanupAudioMonitor(current);
         stopHeadsetMediaSession();
         releaseScreenWakeLock();

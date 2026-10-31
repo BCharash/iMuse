@@ -143,3 +143,28 @@ button:active {
 .headset-control-option[hidden] { display: none; }
 .headset-control-option label { cursor: pointer; }
 .headset-control-option input { accent-color: var(--accent); }
+
+/* Stage 1: settings and microphone status. Existing recording controls unchanged. */
+#settingsButton {display:block;margin:0 auto 14px;background:transparent;color:var(--accent-dark);border:1px solid var(--border);padding:9px 22px}
+.settings-panel {max-width:520px;margin:12px auto 22px;padding:18px;background:var(--surface);border:1px solid var(--border);border-radius:16px}
+.settings-panel[hidden],.command-listening[hidden] {display:none}
+.settings-panel h2 {margin:0 0 12px;font-size:20px}
+.settings-check {display:block;margin:8px 0}
+#voiceSettings {display:grid;gap:14px;margin-top:14px}
+#voiceSettings label {display:grid;gap:3px;font-size:14px}
+#voiceSettings output {color:var(--accent-dark);font-weight:600}
+#voiceSettings input[type=range] {width:100%;accent-color:var(--accent)}
+#voiceSettings select {width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;background:white}
+.settings-note {font-size:12px;color:var(--muted)}
+.microphone-status {text-align:center;font-size:13px;color:var(--accent-dark);overflow-wrap:anywhere}
+.command-listening {margin:12px auto;padding:12px;border:1px solid var(--accent);border-radius:12px;text-align:center;font-weight:600}
+
+/* Wake engine selection; microphone remains outside the collapsible Settings panel. */
+#heedThresholdRow[hidden],#voicuteThresholdRow[hidden]{display:none}
+.microphone-status{margin:4px auto 16px;padding:8px 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface);font-weight:600}
+
+#recordingStatusGroup { margin: 12px auto 20px; text-align: center; }
+#recordingStatusGroup #status { margin: 12px 0; }
+#recordingStatusGroup #wakeStatus, #recordingStatusGroup #lifecycleStatus { margin: 8px auto; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+#savedRecordingsLocation { margin-top: 26px; }
+#savedRecordingsLocation:empty { display: none; }
