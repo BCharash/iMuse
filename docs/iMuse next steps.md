@@ -1,64 +1,42 @@
 # iMuse next steps
 
-**Updated:** 30 October 2026  
-**Status:** Current action plan; supersedes earlier priority lists without erasing historical journal entries. This plan does not itself authorize edits to production code.
+**Updated:** 31 October 2026  
+**Status:** Current priorities following Heed/Voicute and TensorFlow integration. This is a planning document, not an independent runtime certification or authorization to change code.
 
-## Goal and decision
+## Goal and protected invariants
 
-Build one unified iMuse application using Memora as the technical foundation, with tabs **Record → Transcribe → Edit and Combine → Search**. Record remains independent of Whisper/transcription and retains incremental IndexedDB preservation, crash recovery, manual and inactivity pause/resume, completed-file export, and existing saved-session behavior. Reuse Memora's file import/save and transcription/model infrastructure. Preserve original audio after handoff.
+Unify iMuse Record with Memora's Transcribe, Edit and Combine, and Search workflows. Record is independent of Whisper and recognition-model availability. Preserve incremental IndexedDB audio persistence, crash recovery, original saved sessions, manual controls, and accurate media format metadata. Never delete source audio as a side effect of transcription or handoff.
 
-**Decision from 30 October:** Stop broad standalone command-overlap experimentation and **proceed toward integrating Heed wake + TensorFlow Go/Stop commands into the current iMuse recorder**. The voice-control feature must be optional, modular, and incapable of compromising capture or recovery. No production code has been changed as part of this documentation update.
+## Current implementation checkpoint
 
-## Confirmed baseline (do not re-test generically without cause)
+- Selectable wake engines: **Heed / “Hey Doc”** and **Voicute / “Hey Friday”**. Both have been reported working on the MacBook, but field reliability is not established.
+- After wake, a bounded **TensorFlow.js Go/Stop** command window operates on the active recording. Wake while recording pauses first; wake while paused acknowledges “Yes?”. **Automatic silence pause and manual pause do not launch TensorFlow.**
+- The command window uses a small **solid light-blue circular countdown**, emptying counterclockwise from 12 o'clock, instead of numerical seconds.
+- Spoken cues are assigned to state transitions: “New recording” when a new session begins; “Pause” on entering paused; “Recording” on resume; “Recording stopped” on stopping. “Yes?” acknowledges a wake phrase while already paused. The **periodic double beep every ~4.5 seconds while paused must be retained**.
+- Microphone selection is implemented through a microphone manager; the user reported that System default selected Shokz on the MacBook. The shared spoken-response module serializes WAV playback. The latest timer and audio-state updates have syntax checks, **not comprehensive device validation**.
+- Current paths are `js/heed/`, `js/voicute/`, `js/tensorflow/`, `js/microphone-manager.js`, and `js/audio-response-manager.js`; do not use the obsolete proposed `js/voice/` tree.
+- **Idle wake before first Start Recording is not implemented** and is deliberately deferred until the present version is tested.
 
-- Incremental IndexedDB chunk persistence; recovery after reload during a multi-part recording, including pauses; user accepts possible loss of a short uncommitted tail.
-- Manual pause/resume; approximately five-second inactivity pause and paused-state audible cue; browser-aware M4A/AAC preference with supported fallback.
-- Completed saved recordings remain available; new recording does not delete previous recordings; Delete Saved Session removes only the selected session and is hidden during active recording.
-- Tested WebM export accepted by Memora; a recovered M4A was reportedly usable, but rigorous media-container certification is not established by this note.
-- MacBook desktop opt-in headset controls are retained; iPhone headset controls disabled/deferred.
-- Lab observations: MacBook TensorFlow overlap **0.75** performed very well; iPhone **0.90** improved Go response. Wake-word misses and occasional Stop misses remain. Heed threshold was varied, so no validated optimum exists. The temporary phrase is **Hey Doc**, not yet a trained **Hey iMuse** model.
+## Priority 1 — Field-test the current build, then freeze a stable commit
 
-## Priority 1 — Freeze checkpoint and inspect current code
+Test on MacBook with built-in/Shokz microphones and on iPhone. Verify wake detection by both engines, Go/Stop thresholds, pause from silence/button/headset/wake, spoken cue ordering and failure behavior, double beep continuing during pause, timer sweep and disappearance, command timeout, manual fallback, microphone release, and no spurious command activation. Check recording playback and recoverability after a forced reload. Capture reproducible failures with steps and observed states; avoid speculative refactoring.
 
-1. User supplies **latest current** iMuse files and any Memora files needed for the interface; older attachments or this journal are not authoritative code.
-2. Review recorder states, microphone acquisition, MediaRecorder pause/resume, IndexedDB write lifecycle, audio cues, current wake/Voicute path, Settings, desktop headset path, and Memora file-import handoff.
-3. Identify existing abstractions to reuse; make a minimal, non-destructive integration plan. Commit stable baseline before changes. Avoid simultaneous broad refactoring.
+## Priority 2 — Targeted architecture audit
 
-## Priority 2 — Implement isolated voice control in stages
+Review the latest authoritative code for: single-owner microphone acquisition and disposal; any temporary global `getUserMedia` interception by the TensorFlow adapter; races between pause/stop, spoken playback, command-window generation, and manual/headset actions; stale callbacks; queue backpressure and IndexedDB transaction durability; actual microphone-status accuracy; cleanup after failures. Recognition must never block or invalidate durable capture. Make only narrowly justified changes and repeat affected tests.
 
-**Folder requirement:** place **all TensorFlow command code and related assets** in a dedicated subfolder, provisionally `js/voice/tensorflow/`. Keep wake-word adapter separate (`js/voice/wake/`) and voice-state coordination in `js/voice/`, subject to current repository layout. Do not scatter TensorFlow files into the project root or duplicate dependencies.
+## Priority 3 — Idle wake listening (not yet authorized for implementation)
 
-1. Introduce an optional voice-control setting, platform-aware overlap config (desktop starting point 0.75, iPhone starting point 0.90), conservative command thresholds (Go ~0.60, Stop ~0.85), and visible microphone/listening state. These are provisional values.
-2. Implement one coordinated microphone/audio-input route if the existing code supports it. Keep Heed listening for wake and TensorFlow command listener inactive except in command mode; ensure loading/failure of either recognizer does not affect recording.
-3. **First integrate paused state:** wake enters command mode; Go resumes the same session; Stop finalizes; timeout/failure leaves session paused. Test manual fallback.
-4. **Then integrate active recording:** recognized wake pauses capture through the existing recorder API before command listening. Go resumes; Stop finalizes; timeout remains paused. Preserve all committed chunks.
-5. **Finally add optional idle hands-free start:** when explicitly enabled and app is active, wake enters command mode; Go starts a new recording; Stop/timeout returns idle. Never claim iOS lock-screen or background operation.
-6. Guard every asynchronous listener/callback with state/session-generation IDs. Tear down listeners on Stop, Delete, navigation, permission failure, and disable; prevent stale Go/Stop actions and duplicate finalization.
-7. Keep desktop headset opt-in and mobile headset disabled; coordinate multiple control pathways through the same recorder state machine.
+When Audio commands is enabled and the app is foregrounded, allow a wake phrase before the first button press, respond “Yes?”, then interpret Go as starting a **new** recording (with “New recording” state cue) and Stop/timeout as returning to idle. Explicitly design the handoff from listening-only microphone to recording without duplicate streams or gaps; release microphone when commands are disabled. Do not promise reliable iPhone background/locked-screen operation.
 
-## Priority 3 — Narrow in-app acceptance tests
+## Priority 4 — Memora integration
 
-- Normal record → wake → Go → record → wake → Stop; manual pause/resume; auto-pause; command timeout and repeated wake.
-- False wake during ordinary speech; missed wake on first attempt; deliberate repeated wake phrases; accidental Stop protection. Do not treat lab recognition counts as field accuracy rates.
-- Recording playback, segment ordering, persisted chunk recovery after interruption, and valid output with recognition enabled. Compare against voice-control-disabled baseline for audible dropouts and interference.
-- Real iPhone Safari/PWA microphone, foreground/screen state, model-loading, CPU/battery practicality, and device-specific overlap; MacBook Chrome regression.
-- Audio cues do not pollute captured speech; microphone permission failure and offline/model load failure degrade to fully functional manual recording.
-- Completed/recovered audio passes to Memora Transcribe without deleting IndexedDB originals. No new Whisper dependency in Record.
+Use the active `iMuse Memora integration handoff.md` to map the current Memora import/Transcribe interfaces and iMuse session/export interfaces. Preserve source recordings and recoverable sessions, avoid duplicate model/file-picker infrastructure, and test completed plus interrupted recordings end-to-end.
 
-## Known limitation: command words in recorded audio
+## Deferred
 
-A recognized wake phrase can already have entered the recorder before pause. Earlier missed attempts (“Hey Doc” said repeatedly) will be saved as normal speech. The current architecture **does not solve that**. Never delete source audio to hide it. Consider reversible, timestamp/utterance-aligned exclusion in a later phase only after safe recognition and boundary testing. First-attempt wake reliability is important but must be balanced against false activations.
+Custom universal “Hey iMuse” model, reversible removal of spoken commands from exported audio, native Swift/Android development, iPhone headset media buttons, broad media-remux redesign, and speculative storage migration. Reconsider only with evidence or an explicit product decision.
 
-## Deferred, not blocking this integration
+## Working rules
 
-- Training and validating the eventual custom **Hey iMuse** model (required before production phrase switch, but temporary model can be used during integration).
-- Automatic, reversible cleanup of wake/command speech in finalized audio.
-- iPhone headset media-button experiments; native-app redesign; always-on locked-screen recording promises.
-- Whisper-tiny command recognition (superseded as current preferred command path by TensorFlow Go/Stop).
-- Speculative OPFS migration, wholesale media-remux refactor, redoing already accepted Delete/recovery tests, or parallel transcription in Record.
-
-## Working method and next action
-
-Request latest source files **before any edit**. Change one logical layer at a time; test on the actual device. Deliver only modified code files in a ZIP with their **true original filenames**, no numbered suffixes or parentheses inside the archive. Remove temporary diagnostics after acceptance. Documentation may be updated as integration discoveries warrant. See **DJ007** and **iMuse voice-control integration plan.md** for architecture, file layout, state transitions, safety and acceptance criteria.
-
-**Next concrete action:** inspect the current iMuse source and agree the first small implementation change: a voice-control coordinator and isolated TensorFlow module, beginning with **paused → wake → Go/Stop**.
+User supplies latest source files before changes. Only changed files are delivered, in a ZIP with original filenames and paths. Remove temporary diagnostics. The chronological design journal retains historical experiments; archived checklists and plans are not current implementation instructions.

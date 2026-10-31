@@ -1,3 +1,5 @@
+> **Status update — 31 October 2026:** This document records an earlier code review of `iMuse(7).zip`, not an audit of the current build. Microphone selection and a shared spoken-response manager have since been introduced; Heed/Voicute and TensorFlow Go/Stop are integrated for active sessions. The historical findings below must **not** be presented as verified current defects. The remaining items are audit questions until checked against latest source and tested.
+
 # iMuse architecture stabilization review
 
 Baseline: iMuse(7).zip. Code review and plan, not a runtime-tested patch.
@@ -39,3 +41,14 @@ Only `WAKE_DETECTED` enters command mode. While recording, pause and say “Paus
 ## Test gates
 
 Test on MacBook built-in and Shokz, and iPhone. Verify actual input track `label`, `getSettings().deviceId`, `readyState`, `muted`, active stream ownership, OS indicator, command state and pause reason. Test silence pause, manual pause, wake during record/pause, Go, Stop, timeout, repeated commands, device disconnect, and playback failures. Confirm IndexedDB recovery and final audio integrity. Remove temporary diagnostics after verification. Return only changed files in ZIPs with exact repository-relative filenames.
+
+## Current audit checklist (31 October 2026)
+
+1. Confirm whether any TensorFlow adapter still temporarily overrides global `navigator.mediaDevices.getUserMedia`; if so, test concurrent mic acquisition and teardown before refactoring.
+2. Confirm microphone manager track ownership and UI state for System default/Shokz, built-in microphone, iPhone, command timeout, Stop, and errors.
+3. Check session/generation guards and whether state announcements are emitted exactly once for successful transitions. Verify the new recording cue, pause cue, resume cue, stopped cue, and “Yes?” while already paused.
+4. Verify the **paused double beep remains active** and the circular command timer is display-only (must not change recognition window timing).
+5. Test durable IndexedDB writes, completed/recovered playback, and safe failure when wake/command/audio-response subsystems fail.
+6. Defer idle wake microphone lifecycle until this targeted audit and field testing pass.
+
+Archive this review after the outstanding questions are either resolved or transferred to a current issue list.

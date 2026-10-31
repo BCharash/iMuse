@@ -1,6 +1,6 @@
 # iMuse → Memora Integration Handoff
 
-**Date:** 29 October 2026  
+**Updated:** 31 October 2026  
 **Audience:** Agent implementing the unified iMuse application  
 **Status:** Current user decisions and proposed integration plan; **no code changes authorized by this document**
 
@@ -14,7 +14,7 @@ Merge iMuse's independent, durable **Record** functionality into the Memora-base
 - The user accepts losing a short tail of speech immediately before an abrupt reload/crash. Preserving already committed audio and producing a usable recovery is the priority, not lossless last-millisecond crash capture.
 - A prior exported `.webm` file was successfully opened by Memora. iMuse prefers M4A/AAC when the browser supports it, otherwise uses a supported format. **Do not relabel one container with another extension.**
 - **Delete Saved Session** deletes only the selected saved recording. Starting a new recording does not disturb previous saved sessions. Delete is **hidden during active recording**, so a test of pressing Delete mid-recording is not a valid normal UI scenario.
-- Auto-pause after about five seconds of detected inactivity, a paused-state beep, manual pause/resume, and pause-only Voicute wake detection are part of the current recording work. They are not reasons to add Whisper to Record.
+- Auto-pause after about five seconds of detected inactivity, manual pause/resume, and the **periodic double beep while paused** remain recording functions. Heed and Voicute are now selectable wake engines; a detected wake opens a bounded TensorFlow Go/Stop command window. Neither wake nor command recognition justifies adding Whisper to Record.
 - On MacBook Chrome, GitHub Pages microphone denial was fixed by adjusting site-specific microphone permission; localhost and iPhone access worked. No Git changes were involved. This is a permissions issue, not a demonstrated recording defect.
 - Desktop opt-in headset controls have worked in Mac Chrome, with some variable responsiveness. Mobile headset controls are disabled/deferred: in tested iPhone conditions, microphone capture and headset media-button delivery did not coexist dependably. Do not reopen that investigation during integration.
 
@@ -46,7 +46,7 @@ The previous assistant reported technical checks of the recovered M4A (roughly 2
 - Repeating already successful Delete Saved Session, new-session isolation, and basic reload recovery tests without a new failure hypothesis.
 - Broad container-remuxing or finalization redesign absent evidence of invalid output.
 - iPhone Bluetooth headset media-button control during capture.
-- Continuous Voicute inference during recording, custom wake-phrase training, and spoken commands using Whisper tiny.
+- Idle wake listening before the first Start Recording action (planned next, not implemented); custom wake-phrase training; Whisper-tiny commands (superseded by current TensorFlow Go/Stop).
 - Comprehensive cross-browser, background/locked-screen, and long-duration stress certification. These may be separate future quality tasks; do not present them as completed.
 
 ## Working rules
@@ -58,3 +58,12 @@ The previous assistant reported technical checks of the recovered M4A (roughly 2
 - Keep the journal chronological. Use `iMuse next steps.md` for active priorities and this handoff for integration architecture.
 
 **Bottom line:** iMuse Record has a useful, user-accepted IndexedDB recovery foundation. The next job is to connect that recording to Memora's existing Transcribe and file-management workflows **without losing the source recording or duplicating Memora's functionality**.
+
+## Voice-control implementation update — 31 October 2026
+
+- Existing code separates wake engines (`js/heed/`, `js/voicute/`), TensorFlow command recognition (`js/tensorflow/`), microphone acquisition (`js/microphone-manager.js`), and spoken playback (`js/audio-response-manager.js`). Recorder/controller code still coordinates multiple states; **do not assume the controller is fully decoupled yet**.
+- During an active session, wake while recording pauses capture and opens Go/Stop listening after the pause acknowledgment; wake while already paused says “Yes?” before listening. Silence/manual pauses never themselves launch TensorFlow. Go resumes the existing session; Stop finalizes; timeout remains paused.
+- State-driven WAV responses: New recording, Pause, Recording, Recording stopped. Keep the recurring **double beep** while paused. The command timer is now a compact light-blue, counterclockwise-emptying disk.
+- User reported MacBook System default microphone selected Shokz and both wake engines worked in recent tests; further reliability and iPhone testing remain necessary.
+- **Future idle behavior:** wake before first Start Recording → “Yes?” → Go creates a new session, which announces “New recording”. This is a design requirement, **not current implemented behavior**.
+- Preserve audio source and crash recovery regardless of wake, TensorFlow, or spoken-response errors. Before integration, request fresh source from both repositories and verify interface details.

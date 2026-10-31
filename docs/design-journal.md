@@ -1203,3 +1203,69 @@ Further tests are *targeted integration acceptance*, not open-ended research: mi
 
 **Guiding principle:** Wake enters command mode; Go and Stop act on recording state. Capture and recoverability always win over hands-free convenience.
 
+---
+
+# DJ008 — Production Heed/Voicute + TensorFlow Integration, Audio-State Cues, and Stabilization
+
+**Date:** 31 October 2026  
+**Status:** Implementation documented from user-provided recorder/source and subsequent incremental ZIPs; MacBook observations reported by user. The latest solid-blue countdown patch passed reported JavaScript syntax checks but has not been independently browser-tested. This entry supersedes the *implementation status* in DJ007, not its experimental data.
+
+## 66. Current implementation and separation of concerns
+
+The production prototype now supports **two selectable wake-word engines** in Settings: Voicute (“Hey Friday”) and Heed (“Hey Doc”), each with its own adjustable threshold. They are alternatives, not simultaneously active recognizers. Both can trigger the same short TensorFlow.js Speech Commands **Go/Stop** window while a recording session is active or paused. User reported that both wake phrases worked well on MacBook during the latest tests; this is not a quantified field reliability study.
+
+The wake adapters remain isolated under `js/voicute/` and `js/heed/`; TensorFlow command recognition remains under `js/tensorflow/`, with a standalone lab under `js/tensorflow/labs/`. `js/recorder.js` currently coordinates the recorder, wake events, command window, UI, silence detection, and persistence. The microphone manager (`js/microphone-manager.js`) and spoken-response manager (`js/audio-response-manager.js`) are separate modules. **A fully independent voice/recording state-controller module has not yet been extracted.** The recorder remains authoritative for capture and its IndexedDB writes; voice recognition must never be a prerequisite for preserving audio.
+
+Settings include Audio commands on/off, wake engine and threshold, Go and Stop thresholds, command-window duration, and platform-sensitive TensorFlow overlap (provisional desktop 0.75, mobile 0.90). The Audio commands toggle is locked during an active session, including pause. Desktop headset control remains opt-in; mobile headset media-button control remains disabled/deferred. Microphone selection now includes System default and discovered inputs. The user reported **System default successfully selected the Shokz microphone on MacBook** in the latest test; earlier tests had selected the MacBook microphone, so do not claim universal or stable default-device behavior across browsers and reconnects.
+
+## 67. Two-stage command contract (implemented for active/paused sessions)
+
+1. Wake phrase detected **during recording** → request pause → after the recorder's pause event, say “Pause” → prepare TensorFlow → start the configured Go/Stop window.
+2. Wake phrase detected **while already paused** → say “Yes?” → prepare TensorFlow → start the command window.
+3. **Go** in the command window → resume the *same* paused recording, with “Recording” spoken on entry to recording state.
+4. **Stop** in the command window → finalize the current session, with “Recording stopped” spoken on entry to the stopped state.
+5. **Timeout or command failure** → remain paused, close TensorFlow listening, and re-arm the wake detector. A failed or missed command must not discard the recording.
+6. **Automatic silence pause** (nominally five seconds), manual pause, and headset pause do **not** open TensorFlow. Only a successful wake event opens the command window.
+7. **Idle wake → Go → first recording** remains explicitly **deferred**. No idle microphone/wake-listening lifecycle is yet claimed. The user will exercise the current build before adding this feature.
+
+The source uses a command generation counter to reject some stale asynchronous callbacks, closes the command listener on state changes, and retains manual controls. The present implementation still warrants an audit of race conditions and ownership across wake inference, TensorFlow listener start/stop, and MediaRecorder transitions. In particular, the TensorFlow adapter's temporary `getUserMedia` override/stream cloning described in the stabilization review has not been shown to be fully eliminated; do not describe the microphone graph as conclusively unified.
+
+## 68. Spoken responses now follow recorder state
+
+Five WAV responses are mapped in `js/audio-response-manager.js`: `audio/pause.wav`, `audio/yes.wav`, `audio/recording.wav`, `audio/new-recording.wav`, and `audio/recording-stopped.wav`. The manager preloads and serializes playback using one shared Audio element, with error reporting and a timeout fallback. The latest recorder changes moved the state announcements to the corresponding MediaRecorder lifecycle events to avoid double-speaking when both a wake command and state transition occur.
+
+| Confirmed transition or event | Intended response |
+|---|---|
+| New session enters recording | “New recording” (replaces the former recording-start tone) |
+| Any transition into paused state | “Pause” |
+| Resume existing session | “Recording” |
+| Finalize/stop existing session | “Recording stopped” |
+| Wake detected while already paused | “Yes?” |
+
+**The periodic two-note paused reminder is essential and remains enabled** (approximately every 4.5 seconds). It continues while paused and stops on resume/stop. The user explicitly requested retaining it, even with spoken “Pause.” Audio playback restrictions and timing still require MacBook/iPhone testing; successful `play()` initiation does not guarantee a person heard the cue. The mic-readiness chime is a separate diagnostic/startup behavior and should not be conflated with the removed *new recording* beep.
+
+## 69. Command countdown UI evolution
+
+The initial textual countdown displayed tenths, then whole seconds. The user requested a small, less distracting analog display. It was first changed to an outlined circular progress ring, then to a **solid light-blue disk** that empties **counterclockwise from 12 o'clock**, with a thin dark radial boundary, approximately 28 px across. The latest change is confined to `js/recorder.js`, `index.html`, and `css/style.css`; the listening duration and recognition logic are intended to remain unchanged. This visual change is syntax-checked but not yet verified on MacBook and iPhone. The command countdown is distinct from the five-second **silence auto-pause** timer.
+
+## 70. Stabilization work and evidence boundaries
+
+- **Mic management:** `js/microphone-manager.js` was introduced for device choice and recorder acquisition/release; a system-default Shokz result was user-observed on MacBook. Verify actual selected track on reconnect, device switching, permissions, and idle release.
+- **Spoken response manager:** centralized/preloaded/serialized WAV playback replaced creating a fresh Audio element for every cue; test audible delivery, command-start timing, and failure handling.
+- **Recording/voice coordination:** state-based announcements and wake-only TensorFlow activation are the intended contract. A dedicated serialized controller remains a possible future improvement, not a completed architectural refactor.
+- **Capture/recovery:** previously user-tested IndexedDB incremental recovery, pause/resume and saved-session isolation remain the baseline. These later changes have not independently re-certified crash recovery or media-container integrity; recheck targeted cases before merging into Memora.
+- **Platforms:** user reported good MacBook wake recognition for both engines; do not infer iPhone equivalence. PWA microphone and audio output behavior may change with lock/background, Bluetooth routing, or browser gesture policies.
+
+## 71. Next work — sequence and acceptance gates
+
+**First: user field-test current build before further features.** Exercise repeated wake → Go/Stop, auto/manual/headset pause, timeout, double beeps, cue timing, analog countdown, Shokz vs built-in mic, and basic recovery after reload. Record reproducible failures rather than tuning thresholds from isolated misses. Confirm the spoken cues are not inadvertently recorded or causing wake/command feedback.
+
+**Second: targeted architectural audit** after field feedback. Focus on microphone ownership and truthful idle status; global `getUserMedia` override in TensorFlow; stale callbacks/duplicate finalization; state transitions from manual and headset controls; cue queue delays; and reliable cleanup of audio tracks/listeners. Preserve IndexedDB chunk persistence and avoid a wholesale recorder rewrite.
+
+**Third: implement optional idle wake listening** only after those gates pass. Define an explicit idle-listening microphone state, enable only with Audio commands permission, release when disabled, and support wake → “Yes?” → Go → start new session → “New recording”; Stop/timeout returns to idle listening. Test iPhone foreground constraints. Do not claim locked-screen/background idle listening.
+
+**Fourth: non-destructive Memora integration** using the separate handoff contract: Record → Transcribe, preserving original audio, actual MIME/container, session identity, and recovery status. The native Swift plan remains a future, separate project.
+
+## 72. Documentation maintenance decision
+
+This chronological journal remains the **single history of experiments and accepted decisions**. The current `iMuse next steps.md` (dated 30 October) and `iMuse voice-control integration plan.md` still describe implementation as *not yet started* and must be **revised before being used as active instructions**; they should not override DJ008. `architecture-stabilization-review.md` remains a useful historical audit but its “Baseline: iMuse(7).zip” is not the latest implementation. Stage-1, stage-2, voice-command-stage, and root-cleanup checklists are installation snapshots, not current acceptance criteria. Keep the Memora handoff and Swift migration plan as distinct future-facing documents, updating obsolete voice-control descriptions when those plans are next acted on. Archive completed checklists rather than deleting experimental evidence; see the accompanying document-review recommendations.
