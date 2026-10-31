@@ -170,6 +170,24 @@ async function deleteSessionData(id) {
     await transactionDone(transaction);
 }
 
+// Soft deletion retains the session and its IndexedDB audio chunks until
+// the user explicitly chooses permanent deletion.
+async function moveSessionToRecentlyDeleted(id) {
+    const item = await getSession(id);
+    if (!item) throw new Error("This recording no longer exists.");
+    if (item.state === "deleted") return;
+    await putSession({ ...item, previousState: item.state, state: "deleted",
+        deletedAt: new Date().toISOString() });
+}
+
+async function restoreRecentlyDeletedSession(id) {
+    const item = await getSession(id);
+    if (!item || item.state !== "deleted") throw new Error("This deleted recording is no longer available.");
+    const { previousState, deletedAt, ...rest } = item;
+    const state = previousState === "completed" ? "completed" : "interrupted";
+    await putSession({ ...rest, state, lastUpdatedAt: new Date().toISOString() });
+}
+
 function stopStream(stream) {
     releaseRecordingMicrophone(stream);
 }
@@ -1050,22 +1068,23 @@ function formatDate(value) {
 async function renderRecoverableSessions() {
     if (!db) return;
     const panel = ensureRecoveryPanel();
-    const sessions = (await getAllSessions()).filter(item =>
+    const allSessions = await getAllSessions();
+    const sessions = allSessions.filter(item =>
         ["completed", "recording", "paused", "interrupted", "finalizing", "storage-error"].includes(item.state)
     ).sort((a, b) => (b.startedAt || "").localeCompare(a.startedAt || ""));
+    const deletedSessions = allSessions.filter(item => item.state === "deleted")
+        .sort((a, b) => (b.deletedAt || "").localeCompare(a.deletedAt || ""));
     panel.replaceChildren();
     const heading = document.createElement("h2");
     heading.textContent = "Saved recordings";
     heading.style.fontSize = "1.1rem";
     panel.appendChild(heading);
-    if (!sessions.length) {
-        panel.hidden = true;
-        return;
+    panel.hidden = !sessions.length && !deletedSessions.length;
+    if (sessions.length) {
+        const explanation = document.createElement("p");
+        explanation.textContent = "Completed recordings remain available here after a page reload. Interrupted sessions can be recovered from the chunks saved before the interruption.";
+        panel.appendChild(explanation);
     }
-    panel.hidden = false;
-    const explanation = document.createElement("p");
-    explanation.textContent = "Completed recordings remain available here after a page reload. Interrupted sessions can be recovered from the chunks saved before the interruption.";
-    panel.appendChild(explanation);
     for (const item of sessions) {
         const row = document.createElement("div");
         row.style.display = "flex";
@@ -1096,17 +1115,75 @@ async function renderRecoverableSessions() {
         discardButton.addEventListener("click", async () => {
             discardButton.disabled = true;
             try {
-                await deleteSessionData(item.id);
-                status.textContent = "Saved session deleted.";
+                await moveSessionToRecentlyDeleted(item.id);
+                // The saved-list deletion may target the recording currently shown
+                // in the main player. Clear that stale in-memory playback and its
+                // Delete/Download controls, but leave other playback untouched.
+                if (displayedSessionId === item.id) clearPlayback();
+                status.textContent = "Recording moved to Recently Deleted. It can be restored.";
                 await renderRecoverableSessions();
             } catch (error) {
                 console.error(error);
-                status.textContent = "Could not delete the saved session.";
+                status.textContent = "Could not move the recording to Recently Deleted.";
                 discardButton.disabled = false;
             }
         });
         row.appendChild(discardButton);
         panel.appendChild(row);
+    }
+    if (deletedSessions.length) {
+        const section = document.createElement("section");
+        section.setAttribute("aria-label", "Recently Deleted recordings");
+        const heading = document.createElement("h3");
+        heading.textContent = `Recently Deleted (${deletedSessions.length})`;
+        section.appendChild(heading);
+        const note = document.createElement("p");
+        note.textContent = "Deleted recordings remain in browser storage until permanently deleted. Browser storage is not a guaranteed backup.";
+        section.appendChild(note);
+        for (const item of deletedSessions) {
+            const row = document.createElement("div");
+            row.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem";
+            const label = document.createElement("span");
+            label.style.flex = "1 1 12rem";
+            label.textContent = `${formatDate(item.startedAt)} — deleted ${formatDate(item.deletedAt)}`;
+            row.appendChild(label);
+            const restoreButton = document.createElement("button");
+            restoreButton.type = "button";
+            restoreButton.textContent = "Restore";
+            restoreButton.addEventListener("click", async () => {
+                restoreButton.disabled = true;
+                try {
+                    await restoreRecentlyDeletedSession(item.id);
+                    status.textContent = "Recording restored to Saved recordings.";
+                    await renderRecoverableSessions();
+                } catch (error) {
+                    status.textContent = `Could not restore recording: ${error.message || error}`;
+                    restoreButton.disabled = false;
+                }
+            });
+            row.appendChild(restoreButton);
+            const permanentButton = document.createElement("button");
+            permanentButton.type = "button";
+            permanentButton.textContent = "Delete Permanently";
+            permanentButton.addEventListener("click", async () => {
+                if (!window.confirm("Permanently delete this recording and its saved audio? This cannot be undone.")) return;
+                permanentButton.disabled = true;
+                try {
+                    const current = await getSession(item.id);
+                    if (!current || current.state !== "deleted") throw new Error("Recording is no longer in Recently Deleted.");
+                    await deleteSessionData(item.id);
+                    if (displayedSessionId === item.id) clearPlayback();
+                    status.textContent = "Recording permanently deleted.";
+                    await renderRecoverableSessions();
+                } catch (error) {
+                    status.textContent = `Could not permanently delete recording: ${error.message || error}`;
+                    permanentButton.disabled = false;
+                }
+            });
+            row.appendChild(permanentButton);
+            section.appendChild(row);
+        }
+        panel.appendChild(section);
     }
 }
 
@@ -1417,6 +1494,19 @@ async function startRecording() {
                 try { await deleteSessionData(id); } catch (error) { console.error("Could not delete discarded session:", error); }
                 return;
             }
+            if (current.deleteRequested) {
+                try {
+                    await current.writeQueue;
+                    await moveSessionToRecentlyDeleted(id);
+                    status.textContent = "Recording moved to Recently Deleted. It can be restored.";
+                    await renderRecoverableSessions();
+                } catch (error) {
+                    console.error("Could not preserve deleted recording:", error);
+                    status.textContent = "Could not move recording to Recently Deleted. Check saved recordings before leaving this page.";
+                }
+                setReadyUI();
+                return;
+            }
             recordButton.disabled = true;
             pauseButton.disabled = true;
             status.textContent = "Waiting for saved audio writes to finish...";
@@ -1510,7 +1600,8 @@ deleteButton.addEventListener("click", async () => {
     const current = activeSession;
     const savedSessionId = current ? current.id : displayedSessionId;
     if (current) {
-        current.discard = true;
+        // Preserve any final MediaRecorder dataavailable event before soft deleting.
+        current.deleteRequested = true;
         activeSession = null;
         setAudioCommandsToggleLocked(false);
         cleanupAudioMonitor(current);
@@ -1518,19 +1609,29 @@ deleteButton.addEventListener("click", async () => {
         setWakeStatus("Wake-word detector stopped because the recording was deleted.");
         try {
             if (current.recorder.state !== "inactive") current.recorder.stop();
-            else stopStream(current.stream);
+            else {
+                stopStream(current.stream);
+                await current.writeQueue;
+                await moveSessionToRecentlyDeleted(current.id);
+                await renderRecoverableSessions();
+            }
         } catch (error) {
-            console.warn("Could not stop recorder during delete:", error);
+            console.error("Could not stop recording for Recently Deleted:", error);
             stopStream(current.stream);
+            status.textContent = "Could not finish deleting recording safely. Check saved recordings.";
         }
-        try { await current.writeQueue; } catch (_) { /* deletion is best effort */ }
-        try { await deleteSessionData(current.id); } catch (error) { console.error("Could not delete session:", error); }
     } else if (savedSessionId) {
-        try { await deleteSessionData(savedSessionId); } catch (error) { console.error("Could not delete saved recording:", error); }
+        try {
+            await moveSessionToRecentlyDeleted(savedSessionId);
+        } catch (error) {
+            console.error("Could not move recording to Recently Deleted:", error);
+            status.textContent = "Could not delete recording. Check saved recordings.";
+            return;
+        }
     }
     clearPlayback();
     setReadyUI();
-    status.textContent = "Recording deleted.";
+    if (!current) status.textContent = "Recording moved to Recently Deleted. It can be restored.";
     try { await renderRecoverableSessions(); } catch (error) { console.error(error); }
 });
 
