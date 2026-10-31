@@ -1,3 +1,5 @@
+import { playSpokenResponse, prepareSpokenResponses } from "./audio-response-manager.js";
+import { acquireRecordingMicrophone, releaseRecordingMicrophone } from "./microphone-manager.js";
 import { loadVoicuteWakeWord } from "./voicute/voicute-adapter.js";
 import { loadHeedWakeWord } from "./heed/heed-adapter.js";
 import { getSettings, effectiveOverlap } from "./settings.js";
@@ -90,8 +92,6 @@ let recordingUrl = null;
 let displayedSessionId = null;
 let startRequest = 0;
 let recoveryPanel = null;
-let microphoneInitializationInProgress = false;
-let microphoneInitializationComplete = false;
 
 function openDatabase() {
     return new Promise((resolve, reject) => {
@@ -190,17 +190,8 @@ async function deleteSessionData(id) {
     await transactionDone(transaction);
 }
 
-function displayActiveMicrophone(stream) {
-    const output = document.getElementById("microphoneStatus");
-    if (!output) return;
-    const track = stream?.getAudioTracks()?.[0];
-    if (!track) { output.textContent = "Microphone: unavailable"; return; }
-    const name = track.label?.trim() || "Default microphone (browser did not provide a name)";
-    output.textContent = `Microphone: ${name}`;
-}
-
 function stopStream(stream) {
-    if (stream) stream.getTracks().forEach(track => track.stop());
+    releaseRecordingMicrophone(stream);
 }
 
 // Prefer a format this browser can both record and play, with M4A/AAC first.
@@ -326,15 +317,6 @@ async function playMicReadyChime(current) {
     if (played) await new Promise(resolve => window.setTimeout(resolve, 460));
     return played;
 }
-
-// A rounded D5 confirms that recording is active. Match the paused reminder's
-// gain while keeping this cue lower and more sustained; also used on resume.
-function playRecordingStartCue(current) {
-    return playToneCue(current, [
-        { frequency: 587.33, delay: 0, duration: 0.22, volume: 0.10, harmonic: true }
-    ]);
-}
-
 
 // Keep a silent HTML media session active on desktop, when enabled, so supported
 // headset media buttons can be routed to this page. This is started only from
@@ -598,19 +580,14 @@ const commandIndicator = document.getElementById("commandListening");
 const commandCountdown = document.getElementById("commandCountdown");
 let commandActive = false, commandGeneration = 0, commandInterval = null;
 let commandModel = null, commandStream = null;
-const responseFiles = {
-    pause: "audio/pause.wav", yes: "audio/yes.wav", recording: "audio/recording.wav",
-    newRecording: "audio/new-recording.wav", stopped: "audio/recording-stopped.wav"
-};
+// Spoken responses are serialized by one dedicated audio manager.
 async function sayResponse(name) {
-    const sound = new Audio(responseFiles[name]);
-    try {
-        await new Promise((resolve, reject) => {
-            sound.onended = resolve;
-            sound.onerror = () => reject(new Error(`Cannot play ${responseFiles[name]}`));
-            sound.play().catch(reject);
-        });
-    } catch (error) { console.warn("Voice response unavailable:", error); }
+    const result = await playSpokenResponse(name);
+    if (!result.ok) {
+        console.warn(`Voice response ${name} could not be heard:`, result.error);
+        setWakeStatus(`Spoken response unavailable (${name}); command recognition remains available.`);
+    }
+    return result.ok;
 }
 function closeCommandWindow() {
     commandActive = false;
@@ -628,11 +605,23 @@ async function handleWakeDetected(current) {
     clearWakeDetectorTimers(current);
     const wasRecording = current.recorder.state === "recording";
     if (wasRecording) {
-        try { current.recorder.pause(); } catch (error) { console.warn("Wake pause failed", error); }
+        // The pause event owns the spoken acknowledgement for every pause cause.
+        // Wait for it before opening TensorFlow's command window.
+        let resolveAnnouncement;
+        current.pauseAnnouncement = new Promise(resolve => { resolveAnnouncement = resolve; });
+        current.resolvePauseAnnouncement = resolveAnnouncement;
+        try { current.recorder.pause(); }
+        catch (error) {
+            current.resolvePauseAnnouncement?.();
+            current.resolvePauseAnnouncement = null;
+            console.warn("Wake pause failed", error);
+            closeCommandWindow();
+            return;
+        }
     }
     setWakeStatus(`Detected “${wakeWordPhrase}”; preparing Go / Stop.`);
-    // Keep the paused reminder; the voice response completes before the command timer starts.
-    await sayResponse(wasRecording ? "pause" : "yes");
+    if (wasRecording) await current.pauseAnnouncement;
+    else await sayResponse("yes");
     if (generation !== commandGeneration || !commandActive || activeSession !== current) return;
     try {
         commandModel = await loadCommands();
@@ -641,7 +630,7 @@ async function handleWakeDetected(current) {
         const seconds = getSettings().commandWindow;
         const expiresAt = performance.now() + seconds * 1000;
         commandIndicator.hidden = false;
-        commandCountdown.textContent = `${seconds.toFixed(1)} s`;
+        commandCountdown.textContent = `${Math.ceil(seconds)} s`;
         await startCommands(commandModel, commandStream, effectiveOverlap(deviceClass), scores => {
             if (generation !== commandGeneration || !commandActive || performance.now() >= expiresAt) return;
             const settings = getSettings();
@@ -650,20 +639,16 @@ async function handleWakeDetected(current) {
             if (!command) return;
             closeCommandWindow();
             if (command === "go") {
-                void (async () => {
-                    await sayResponse("recording");
-                    if (activeSession === current && current.recorder.state === "paused") current.recorder.resume();
-                })();
+                if (activeSession === current && current.recorder.state === "paused") current.recorder.resume();
             } else {
                 finalizeRecording();
-                void sayResponse("stopped");
             }
         });
         if (generation !== commandGeneration || !commandActive) return;
         commandInterval = setInterval(() => {
             if (generation !== commandGeneration || !commandActive) return;
             const remaining = Math.max(0, (expiresAt - performance.now()) / 1000);
-            commandCountdown.textContent = `${remaining.toFixed(1)} s`;
+            commandCountdown.textContent = `${Math.ceil(remaining)} s`;
             if (remaining === 0) {
                 closeCommandWindow();
                 if (activeSession === current) scheduleWakeDetectorArm(current, 0);
@@ -1434,75 +1419,6 @@ function closeAudioContext(context) {
     }
 }
 
-async function initializeMicrophoneReadiness() {
-    if (microphoneInitializationInProgress || microphoneInitializationComplete) return;
-    microphoneInitializationInProgress = true;
-    recordButton.disabled = true;
-    status.textContent = "Checking microphone access and testing audio recording…";
-    let stream = null;
-    let audioContext = null;
-    let audioSource = null;
-    try {
-        if (!navigator.mediaDevices?.getUserMedia) {
-            throw new Error("This browser does not provide microphone access to this page.");
-        }
-        if (typeof MediaRecorder === "undefined") {
-            throw new Error("This browser does not support MediaRecorder.");
-        }
-
-        // Request permission during app initialization, not at the moment the
-        // user wants to speak. The stream is released after this test.
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        displayActiveMicrophone(stream);
-        const track = stream.getAudioTracks()[0];
-        if (!track || track.readyState !== "live" || track.muted) {
-            throw new Error("The microphone permission was granted, but no live audio track is available.");
-        }
-
-        const recorderChoice = createCompatibleRecorder(stream);
-        await verifyRecorderCanCapture(recorderChoice.recorder);
-        if (track.readyState !== "live" || track.muted) {
-            throw new Error("The microphone became unavailable during the readiness test.");
-        }
-
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) throw new Error("Web Audio is not available in this browser.");
-        audioContext = new AudioContextClass();
-        audioSource = audioContext.createMediaStreamSource(stream);
-        const analyser = audioContext.createAnalyser();
-        audioSource.connect(analyser);
-        await audioContext.resume().catch(() => {});
-
-        // Play the ready cue only after the microphone and a real recorder
-        // capture have both passed. Safari may defer sound until a user gesture.
-        const cueSession = { audioContext, discard: false };
-        const cuePlayed = await playMicReadyChime(cueSession);
-        microphoneInitializationComplete = true;
-
-        if (audioSource) {
-            try { audioSource.disconnect(); } catch (_) {}
-            audioSource = null;
-        }
-        closeAudioContext(audioContext);
-        audioContext = null;
-        status.textContent = cuePlayed
-            ? "Ready to record. Microphone and recorder passed the startup check."
-            : "Microphone and recorder passed the startup check, but the browser blocked the startup chime. Press Start Recording when ready.";
-    } catch (error) {
-        console.warn("iMuse microphone readiness check failed:", error);
-        microphoneInitializationComplete = false;
-        status.textContent = `Microphone not ready: ${error.message || "access or recording test failed"}. Press Start Recording to retry.`;
-    } finally {
-        if (audioSource) {
-            try { audioSource.disconnect(); } catch (_) {}
-        }
-        closeAudioContext(audioContext);
-        stopStream(stream);
-        microphoneInitializationInProgress = false;
-        recordButton.disabled = false;
-    }
-}
-
 async function startRecording() {
     if (headsetControlsEnabled) startHeadsetMediaSession();
     recordButton.disabled = true;
@@ -1522,8 +1438,7 @@ async function startRecording() {
     status.textContent = "Preparing microphone...";
     let stream;
     try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        displayActiveMicrophone(stream);
+        stream = await acquireRecordingMicrophone();
         if (requestId !== startRequest) {
             stopStream(stream);
             return;
@@ -1647,6 +1562,13 @@ async function startRecording() {
             current.silenceSince = null;
             if (!commandActive) scheduleWakeDetectorArm(current, 0);
             startPausedBeep(current);
+            // Announce each successful transition once. The periodic double beep remains.
+            const pauseSpeech = sayResponse("pause");
+            if (current.resolvePauseAnnouncement) {
+                const resolve = current.resolvePauseAnnouncement;
+                current.resolvePauseAnnouncement = null;
+                void pauseSpeech.then(resolve, resolve);
+            }
             status.textContent = current.pauseReason === "silence"
                 ? `Paused automatically after ${SILENCE_PAUSE_MS / 1000} seconds of silence. Say “${wakeWordPhrase}” for voice commands, or press Resume.`
                 : `Paused — ${current.metadata.chunkCount} chunks saved so far. Say “${wakeWordPhrase}” for voice commands, or press Resume.`;
@@ -1668,11 +1590,13 @@ async function startRecording() {
             current.autoPausing = false;
             if (!commandActive) setWakeStatus(`Listening for “${wakeWordPhrase}” while recording.`);
             status.textContent = "Recording resumed.";
-            playRecordingStartCue(current);
+            void sayResponse("recording");
         });
         recorder.addEventListener("stop", async () => {
             if (current.stopHandled) return;
             current.stopHandled = true;
+            current.resolvePauseAnnouncement?.();
+            current.resolvePauseAnnouncement = null;
             closeCommandWindow();
             cleanupAudioMonitor(current);
             stopStream(stream);
@@ -1715,6 +1639,8 @@ async function startRecording() {
                     : "Recording could not be finalized. No playable audio was available.";
             }
             setReadyUI();
+            // Announce stop only after the session has left the active recording state.
+            void sayResponse("stopped");
             await renderRecoverableSessions();
         });
         await setupSilenceMonitor(current);
@@ -1729,7 +1655,8 @@ async function startRecording() {
         if (getSettings().audioCommands) scheduleWakeDetectorArm(current, 0);
         else setWakeStatus("Audio commands disabled; manual controls available.");
         requestScreenWakeLock();
-        playRecordingStartCue(current);
+        // The new-recording announcement replaces the old single start beep.
+        void sayResponse("newRecording");
     } catch (error) {
 
         console.error(error);
@@ -1815,6 +1742,9 @@ window.addEventListener("pagehide", () => {
 
 initialize();
 initializeWakeWord();
-initializeMicrophoneReadiness();
+// Microphone is acquired only when recording begins; no startup readiness capture.
 setLifecycleStatus("Screen wake lock will be requested while recording, if supported.");
 if (deviceClass === "desktop") initializeHeadsetMediaActions();
+
+// Cache short response files without opening the microphone.
+void prepareSpokenResponses();

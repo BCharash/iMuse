@@ -168,3 +168,9 @@ button:active {
 #recordingStatusGroup #wakeStatus, #recordingStatusGroup #lifecycleStatus { margin: 8px auto; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 #savedRecordingsLocation { margin-top: 26px; }
 #savedRecordingsLocation:empty { display: none; }
+
+/* Microphone selection is independent of voice-command settings. */
+.microphone-choice-label { display:block; font-size:14px; font-weight:600; margin-top:8px; }
+.microphone-choice-controls { display:flex; gap:8px; align-items:center; margin-top:6px; }
+.microphone-choice-controls select { flex:1; min-width:0; padding:9px; border:1px solid var(--border); border-radius:8px; }
+.microphone-choice-controls button { padding:9px 12px; }

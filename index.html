@@ -48,7 +48,7 @@
     </button>
 
 
-    <p id="microphoneStatus" class="microphone-status" role="status">Microphone: not yet identified</p>
+    <p id="microphoneStatus" class="microphone-status" role="status">Microphone: inactive (not listening)</p>
 
     <div id="recordingStatusGroup">
     <div id="commandListening" class="command-listening" hidden role="status" aria-live="polite">Listening for Go or Stop <span id="commandCountdown"></span></div>
@@ -74,6 +74,12 @@
     <button id="settingsButton" type="button" aria-expanded="false" aria-controls="settingsPanel">Settings</button>
     <section id="settingsPanel" class="settings-panel" hidden aria-label="Voice control settings">
         <h2>Settings</h2>
+        <label class="microphone-choice-label" for="microphoneChoice">Recording microphone</label>
+        <div class="microphone-choice-controls">
+            <select id="microphoneChoice"><option value="">System default</option></select>
+            <button id="refreshMicrophones" type="button">Refresh</button>
+        </div>
+        <p class="settings-note">Selection applies to the next recording. Device names may require microphone permission.</p>
         <label id="headsetControlOption" class="settings-check" hidden><input type="checkbox" id="headsetControlToggle"> Headset controls (desktop)</label>
         <label class="settings-check"><input type="checkbox" id="audioCommandsToggle"> Audio commands</label>
         <div id="voiceSettings">
