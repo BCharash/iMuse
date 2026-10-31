@@ -1269,3 +1269,68 @@ The initial textual countdown displayed tenths, then whole seconds. The user req
 ## 72. Documentation maintenance decision
 
 This chronological journal remains the **single history of experiments and accepted decisions**. The current `iMuse next steps.md` (dated 30 October) and `iMuse voice-control integration plan.md` still describe implementation as *not yet started* and must be **revised before being used as active instructions**; they should not override DJ008. `architecture-stabilization-review.md` remains a useful historical audit but its “Baseline: iMuse(7).zip” is not the latest implementation. Stage-1, stage-2, voice-command-stage, and root-cleanup checklists are installation snapshots, not current acceptance criteria. Keep the Memora handoff and Swift migration plan as distinct future-facing documents, updating obsolete voice-control descriptions when those plans are next acted on. Archive completed checklists rather than deleting experimental evidence; see the accompanying document-review recommendations.
+
+---
+
+# DJ009 — Headset Media-Button Controls Retired; Recently Deleted and Bulk Permanent Deletion
+
+**Date:** 31 October 2026  
+**Status:** Latest implementation decisions and code-delivery record; browser acceptance testing of the final bulk-delete patch remains outstanding. This entry supersedes DJ004, DJ005, DJ007, and DJ008 **only where they describe headset controls as currently enabled**. Their experimental findings and implementation history remain preserved.
+
+## 73. Final headset-control decision: remove from active iMuse
+
+The user established a critical difference between the **microphone selected for recording** and the **Bluetooth headset's media-button event routing**:
+
+- On the MacBook, physical Shokz media buttons could control the earlier browser prototype when the **MacBook's built-in microphone** was selected.
+- When the **Shokz Bluetooth microphone** was explicitly selected on the MacBook, headset-button control did not work reliably. Button presses could instead invoke system-level behavior such as Siri.
+- On iPhone, physical Shokz headset-button control never provided dependable recording commands. The user suspected the iPhone's selection of the Shokz microphone was relevant, but this remains a hypothesis rather than an established browser or Bluetooth mechanism.
+- The one working desktop combination defeated the practical purpose of using the headset for hands-free recording.
+
+**Decision:** remove physical headset media-button controls from **both desktop and mobile** production iMuse, including the desktop opt-in Settings toggle. Do not maintain two partially functional pathways. This does **not** remove support for selecting and recording through the Shokz Bluetooth microphone; audio input and media-button control are separate concerns. Wake-word detection, TensorFlow Go/Stop voice commands, spoken responses, manual Pause/Resume, and paused-state double beeps remain independent features.
+
+The removal patch changed `js/recorder.js`, `js/settings.js`, `index.html`, and `css/style.css`; `app.js` was not changed. It removed the Media Session action handlers, the silent-media playback workaround, the headset activation/teardown code, the toggle and its styling, and headset-specific event hooks. JavaScript syntax checks passed; this was **not** a full MacBook/iPhone regression test. The prior implementation is **retired, not rejected as impossible**: revisit only with a demonstrable Bluetooth/headset/browser workaround that operates while the headset microphone is actually in use.
+
+## 74. Historical headset implementation — preserve for a future workaround
+
+The earlier prototype's implementation strategy and successful partial experiment are retained here as a technical reconstruction guide, not instructions to re-enable it now:
+
+1. In desktop Chrome, a user gesture activated a browser `MediaSession` with handlers for media transport actions. The experimental mapping used a headset pause/play-style action to start a recording while idle or pause/resume an active session, and a **next-track** action to finalize/save. The exact action mapping must be checked against the archived source before reuse.
+2. A silent or near-silent HTML audio element was used to try to keep a media playback session eligible to receive headset button events. Playback had to be initiated by a permitted user gesture; the experiment also manipulated `navigator.mediaSession.playbackState` and registered action handlers. This could interfere with system audio focus or invoke system music/Siri instead of the page.
+3. On iPhone Edge, a valid silent MP3 could play, but button presses did not reliably invoke the registered Media Session handlers. The `navigator.audioSession.type = 'play-and-record'` experiment also failed to route button actions despite successful microphone recording. A separate audible-tone web media-key test responded to an initial press, but did not establish a repeatable recording-control pathway.
+4. The proposed uncompleted diagnostic was to synchronize `playbackState` with actual audio-element `play`/`pause` transitions, keep the media session alive across at least three presses, and, if successful in Edge, retest from an HTTPS-hosted Safari/PWA page. These were hypotheses, not established fixes.
+5. Any revived design must test **Shokz microphone selected and actively capturing** on both MacBook and iPhone, including Bluetooth hands-free audio mode, OS media/Siri routing, repeated button presses, capture integrity, and microphone stream coexistence. A test with the built-in microphone alone is insufficient.
+
+**Preservation policy:** keep DJ004's detailed test observations and this implementation description; do not erase them simply because the feature was removed. Historical code is not embedded verbatim in this journal. If the exact former JavaScript is required, retrieve the archived pre-removal repository commit or ZIP, rather than reconstructing potentially incorrect code from memory. The earlier `iMuse-headset-controls.zip` is one historical source artifact, but its presence outside the repository is not guaranteed long-term; preserve the relevant commit in version control. Do not reintroduce the old silent-audio workaround without a new demonstrated route.
+
+## 75. Recently Deleted — recoverable deletion lifecycle
+
+The recorder now distinguishes ordinary deletion from irreversible removal:
+
+- Deleting a saved session moves **that selected recording** to **Recently Deleted**, rather than immediately destroying its saved audio.
+- The Recently Deleted section displays retained deleted sessions and permits **Restore** or **Delete Permanently** per recording.
+- A recording in Recently Deleted remains in browser storage until explicitly permanently deleted, subject to normal browser storage eviction/clearing. Recently Deleted is a recovery convenience, **not an independent backup**.
+- A new recording does not delete other saved sessions. The ordinary Delete control is hidden while a recording is active, as previously confirmed in DJ006.
+- Restore and permanent deletion must act on the intended session ID, not on whichever recording happens to be currently selected or playing. Playback and list state should be refreshed after deletion/restoration so stale UI or audio does not remain associated with a removed session.
+
+This describes the current intended user-facing lifecycle. The implementation should not be interpreted as proof of survival after browser storage eviction or every crash race.
+
+## 76. Bulk permanent deletion from Recently Deleted
+
+The user identified that permanently deleting a long list was tedious because **each individual recording required a confirmation dialog**. The new implementation adds multi-selection to the Recently Deleted section:
+
+1. A checkbox beside each deleted recording.
+2. **Select all** for the currently displayed deleted-recording list.
+3. A selected-item count and **Delete selected permanently** control.
+4. **One confirmation dialog** covering the entire selected set, explicitly warning that the operation cannot be undone.
+5. Per-recording deletion attempts, with a result message reporting how many succeeded and how many failed; failed items remain in Recently Deleted for later retry. The code rechecks that each target still has the `deleted` state before permanent removal.
+6. Existing individual **Restore** and **Delete Permanently** actions remain available for single-recording workflows.
+
+The bulk-delete patch was confined to `js/recorder.js` and delivered as a ZIP preserving the repository path. JavaScript syntax validation passed. The user has not yet reported a browser acceptance test of the new multi-select workflow. Recommended focused test: select two of several deleted recordings, cancel the first confirmation and verify no changes; repeat and confirm that only the two are permanently removed; verify Select all, Restore, empty-list behavior, and the remaining saved recordings. Permanent deletion is intentionally irreversible; do not treat the browser's Recently Deleted list as a second recycle bin after confirmation.
+
+## 77. Current direction and superseded instructions
+
+Physical headset **media-button controls are absent** from the active iMuse design. Do not follow older DJ008 references to testing headset pause as a required current feature, or older DJ005 instructions to preserve a desktop headset-control pathway. The historical test record is retained for a future Bluetooth-mode workaround. The Shokz microphone remains a supported input choice where the browser exposes it.
+
+Recently Deleted and bulk permanent deletion are part of the recorder's local-storage management; they do not change the fundamental capture, incremental IndexedDB persistence, recovery, or voice-command contracts. Continue prioritizing durable audio preservation and verify deletion UI behavior separately from capture fidelity.
+
+> **Retain the experimental knowledge; remove unreliable production controls. Deletion should be deliberate, recoverable until explicitly permanent, and efficient for multiple recordings.**
