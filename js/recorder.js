@@ -74,6 +74,17 @@ let recordingUrl = null;
 let displayedSessionId = null;
 let startRequest = 0;
 let recoveryPanel = null;
+let lastRecordingPeakBytes = 0;
+
+// Count actual active recording time, excluding periods when MediaRecorder is paused.
+function recordedSeconds(current) {
+    const activeMs = current.activeSinceMs === null ? 0 : Math.max(0, performance.now() - current.activeSinceMs);
+    return Math.floor((current.recordedMs + activeMs) / 1000);
+}
+function savedChunkProgress(current) {
+    const count = current.metadata.chunkCount;
+    return `${count} chunk${count === 1 ? "" : "s"} saved, ${recordedSeconds(current)} s recorded`;
+}
 
 // Small, allocation-free snapshot of the recorder's pending audio buffer.
 // This is not a measurement of total browser/process memory.
@@ -81,7 +92,7 @@ function publishRecordingDiagnostics() {
     const current = activeSession;
     window.imuseRecordingDiagnostics = {
         pendingBytes: current?.pendingBytes || 0,
-        peakPendingBytes: current?.peakPendingBytes || 0,
+        peakPendingBytes: current?.peakPendingBytes ?? lastRecordingPeakBytes,
         pendingChunks: current?.pendingChunks?.size || 0,
         bufferLimitBytes: MAX_PENDING_AUDIO_BYTES,
         recordingState: current?.recorder?.state || "inactive"
@@ -1555,6 +1566,8 @@ async function startRecording() {
             pendingChunks: new Map(),
             pendingBytes: 0,
             peakPendingBytes: 0,
+            recordedMs: 0,
+            activeSinceMs: null,
             storageStopRequested: false,
             discard: false,
             stopHandled: false,
@@ -1580,6 +1593,7 @@ async function startRecording() {
             micUnavailableNotice: false
         };
         activeSession = current;
+        lastRecordingPeakBytes = 0;
         publishRecordingDiagnostics();
         // Freeze voice-command preference throughout this recording session.
         setAudioCommandsToggleLocked(true);
@@ -1606,7 +1620,7 @@ async function startRecording() {
             });
         }
         recorder.addEventListener("start", () => {
-
+            current.activeSinceMs = performance.now();
         });
         // Keep only audio awaiting a completed IndexedDB transaction in RAM.
         // If storage stalls or fails, stop capture rather than buffering indefinitely.
@@ -1640,8 +1654,7 @@ async function startRecording() {
                 current.pendingBytes -= chunk.size;
                 publishRecordingDiagnostics();
                 if (!current.persistenceError && !current.stopHandled) {
-                    const count = current.metadata.chunkCount;
-                    const progress = `${count} chunk${count === 1 ? "" : "s"} saved to this browser`;
+                    const progress = `${savedChunkProgress(current)} to this browser`;
                     if (recorder.state === "recording") {
                         status.textContent = `Recording in ${current.formatLabel} — ${progress}.`;
                     } else if (recorder.state === "paused") {
@@ -1670,6 +1683,10 @@ async function startRecording() {
         });
         recorder.addEventListener("pause", async () => {
             if (activeSession !== current || current.discard) return;
+            if (current.activeSinceMs !== null) {
+                current.recordedMs += Math.max(0, performance.now() - current.activeSinceMs);
+                current.activeSinceMs = null;
+            }
             current.metadata.state = "paused";
             current.metadata.lastUpdatedAt = new Date().toISOString();
             try { await putSession(current.metadata); } catch (error) { console.error(error); }
@@ -1686,11 +1703,12 @@ async function startRecording() {
                 void pauseSpeech.then(resolve, resolve);
             }
             status.textContent = current.pauseReason === "silence"
-                ? `Paused automatically after silence — ${current.metadata.chunkCount} chunks saved. Press Record to resume.`
-                : `Paused — ${current.metadata.chunkCount} chunks saved. Press Record to resume.`;
+                ? `Paused automatically after silence — ${savedChunkProgress(current)}. Press Record to resume.`
+                : `Paused — ${savedChunkProgress(current)}. Press Record to resume.`;
         });
         recorder.addEventListener("resume", async () => {
             if (activeSession !== current || current.discard) return;
+            current.activeSinceMs = performance.now();
             current.metadata.state = "recording";
             current.metadata.lastUpdatedAt = new Date().toISOString();
             try { await putSession(current.metadata); } catch (error) { console.error(error); }
@@ -1701,12 +1719,17 @@ async function startRecording() {
             current.pauseReason = null;
             current.autoPausing = false;
             if (!commandActive) setWakeStatus(`Listening for “${wakeWordPhrase}”.`);
-            status.textContent = `Recording resumed in ${current.formatLabel} — ${current.metadata.chunkCount} chunks saved to this browser.`;
+            status.textContent = `Recording resumed in ${current.formatLabel} — ${savedChunkProgress(current)} to this browser.`;
             void sayResponse("recording");
         });
         recorder.addEventListener("stop", async () => {
             if (current.stopHandled) return;
             current.stopHandled = true;
+            if (current.activeSinceMs !== null) {
+                current.recordedMs += Math.max(0, performance.now() - current.activeSinceMs);
+                current.activeSinceMs = null;
+            }
+            lastRecordingPeakBytes = current.peakPendingBytes;
             current.resolvePauseAnnouncement?.();
             current.resolvePauseAnnouncement = null;
             closeCommandWindow();
