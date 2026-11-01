@@ -1417,8 +1417,16 @@ async function recoverSession(id, button) {
         if (!parts.length) throw new Error("No audio chunks were successfully saved for this session.");
         const blob = new Blob(parts, { type: item.mimeType || parts.find(part => part.type)?.type || "audio/webm" });
         if (!blob.size) throw new Error("The recovered audio is empty.");
+        // Promote successfully recovered audio to normal saved-recording behavior.
+        // Preserve interruptedAt and other original metadata as recovery history.
+        await putSession({
+            ...item,
+            state: "completed",
+            recoveredAt: new Date().toISOString(),
+            lastUpdatedAt: new Date().toISOString()
+        });
         showPlayback(blob, id);
-        status.textContent = `Recovered audio loaded. Listen through it to check for missing sections.`;
+        status.textContent = `Recovered audio saved. Listen through it to check for missing sections.`;
         await renderRecoverableSessions();
     } catch (error) {
         console.error("Recovery failed:", error);
