@@ -125,7 +125,18 @@ diagnosticsUpdated.style.cssText = "font-size:.8rem;opacity:.8";
 diagnosticsActions.append(diagnosticsRefresh, diagnosticsUpdated);
 diagnosticsSection.appendChild(diagnosticsActions);
 panel.appendChild(diagnosticsSection);
-const formatBytes = bytes => Number.isFinite(bytes) ? (bytes < 1024 ? `${bytes} B` : bytes < 1048576 ? `${(bytes/1024).toFixed(1)} KB` : `${(bytes/1048576).toFixed(2)} MB`) : "Unavailable";
+// Show up to four significant figures; switch to GB above 500 MB.
+const formatBytes = bytes => {
+    if (!Number.isFinite(bytes)) return "Unavailable";
+    if (bytes === 0) return "0 B";
+    const mb = 1024 * 1024;
+    const gb = 1024 * mb;
+    const format = (value, unit) => `${Number(value.toPrecision(4)).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${unit}`;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < mb) return format(bytes / 1024, "KB");
+    if (bytes > 500 * mb) return format(bytes / gb, "GB");
+    return format(bytes / mb, "MB");
+};
 function updateRecordingDiagnostics() {
     const d = window.imuseRecordingDiagnostics || {};
     diagnosticsFields.pending.textContent = formatBytes(d.pendingBytes ?? 0);
