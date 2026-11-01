@@ -39,14 +39,11 @@
     <p class="tagline">Turn your thoughts into text</p>
     <p class="subtitle">Speak freely. iMuse is ready</p>
 
-    <button id="recordButton">
-        Start Recording
-    </button>
-
-    <button id="pauseButton" disabled>
-        Pause
-    </button>
-
+    <section class="recording-primary-controls" aria-label="Recording controls">
+        <h2 id="recordingHeading" aria-live="polite">New Recording</h2>
+        <button id="recordButton" class="record-icon-button" type="button" aria-label="Start recording" title="Start recording"><span class="record-symbol" aria-hidden="true"></span></button>
+        <button id="pauseButton" class="stop-icon-button" type="button" disabled aria-label="Stop recording" title="Stop recording"><span class="stop-symbol" aria-hidden="true"></span><span class="stop-caption">Stop</span></button>
+    </section>
 
     <p id="microphoneStatus" class="microphone-status" role="status">Microphone: inactive (not listening)</p>
 

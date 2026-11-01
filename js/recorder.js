@@ -316,12 +316,30 @@ async function playMicReadyChime(current) {
     return played;
 }
 
+// UI state follows MediaRecorder events, including silence and voice-triggered transitions.
+const recordingHeading = document.getElementById("recordingHeading");
+function setRecordingControlState(state) {
+    const labels = {
+        idle: ["New Recording", "Start recording"],
+        preparing: ["Preparing recording…", "Preparing recording"],
+        recording: ["Recording in progress", "Pause recording"],
+        paused: ["Paused", "Resume recording"],
+        finalizing: ["Finalizing recording…", "Finalizing recording"]
+    };
+    const [heading, action] = labels[state] || labels.idle;
+    recordingHeading.textContent = heading;
+    recordButton.setAttribute("aria-label", action);
+    recordButton.title = action;
+    recordButton.classList.toggle("is-recording", state === "recording");
+    recordButton.disabled = state === "preparing" || state === "finalizing";
+    pauseButton.disabled = !["recording", "paused"].includes(state);
+}
+
 function finalizeRecording() {
     closeCommandWindow();
     const current = activeSession;
     if (!current || !["recording", "paused"].includes(current.recorder.state)) return;
-    recordButton.disabled = true;
-    pauseButton.disabled = true;
+    setRecordingControlState("finalizing");
     current.metadata.state = "finalizing";
     current.metadata.lastUpdatedAt = new Date().toISOString();
     putSession(current.metadata).catch(error => console.error("Could not mark session finalizing:", error));
@@ -330,8 +348,7 @@ function finalizeRecording() {
         current.recorder.stop();
     } catch (error) {
         console.error("Recording stop failed:", error);
-        recordButton.disabled = false;
-        pauseButton.disabled = current.recorder.state !== "recording" && current.recorder.state !== "paused";
+        setRecordingControlState(current.recorder.state);
         status.textContent = `Could not stop recording: ${error.message || error}`;
     }
 }
@@ -1028,10 +1045,7 @@ function setAudioCommandsToggleLocked(locked) {
 function setReadyUI() {
     setAudioCommandsToggleLocked(false);
     setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
-    recordButton.textContent = "Start Recording";
-    recordButton.disabled = false;
-    pauseButton.textContent = "Pause";
-    pauseButton.disabled = true;
+    setRecordingControlState("idle");
 }
 
 function showPlayback(blob, sessionId = null) {
@@ -1470,8 +1484,7 @@ function closeAudioContext(context) {
 async function startRecording() {
     setMicrophoneSelectionLocked(true);
     setSilencePauseLocked(true);
-    recordButton.disabled = true;
-    pauseButton.disabled = true;
+    setRecordingControlState("preparing");
 
     // A new session should not leave the previous session's player visible.
     // The previous recording remains saved in IndexedDB.
@@ -1483,8 +1496,7 @@ async function startRecording() {
         return;
     }
     const requestId = ++startRequest;
-    recordButton.disabled = true;
-    pauseButton.disabled = true;
+    setRecordingControlState("preparing");
     status.textContent = "Preparing microphone...";
     let stream;
     try {
@@ -1597,16 +1609,14 @@ async function startRecording() {
         recorder.addEventListener("error", event => {
             console.error("MediaRecorder error:", event.error || event);
             status.textContent = "Recording error. Some audio may not have been saved.";
-            recordButton.disabled = false;
-            pauseButton.disabled = true;
+            setRecordingControlState("idle");
         });
         recorder.addEventListener("pause", async () => {
             if (activeSession !== current || current.discard) return;
             current.metadata.state = "paused";
             current.metadata.lastUpdatedAt = new Date().toISOString();
             try { await putSession(current.metadata); } catch (error) { console.error(error); }
-            pauseButton.textContent = "Resume";
-            pauseButton.disabled = false;
+            setRecordingControlState("paused");
             current.autoPausing = false;
             current.silenceSince = null;
             if (!commandActive) scheduleWakeDetectorArm(current, 0);
@@ -1627,7 +1637,7 @@ async function startRecording() {
             current.metadata.state = "recording";
             current.metadata.lastUpdatedAt = new Date().toISOString();
             try { await putSession(current.metadata); } catch (error) { console.error(error); }
-            pauseButton.textContent = "Pause";
+            setRecordingControlState("recording");
             stopPausedBeep(current);
             if (!commandActive) scheduleWakeDetectorArm(current, 0);
             current.silenceSince = null;
@@ -1668,8 +1678,7 @@ async function startRecording() {
                 setReadyUI();
                 return;
             }
-            recordButton.disabled = true;
-            pauseButton.disabled = true;
+            setRecordingControlState("finalizing");
             status.textContent = "Waiting for saved audio writes to finish...";
             await current.writeQueue;
             let finalBlob;
@@ -1704,10 +1713,7 @@ async function startRecording() {
         await setupSilenceMonitor(current);
         recorder.start(250);
 
-        recordButton.textContent = "Stop Recording";
-        recordButton.disabled = false;
-        pauseButton.textContent = "Pause";
-        pauseButton.disabled = false;
+        setRecordingControlState("recording");
         status.textContent = `Recording in ${formatLabel} — saving audio chunks as they arrive.`;
 
         if (getSettings().audioCommands) scheduleWakeDetectorArm(current, 0);
@@ -1719,41 +1725,36 @@ async function startRecording() {
 
         console.error(error);
         stopStream(stream);
-        recordButton.disabled = false;
-        recordButton.textContent = "Start Recording";
-        pauseButton.disabled = true;
+        setRecordingControlState("idle");
         if (!activeSession) { setAudioCommandsToggleLocked(false); setMicrophoneSelectionLocked(false); setSilencePauseLocked(false); }
         status.textContent = `Could not start durable recording: ${error.message || "microphone unavailable"}`;
     }
 }
 
 recordButton.addEventListener("click", () => {
-    if (!activeSession) {
+    const current = activeSession;
+    if (!current) {
         startRecording();
         return;
     }
-    finalizeRecording();
-});
-
-pauseButton.addEventListener("click", () => {
-    const current = activeSession;
-    if (!current) return;
     closeCommandWindow();
     try {
         if (current.recorder.state === "recording") {
             current.recorder.pause();
-            pauseButton.textContent = "Resume";
             status.textContent = "Pausing recording...";
         } else if (current.recorder.state === "paused") {
-            if (commandActive) closeCommandWindow();
             current.recorder.resume();
-            pauseButton.textContent = "Pause";
             status.textContent = "Resuming recording...";
         }
     } catch (error) {
         console.error(error);
         status.textContent = "Could not change recording state. Please stop and check the audio.";
     }
+});
+
+// Manual Stop is deliberate and does not require spoken confirmation.
+pauseButton.addEventListener("click", () => {
+    if (activeSession) finalizeRecording();
 });
 
 deleteButton.addEventListener("click", async () => {

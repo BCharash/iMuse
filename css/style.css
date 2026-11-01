@@ -107,17 +107,20 @@ button:active {
     display: none;
 }
 
-#recordButton {
-    display: block;
-    margin: 0 auto 14px;
-    padding: 17px 34px;
-    font-size: 18px;
-}
-
-#pauseButton {
-    display: block;
-    margin: 0 auto 14px;
-}
+/* The recorder state is the sole source of truth for these controls. */
+.recording-primary-controls {display:flex;flex-direction:column;align-items:center;gap:12px;margin:0 auto 20px}
+#recordingHeading {margin:0 0 5px;text-align:center;font-size:23px;font-weight:500}
+#recordButton {width:116px;height:116px;padding:0;display:grid;place-items:center;background:#fbe8e6;border:2px solid #dfc4c1;border-radius:50%}
+#recordButton:hover:not(:disabled) {background:#f6d9d5}
+#recordButton:disabled {opacity:.55}
+.record-symbol {width:65px;height:65px;border-radius:50%;background:#c63e37;display:block}
+#recordButton.is-recording .record-symbol {width:22px;height:58px;border-radius:4px;box-shadow:32px 0 0 #c63e37;transform:translateX(-16px)}
+#pauseButton {min-width:76px;padding:8px 14px;background:transparent;color:var(--text);display:flex;align-items:center;flex-direction:column;gap:5px;border-radius:12px}
+#pauseButton:hover:not(:disabled) {background:#eee8e2}
+.stop-symbol {width:32px;height:32px;border-radius:5px;background:#c63e37;display:block}
+#pauseButton:disabled .stop-symbol {background:#bcb8b3}
+#pauseButton:disabled {color:#99958e;background:transparent}
+.stop-caption {font-size:13px}
 
 #recordingControls {
     display: flex;
