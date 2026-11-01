@@ -80,17 +80,24 @@
             <button id="refreshMicrophones" type="button">Refresh</button>
         </div>
         <p class="settings-note">Selection applies to the next recording. Device names may require microphone permission.</p>
+        <label class="settings-slider">Pause after no speech (seconds) <output id="silencePauseSecondsValue"></output><input type="range" id="silencePauseSeconds" min="3" max="15" step="1"></label>
         <label class="settings-check"><input type="checkbox" id="audioCommandsToggle"> Audio commands</label>
         <div id="voiceSettings">
-            <label>Wake-word engine <select id="wakeEngine"><option value="voicute">Voicute — Hey Friday</option><option value="heed">Heed — Hey Doc</option></select></label>
-            <label id="voicuteThresholdRow">Voicute threshold <output id="voicuteThresholdValue"></output><input type="range" id="voicuteThreshold" min="0.3" max="0.95" step="0.01"></label>
-            <label id="heedThresholdRow">Heed threshold <output id="wakeThresholdValue"></output><input type="range" id="wakeThreshold" min="0.3" max="0.99" step="0.001"></label>
-            <label>Command listening window (seconds) <output id="commandWindowValue"></output><input type="range" id="commandWindow" min="2" max="15" step="1"></label>
-            <label>Go threshold <output id="goThresholdValue"></output><input type="range" id="goThreshold" min="0.3" max="0.99" step="0.01"></label>
-            <label>Stop threshold <output id="stopThresholdValue"></output><input type="range" id="stopThreshold" min="0.3" max="0.99" step="0.01"></label>
-            <label>Yes confirmation threshold <output id="yesThresholdValue"></output><input type="range" id="yesThreshold" min="0.3" max="0.99" step="0.01"></label>
-            <label>No confirmation threshold <output id="noThresholdValue"></output><input type="range" id="noThreshold" min="0.3" max="0.99" step="0.01"></label>
-            <label>TensorFlow overlap <select id="overlapFactor"><option value="auto">Automatic (desktop 0.75 / mobile 0.90)</option><option value="0.5">0.50</option><option value="0.75">0.75</option><option value="0.9">0.90</option></select></label>
+            <fieldset class="settings-group">
+                <legend>Wake-word recognition</legend>
+                <label>Wake-word engine <select id="wakeEngine"><option value="voicute">Voicute — Hey Friday</option><option value="heed">Heed — Hey Doc</option></select></label>
+                <label id="voicuteThresholdRow">Voicute threshold <output id="voicuteThresholdValue"></output><input type="range" id="voicuteThreshold" min="0.3" max="0.95" step="0.01"></label>
+                <label id="heedThresholdRow">Heed threshold <output id="wakeThresholdValue"></output><input type="range" id="wakeThreshold" min="0.3" max="0.99" step="0.01"></label>
+            </fieldset>
+            <fieldset class="settings-group">
+                <legend>Voice command recognition</legend>
+                <label>Command listening window (seconds) <output id="commandWindowValue"></output><input type="range" id="commandWindow" min="2" max="15" step="1"></label>
+                <label>Go threshold <output id="goThresholdValue"></output><input type="range" id="goThreshold" min="0.3" max="0.99" step="0.01"></label>
+                <label>Stop threshold <output id="stopThresholdValue"></output><input type="range" id="stopThreshold" min="0.3" max="0.99" step="0.01"></label>
+                <label>Yes confirmation threshold <output id="yesThresholdValue"></output><input type="range" id="yesThreshold" min="0.3" max="0.99" step="0.01"></label>
+                <label>No confirmation threshold <output id="noThresholdValue"></output><input type="range" id="noThreshold" min="0.3" max="0.99" step="0.01"></label>
+                <label>TensorFlow overlap <select id="overlapFactor"><option value="auto">Automatic (desktop 0.75 / mobile 0.90)</option><option value="0.5">0.50</option><option value="0.75">0.75</option><option value="0.9">0.90</option></select></label>
+            </fieldset>
         </div>
         <p class="settings-note">Settings are saved on this device. Wake phrases enter the Go/Stop command window during recording or pause.</p>
     </section>

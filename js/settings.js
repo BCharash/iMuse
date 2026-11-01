@@ -1,7 +1,7 @@
 // Stage 1: configuration only. The existing wake-word implementation remains
 // unchanged until the Heed/TensorFlow integration is tested in later stages.
 const KEY = "imuse.voice-settings.v1";
-const defaults = Object.freeze({audioCommands:false, wakeEngine:"voicute", wakeThreshold:0.667, voicuteThreshold:0.90, commandWindow:5,
+const defaults = Object.freeze({audioCommands:false, wakeEngine:"voicute", wakeThreshold:0.67, voicuteThreshold:0.90, commandWindow:5, silencePauseSeconds:5,
     goThreshold:0.60, stopThreshold:0.85, yesThreshold:0.85, noThreshold:0.55, overlapFactor:"auto"});
 const allowedOverlap = new Set(["auto", "0.5", "0.75", "0.9"]);
 const clamp = (value,min,max,fallback) => Number.isFinite(Number(value)) ? Math.min(max,Math.max(min,Number(value))) : fallback;
@@ -12,6 +12,7 @@ export function loadSettings() {
         wakeEngine:stored.wakeEngine === "heed" ? "heed" : "voicute",
         voicuteThreshold:clamp(stored.voicuteThreshold,.3,.95,defaults.voicuteThreshold),
         wakeThreshold:clamp(stored.wakeThreshold,.3,.99,defaults.wakeThreshold),
+        silencePauseSeconds:Math.round(clamp(stored.silencePauseSeconds,3,15,defaults.silencePauseSeconds)),
         commandWindow:Math.round(clamp(stored.commandWindow,2,15,defaults.commandWindow)),
         goThreshold:clamp(stored.goThreshold,.3,.99,defaults.goThreshold),
         stopThreshold:clamp(stored.stopThreshold,.3,.99,defaults.stopThreshold),
@@ -28,17 +29,24 @@ button.addEventListener("click", () => {
     panel.hidden = !panel.hidden;
     button.setAttribute("aria-expanded", String(!panel.hidden));
 });
-const controls = {wakeEngine:"wakeEngine",voicuteThreshold:"voicuteThreshold",audioCommands:"audioCommandsToggle",wakeThreshold:"wakeThreshold",commandWindow:"commandWindow",
+const controls = {silencePauseSeconds:"silencePauseSeconds",wakeEngine:"wakeEngine",voicuteThreshold:"voicuteThreshold",audioCommands:"audioCommandsToggle",wakeThreshold:"wakeThreshold",commandWindow:"commandWindow",
     goThreshold:"goThreshold",stopThreshold:"stopThreshold",yesThreshold:"yesThreshold",noThreshold:"noThreshold",overlapFactor:"overlapFactor"};
+let silencePauseLocked = false;
+export function setSilencePauseLocked(locked) {
+    silencePauseLocked = Boolean(locked);
+    const slider = document.getElementById("silencePauseSeconds");
+    if (slider) slider.disabled = silencePauseLocked;
+}
 function render() {
     for (const [key,id] of Object.entries(controls)) {
         const el=document.getElementById(id);if (!el) continue;
         if (el.type === "checkbox") el.checked = settings[key]; else el.value=String(settings[key]);
-        const output=document.getElementById(key+"Value");if (output) output.textContent=String(settings[key]);
+        const output=document.getElementById(key+"Value");if (output) output.textContent = ["wakeThreshold","voicuteThreshold","goThreshold","stopThreshold","yesThreshold","noThreshold"].includes(key) ? Number(settings[key]).toFixed(2) : String(settings[key]);
     }
     document.getElementById("heedThresholdRow").hidden = settings.wakeEngine !== "heed";
     document.getElementById("voicuteThresholdRow").hidden = settings.wakeEngine !== "voicute";
     document.getElementById("voiceSettings").querySelectorAll("input,select").forEach(el => el.disabled = !settings.audioCommands);
+    setSilencePauseLocked(silencePauseLocked);
 }
 for (const [key,id] of Object.entries(controls)) {
     const el=document.getElementById(id);if (!el) continue;

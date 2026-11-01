@@ -175,3 +175,12 @@ button:active {
 .command-timer-track { fill: var(--surface); stroke: var(--border); stroke-width: 1; }
 .command-timer-progress { fill: #9bdcf5; stroke: none; }
 .command-timer-hand { stroke: #35424b; stroke-width: 0.85; }
+
+/* Settings groups use the existing neutral palette and rounded corners. */
+.settings-slider { display:grid; gap:4px; margin:16px 0 18px; font-size:14px; }
+.settings-slider output { color:var(--accent-dark); font-weight:600; }
+.settings-slider input[type=range] { width:100%; accent-color:var(--accent); }
+.settings-group { min-width:0; margin:0; padding:14px; border:1px solid var(--border); border-radius:12px; display:grid; gap:14px; background:var(--surface); }
+.settings-group legend { padding:0 7px; color:var(--accent-dark); font-size:15px; font-weight:600; }
+.settings-group:has(input:disabled) { /* Retain readable headings even when commands are disabled. */ }
+.settings-slider input:disabled { opacity:.5; }

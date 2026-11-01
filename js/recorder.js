@@ -2,7 +2,7 @@ import { playSpokenResponse, prepareSpokenResponses } from "./audio-response-man
 import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSelectionLocked } from "./microphone-manager.js";
 import { loadVoicuteWakeWord } from "./voicute/voicute-adapter.js";
 import { loadHeedWakeWord } from "./heed/heed-adapter.js";
-import { getSettings, effectiveOverlap } from "./settings.js";
+import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { loadCommands, startCommands, stopCommands } from "./tensorflow/commands-adapter.js";
 
 const recordButton = document.getElementById("recordButton");
@@ -336,7 +336,7 @@ function finalizeRecording() {
     }
 }
 
-const SILENCE_PAUSE_MS = 5000;
+// Silence duration is configurable in Settings; snapshot per recording.
 const SILENCE_RMS_THRESHOLD = 0.015;
 const PAUSED_BEEP_INTERVAL_MS = 4500;
 
@@ -880,7 +880,7 @@ async function setupSilenceMonitor(current) {
                 return;
             }
 
-            if (Date.now() - current.silenceSince >= SILENCE_PAUSE_MS) {
+            if (Date.now() - current.silenceSince >= current.silencePauseMs) {
                 current.autoPausing = true;
                 current.pauseReason = "silence";
                 current.silenceSince = null;
@@ -1027,7 +1027,7 @@ function setAudioCommandsToggleLocked(locked) {
 
 function setReadyUI() {
     setAudioCommandsToggleLocked(false);
-    setMicrophoneSelectionLocked(false);
+    setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
     recordButton.textContent = "Start Recording";
     recordButton.disabled = false;
     pauseButton.textContent = "Pause";
@@ -1469,6 +1469,7 @@ function closeAudioContext(context) {
 
 async function startRecording() {
     setMicrophoneSelectionLocked(true);
+    setSilencePauseLocked(true);
     recordButton.disabled = true;
     pauseButton.disabled = true;
 
@@ -1477,7 +1478,7 @@ async function startRecording() {
     clearPlayback();
 
     if (!db) {
-        setMicrophoneSelectionLocked(false);
+        setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
         status.textContent = "IndexedDB is unavailable, so durable recording cannot start safely.";
         return;
     }
@@ -1490,7 +1491,7 @@ async function startRecording() {
         stream = await acquireRecordingMicrophone();
         if (requestId !== startRequest) {
             stopStream(stream);
-            setMicrophoneSelectionLocked(false);
+            setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
             return;
         }
         const recorderChoice = createCompatibleRecorder(stream);
@@ -1512,7 +1513,7 @@ async function startRecording() {
         if (requestId !== startRequest) {
             stopStream(stream);
             await deleteSessionData(id);
-            setMicrophoneSelectionLocked(false);
+            setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
             return;
         }
         const current = {
@@ -1539,6 +1540,7 @@ async function startRecording() {
             wakeRearmTimer: null,
             silenceCheckTimer: null,
             silenceSince: null,
+            silencePauseMs: getSettings().silencePauseSeconds * 1000,
             autoPausing: false,
             pauseReason: null,
             pausedBeepTimer: null,
@@ -1617,7 +1619,7 @@ async function startRecording() {
                 void pauseSpeech.then(resolve, resolve);
             }
             status.textContent = current.pauseReason === "silence"
-                ? `Paused automatically after ${SILENCE_PAUSE_MS / 1000} seconds of silence. Say “${wakeWordPhrase}” for voice commands, or press Resume.`
+                ? `Paused automatically after ${current.silencePauseMs / 1000} seconds of silence. Say “${wakeWordPhrase}” for voice commands, or press Resume.`
                 : `Paused — ${current.metadata.chunkCount} chunks saved so far. Say “${wakeWordPhrase}” for voice commands, or press Resume.`;
         });
         recorder.addEventListener("resume", async () => {
@@ -1645,7 +1647,7 @@ async function startRecording() {
             stopStream(stream);
             if (activeSession === current) activeSession = null;
             setAudioCommandsToggleLocked(false);
-            setMicrophoneSelectionLocked(false);
+            setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
             releaseScreenWakeLock();
             setWakeStatus("Wake-word detector idle. Start a recording to test it.");
             if (current.discard) {
@@ -1720,7 +1722,7 @@ async function startRecording() {
         recordButton.disabled = false;
         recordButton.textContent = "Start Recording";
         pauseButton.disabled = true;
-        if (!activeSession) { setAudioCommandsToggleLocked(false); setMicrophoneSelectionLocked(false); }
+        if (!activeSession) { setAudioCommandsToggleLocked(false); setMicrophoneSelectionLocked(false); setSilencePauseLocked(false); }
         status.textContent = `Could not start durable recording: ${error.message || "microphone unavailable"}`;
     }
 }
@@ -1764,7 +1766,7 @@ deleteButton.addEventListener("click", async () => {
         current.deleteRequested = true;
         activeSession = null;
         setAudioCommandsToggleLocked(false);
-        setMicrophoneSelectionLocked(false);
+        setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
         cleanupAudioMonitor(current);
         releaseScreenWakeLock();
         setWakeStatus("Wake-word detector stopped because the recording was deleted.");
