@@ -343,7 +343,7 @@ function finalizeRecording() {
     current.metadata.state = "finalizing";
     current.metadata.lastUpdatedAt = new Date().toISOString();
     putSession(current.metadata).catch(error => console.error("Could not mark session finalizing:", error));
-    status.textContent = "Finalizing recording...";
+    status.textContent = "Saving recording…";
     try {
         current.recorder.stop();
     } catch (error) {
@@ -370,7 +370,7 @@ async function initializeWakeWord() {
  const engineName=selectedWakeEngine;
  WAKE_THRESHOLD=engineName==="heed"?getSettings().wakeThreshold:getSettings().voicuteThreshold;
  wakeWordLoadError=null;
- setWakeStatus(`Wake-word detector: loading ${engineName}…`);
+ setWakeStatus(`Preparing voice commands…`);
  try {
   const loaded=engineName==="heed"
    ?await loadHeedWakeWord({threshold:WAKE_THRESHOLD,onStatus:setWakeStatus})
@@ -378,12 +378,12 @@ async function initializeWakeWord() {
   if(selectedWakeEngine!==engineName)return;
   wakeWord=loaded;
   wakeWordPhrase=loaded.phrase;
-  setWakeStatus(`Wake-word detector ready: ${engineName} — “${wakeWordPhrase}” (threshold ${WAKE_THRESHOLD.toFixed(2)}).`);
+  setWakeStatus(`Voice commands ready — “${wakeWordPhrase}”.`);
   if(activeSession && getSettings().audioCommands)scheduleWakeDetectorArm(activeSession,0);
  }catch(error){
   if(selectedWakeEngine!==engineName)return;
   wakeWordLoadError=error;
-  setWakeStatus(`Wake-word detector unavailable: ${error.message||error}. Manual controls remain available.`);
+  setWakeStatus(`Voice commands unavailable. You can still use the recording buttons.`);
  }
 }
 
@@ -423,7 +423,7 @@ async function sayResponse(name) {
     const result = await playSpokenResponse(name);
     if (!result.ok) {
         console.warn(`Voice response ${name} could not be heard:`, result.error);
-        setWakeStatus(`Spoken response unavailable (${name}); command recognition remains available.`);
+        setWakeStatus(`Voice prompt unavailable. Voice commands may still work.`);
     }
     return result.ok;
 }
@@ -454,7 +454,7 @@ async function confirmVoiceStop(current) {
     stopPausedBeep(current);
     clearWakeDetectorTimers(current);
     commandIndicator.hidden = true;
-    setWakeStatus("Preparing Stop confirmation…");
+    setWakeStatus("Preparing stop confirmation…");
     try {
         // Do not overlap listeners: wait until Go/Stop has completely released TensorFlow.
         await stopCommands(commandModel);
@@ -472,7 +472,7 @@ async function confirmVoiceStop(current) {
         commandIndicator.firstChild.textContent = "Listening for Yes or No ";
         commandIndicator.hidden = false;
         updateCommandTimer(1);
-        setWakeStatus("Confirm Stop: say Yes to stop, or No to remain paused.");
+        setWakeStatus("Say “Yes” to stop or “No” to stay paused.");
         await startCommands(commandModel, current.stream, effectiveOverlap(deviceClass), scores => {
             if (generation !== commandGeneration || !commandActive || performance.now() >= expiresAt) return;
             const settings = getSettings();
@@ -484,7 +484,7 @@ async function confirmVoiceStop(current) {
                 if (activeSession === current && current.recorder.state === "paused") {
                     void sayResponse("pause");
                     scheduleWakeDetectorArm(current, 0);
-                    setWakeStatus("Stop cancelled. Recording remains paused.");
+                    setWakeStatus("Stop cancelled. Recording paused.");
                 }
             }
         });
@@ -499,7 +499,7 @@ async function confirmVoiceStop(current) {
                 if (activeSession === current && current.recorder.state === "paused") {
                     void sayResponse("pause");
                     scheduleWakeDetectorArm(current, 0);
-                    setWakeStatus("No confirmation received. Recording remains paused.");
+                    setWakeStatus("No response received. Recording paused.");
                 }
             }
         }, 100);
@@ -510,7 +510,7 @@ async function confirmVoiceStop(current) {
         if (activeSession === current && current.recorder.state === "paused") {
             void sayResponse("pause");
             scheduleWakeDetectorArm(current, 0);
-            setWakeStatus("Stop not confirmed; recording remains paused.");
+            setWakeStatus("Stop not confirmed. Recording paused.");
         }
     }
 }
@@ -539,7 +539,7 @@ async function handleWakeDetected(current) {
             return;
         }
     }
-    setWakeStatus(`Detected “${wakeWordPhrase}”; preparing Go / Stop.`);
+    setWakeStatus(`Wake word detected. Preparing voice commands…`);
     if (wasRecording) await current.pauseAnnouncement;
     else await sayResponse("yes");
     if (generation !== commandGeneration || !commandActive || activeSession !== current) return;
@@ -577,14 +577,14 @@ async function handleWakeDetected(current) {
             if (remaining === 0) {
                 closeCommandWindow();
                 if (activeSession === current) scheduleWakeDetectorArm(current, 0);
-                setWakeStatus(`Command timed out. Listening for “${wakeWordPhrase}”.`);
+                setWakeStatus(`No command heard. Listening for “${wakeWordPhrase}”.`);
             }
         }, 100);
     } catch (error) {
         console.warn("TensorFlow command recognition failed:", error);
         closeCommandWindow();
         if (activeSession === current) scheduleWakeDetectorArm(current, 0);
-        setWakeStatus(`Go / Stop unavailable: ${error.message || error}. Manual controls remain available.`);
+        setWakeStatus(`Voice commands unavailable. Use the recording buttons.`);
     }
 }
 
@@ -607,8 +607,8 @@ function scheduleWakeDetectorArm(current, delayMs = 650) {
     }
     if (!getSettings().audioCommands || !wakeWord || !current.wakeRing) {
         setWakeStatus(!getSettings().audioCommands ? "Audio commands disabled." : wakeWordLoadError
-            ? "Wake-word detector unavailable; use Resume manually."
-            : "Wake-word detector is loading; use Resume manually if needed.");
+            ? "Voice commands unavailable. Use the Record button to resume."
+            : "Preparing voice commands. You can resume manually.");
         return;
     }
     current.wakeRearmTimer = window.setTimeout(() => {
@@ -623,7 +623,7 @@ function scheduleWakeDetectorArm(current, delayMs = 650) {
         resetWakeAudioBuffer(current);
         current.wakeDetectorEnabled = true;
         setWakeStatus(
-            `Listening for “${wakeWordPhrase}” (threshold ${WAKE_THRESHOLD.toFixed(2)}).`
+            `Listening for “${wakeWordPhrase}”.`
         );
     }, delayMs);
 }
@@ -705,7 +705,7 @@ async function runWakeWordInference(current, sampleRate) {
     } catch (error) {
         current.wakeDetectorEnabled = false;
         console.warn("Wake-word inference failed:", error);
-        setWakeStatus(`Wake-word inference stopped after an error: ${error.message || error}. Use Resume manually.`);
+        setWakeStatus(`Voice detection stopped. Use the recording buttons.`);
     } finally {
         current.wakeInferenceBusy = false;
     }
@@ -715,18 +715,18 @@ async function requestScreenWakeLock() {
     if (!activeSession) return;
     if (!("wakeLock" in navigator)) {
         setLifecycleStatus(
-            "Screen wake lock is not supported in this browser. Background listening is not guaranteed."
+            "Screen lock prevention unavailable. Keep iMuse visible while recording."
         );
         return;
     }
     if (document.visibilityState !== "visible") {
         setLifecycleStatus(
-            "iMuse is in the background. The browser may suspend microphone processing or wake-word detection."
+            "iMuse is in the background. Recording or voice detection may be interrupted."
         );
         return;
     }
     if (screenWakeLock && !screenWakeLock.released) {
-        setLifecycleStatus("Screen wake lock active while recording; this does not guarantee background execution.");
+        setLifecycleStatus("Screen will stay awake while iMuse is visible.");
         return;
     }
     try {
@@ -736,16 +736,16 @@ async function requestScreenWakeLock() {
             if (screenWakeLock === sentinel) screenWakeLock = null;
             if (activeSession) {
                 setLifecycleStatus(
-                    "Screen wake lock released. The browser may dim the screen or suspend background work."
+                    "Screen lock prevention ended. Keep iMuse visible while recording."
                 );
             }
         }, { once: true });
         setLifecycleStatus(
-            "Screen wake lock active while recording; this helps keep the screen awake but cannot guarantee background execution."
+            "Screen will stay awake while iMuse is visible."
         );
     } catch (error) {
         setLifecycleStatus(
-            `Could not keep the screen awake (${error.message || "not permitted"}). Background listening is not guaranteed.`
+            `Could not prevent screen locking. Keep iMuse visible while recording.`
         );
     }
 }
@@ -756,17 +756,17 @@ async function releaseScreenWakeLock() {
     if (sentinel && !sentinel.released) {
         try { await sentinel.release(); } catch (_) {}
     }
-    setLifecycleStatus("Screen wake lock released. Start a recording to test listening lifecycle.");
+    setLifecycleStatus("Screen lock prevention inactive.");
 }
 
 function handleVisibilityChange() {
 
     if (!activeSession) {
-        setLifecycleStatus("Screen wake lock will be requested while recording, if supported.");
+        setLifecycleStatus("Screen lock prevention activates during recording when available.");
         return;
     }
     if (document.visibilityState === "visible") {
-        setLifecycleStatus("iMuse is visible again; checking audio and screen wake lock.");
+        setLifecycleStatus("iMuse is active. Checking microphone and screen settings…");
         if (activeSession.audioContext?.state === "suspended") {
             activeSession.audioContext.resume().then(() => {
                 if (
@@ -778,7 +778,7 @@ function handleVisibilityChange() {
                 }
             }).catch(error => {
                 console.warn("Could not resume Web Audio after visibility change:", error);
-                setLifecycleStatus("Audio processing did not resume automatically. Keep iMuse visible and check microphone access.");
+                setLifecycleStatus("Audio processing could not resume. Check microphone access.");
             });
         } else if (["paused", "recording"].includes(activeSession.recorder.state) && wakeWord) {
             scheduleWakeDetectorArm(activeSession, 0);
@@ -786,7 +786,7 @@ function handleVisibilityChange() {
         requestScreenWakeLock();
     } else {
         setLifecycleStatus(
-            "iMuse is hidden. The browser may suspend the page, microphone processing, or detector; this status cannot guarantee continued listening."
+            "iMuse is in the background. Audio capture or voice commands may be interrupted."
         );
     }
 }
@@ -870,14 +870,14 @@ async function setupSilenceMonitor(current) {
                 if (!current.micUnavailableNotice) {
                     current.micUnavailableNotice = true;
                     setLifecycleStatus(
-                        "Microphone/audio processing is temporarily unavailable. iPhone locking can interrupt web-app capture; unlock the phone and check that the microphone resumes."
+                        "Microphone input interrupted. Unlock your device and check that recording resumes."
                     );
                 }
                 return;
             }
             if (current.micUnavailableNotice) {
                 current.micUnavailableNotice = false;
-                setLifecycleStatus("Microphone input has resumed. Keep iMuse visible for the most reliable wake-word listening.");
+                setLifecycleStatus("Microphone input restored.");
             }
 
             analyser.getFloatTimeDomainData(current.audioSamples);
@@ -925,7 +925,7 @@ async function setupSilenceMonitor(current) {
         current.wakeRing = null;
         current.wakeRingPos = 0;
         current.wakeCollectedSamples = 0;
-        setWakeStatus("Wake-word listening unavailable because Web Audio could not start.");
+        setWakeStatus("Voice detection unavailable. Manual recording is still available.");
     }
 }
 
@@ -1103,7 +1103,7 @@ async function exportSavedSession(id, button) {
             type: item.mimeType || parts.find(part => part.type)?.type || "audio/webm"
         });
         downloadAudioBlob(blob, sessionFilename(item));
-        status.textContent = "Audio download started. Open the downloaded file in an external audio player to verify it.";
+        status.textContent = "Download started. Check the exported audio before deleting the original.";
     } catch (error) {
         console.error("Could not export saved recording:", error);
         status.textContent = `Could not export audio: ${error.message || "unknown error"}`;
@@ -1124,7 +1124,7 @@ function ensureCurrentDownloadButton() {
             if (!window.lastRecording) throw new Error("No recording is currently loaded.");
             const item = displayedSessionId ? null : null;
             downloadAudioBlob(window.lastRecording, sessionFilename({ startedAt: new Date().toISOString() }));
-            status.textContent = "Audio download started. Open the downloaded file in an external audio player to verify it.";
+            status.textContent = "Download started. Check the exported audio before deleting the original.";
         } catch (error) {
             status.textContent = `Could not download audio: ${error.message || "unknown error"}`;
         }
@@ -1368,7 +1368,7 @@ async function playSavedSession(id, button) {
         const blob = new Blob(parts, { type: item.mimeType || parts.find(part => part.type)?.type || "audio/webm" });
         if (!blob.size) throw new Error("The saved recording is empty.");
         showPlayback(blob, id);
-        status.textContent = `Loaded completed recording from ${formatDate(item.startedAt)}. Play it to verify the saved audio.`;
+        status.textContent = `Recording loaded. Play it to check the audio.`;
     } catch (error) {
         console.error("Could not load saved recording:", error);
         status.textContent = `Could not load saved recording: ${error.message || "unknown error"}`;
@@ -1389,7 +1389,7 @@ async function recoverSession(id, button) {
         const blob = new Blob(parts, { type: item.mimeType || parts.find(part => part.type)?.type || "audio/webm" });
         if (!blob.size) throw new Error("The recovered audio is empty.");
         showPlayback(blob, id);
-        status.textContent = `Recovered ${parts.length} saved audio chunks. Listen through the recording to verify it before relying on it.`;
+        status.textContent = `Recovered audio loaded. Listen through it to check for missing sections.`;
         await renderRecoverableSessions();
     } catch (error) {
         console.error("Recovery failed:", error);
@@ -1413,7 +1413,7 @@ async function initialize() {
         await renderRecoverableSessions();
     } catch (error) {
         console.error("Recording recovery initialization failed:", error);
-        status.textContent = "IndexedDB could not be initialized. Recording can be tested, but durable recovery is unavailable.";
+        status.textContent = "Recording storage unavailable. Recording cannot start safely.";
     }
 }
 
@@ -1568,19 +1568,19 @@ async function startRecording() {
                 if (activeSession !== current || current.discard) return;
                 current.micUnavailableNotice = true;
                 current.silenceSince = null;
-                setLifecycleStatus("The microphone track was muted. iPhone locking can interrupt web-app audio; unlock the phone and check whether input resumes.");
+                setLifecycleStatus("Microphone input interrupted. Unlock your device and check that recording resumes.");
             });
             microphoneTrack.addEventListener("unmute", () => {
                 if (activeSession !== current || current.discard) return;
                 current.micUnavailableNotice = false;
                 current.silenceSince = null;
-                setLifecycleStatus("Microphone track is active again. Keep iMuse visible for the most reliable wake-word listening.");
+                setLifecycleStatus("Microphone input restored.");
             });
             microphoneTrack.addEventListener("ended", () => {
                 if (activeSession !== current || current.discard) return;
                 current.micUnavailableNotice = true;
                 current.silenceSince = null;
-                setLifecycleStatus("Microphone access ended. iMuse cannot reliably reacquire it without restarting the recording; stop and start a new recording if input does not return.");
+                setLifecycleStatus("Microphone disconnected. Stop and start a new recording if input does not return.");
             });
         }
         recorder.addEventListener("start", () => {
@@ -1596,11 +1596,11 @@ async function startRecording() {
             current.writeQueue = current.writeQueue.then(async () => {
                 if (current.discard) return;
                 await persistChunk(current, sequence, event.data);
-                status.textContent = `Recording in ${current.formatLabel} — ${current.metadata.chunkCount} chunks saved to this browser.`;
+                status.textContent = `Recording… Audio is being saved on this device.`;
             }).catch(error => {
                 current.persistenceError = error;
                 console.error("Audio chunk could not be persisted:", error);
-                status.textContent = "Warning: an audio chunk could not be saved. Keep this page open and stop the recording to retain any audio still in memory.";
+                status.textContent = "Audio storage error. Stop recording and download the audio before closing iMuse.";
                 current.metadata.state = "storage-error";
                 current.metadata.lastUpdatedAt = new Date().toISOString();
                 putSession(current.metadata).catch(saveError => console.error("Could not update session state:", saveError));
@@ -1629,8 +1629,8 @@ async function startRecording() {
                 void pauseSpeech.then(resolve, resolve);
             }
             status.textContent = current.pauseReason === "silence"
-                ? `Paused automatically after ${current.silencePauseMs / 1000} seconds of silence. Say “${wakeWordPhrase}” for voice commands, or press Resume.`
-                : `Paused — ${current.metadata.chunkCount} chunks saved so far. Say “${wakeWordPhrase}” for voice commands, or press Resume.`;
+                ? `Paused automatically after silence. Press Record to resume.`
+                : `Recording paused. Press Record to resume.`;
         });
         recorder.addEventListener("resume", async () => {
             if (activeSession !== current || current.discard) return;
@@ -1643,7 +1643,7 @@ async function startRecording() {
             current.silenceSince = null;
             current.pauseReason = null;
             current.autoPausing = false;
-            if (!commandActive) setWakeStatus(`Listening for “${wakeWordPhrase}” while recording.`);
+            if (!commandActive) setWakeStatus(`Listening for “${wakeWordPhrase}”.`);
             status.textContent = "Recording resumed.";
             void sayResponse("recording");
         });
@@ -1659,7 +1659,7 @@ async function startRecording() {
             setAudioCommandsToggleLocked(false);
             setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
             releaseScreenWakeLock();
-            setWakeStatus("Wake-word detector idle. Start a recording to test it.");
+            setWakeStatus("Wake-word detector idle");
             if (current.discard) {
                 try { await current.writeQueue; } catch (_) { /* best effort; session is being deleted */ }
                 try { await deleteSessionData(id); } catch (error) { console.error("Could not delete discarded session:", error); }
@@ -1679,7 +1679,7 @@ async function startRecording() {
                 return;
             }
             setRecordingControlState("finalizing");
-            status.textContent = "Waiting for saved audio writes to finish...";
+            status.textContent = "Finishing audio storage…";
             await current.writeQueue;
             let finalBlob;
             try {
@@ -1693,7 +1693,7 @@ async function startRecording() {
                 current.metadata.lastUpdatedAt = current.metadata.completedAt;
                 await putSession(current.metadata);
                 showPlayback(finalBlob, id);
-                status.textContent = `Recording complete. ${savedChunks.length} chunks were saved to this browser.`;
+                status.textContent = `Recording saved.`;
             } catch (error) {
                 console.error("Could not finalize persisted recording:", error);
                 finalBlob = new Blob(current.memoryChunks, { type: current.metadata.mimeType || current.memoryChunks.find(part => part.type)?.type || "application/octet-stream" });
@@ -1714,10 +1714,10 @@ async function startRecording() {
         recorder.start(250);
 
         setRecordingControlState("recording");
-        status.textContent = `Recording in ${formatLabel} — saving audio chunks as they arrive.`;
+        status.textContent = `Recording… Audio is being saved on this device.`;
 
         if (getSettings().audioCommands) scheduleWakeDetectorArm(current, 0);
-        else setWakeStatus("Audio commands disabled; manual controls available.");
+        else setWakeStatus("Audio commands disabled.");
         requestScreenWakeLock();
         // The new-recording announcement replaces the old single start beep.
         void sayResponse("newRecording");
@@ -1770,7 +1770,7 @@ deleteButton.addEventListener("click", async () => {
         setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
         cleanupAudioMonitor(current);
         releaseScreenWakeLock();
-        setWakeStatus("Wake-word detector stopped because the recording was deleted.");
+        setWakeStatus("Voice detection stopped.");
         try {
             if (current.recorder.state !== "inactive") current.recorder.stop();
             else {
@@ -1806,7 +1806,7 @@ window.addEventListener("pageshow", () => {
 window.addEventListener("pagehide", () => {
     if (activeSession) {
         setLifecycleStatus(
-            "The page is leaving the foreground. The browser may suspend audio processing; continued wake-word listening is not guaranteed."
+            "iMuse is in the background. Audio capture or voice commands may be interrupted."
         );
     }
 });
@@ -1814,7 +1814,7 @@ window.addEventListener("pagehide", () => {
 initialize();
 initializeWakeWord();
 // Microphone is acquired only when recording begins; no startup readiness capture.
-setLifecycleStatus("Screen wake lock will be requested while recording, if supported.");
+setLifecycleStatus("Screen lock prevention activates during recording when available.");
 
 // Cache short response files without opening the microphone.
 void prepareSpokenResponses();
