@@ -1619,7 +1619,13 @@ async function startRecording() {
                 current.pendingChunks.delete(sequence);
                 current.pendingBytes -= chunk.size;
                 if (!current.persistenceError && !current.stopHandled) {
-                    status.textContent = "Recording… Audio is being saved on this device.";
+                    const count = current.metadata.chunkCount;
+                    const progress = `${count} chunk${count === 1 ? "" : "s"} saved to this browser`;
+                    if (recorder.state === "recording") {
+                        status.textContent = `Recording in ${current.formatLabel} — ${progress}.`;
+                    } else if (recorder.state === "paused") {
+                        status.textContent = `Paused — ${progress}. Press Record to resume.`;
+                    }
                 }
             }).catch(error => {
                 if (!current.persistenceError || current.storageStopRequested) current.persistenceError = error;
@@ -1659,8 +1665,8 @@ async function startRecording() {
                 void pauseSpeech.then(resolve, resolve);
             }
             status.textContent = current.pauseReason === "silence"
-                ? `Paused automatically after silence. Press Record to resume.`
-                : `Recording paused. Press Record to resume.`;
+                ? `Paused automatically after silence — ${current.metadata.chunkCount} chunks saved. Press Record to resume.`
+                : `Paused — ${current.metadata.chunkCount} chunks saved. Press Record to resume.`;
         });
         recorder.addEventListener("resume", async () => {
             if (activeSession !== current || current.discard) return;
@@ -1674,7 +1680,7 @@ async function startRecording() {
             current.pauseReason = null;
             current.autoPausing = false;
             if (!commandActive) setWakeStatus(`Listening for “${wakeWordPhrase}”.`);
-            status.textContent = "Recording resumed.";
+            status.textContent = `Recording resumed in ${current.formatLabel} — ${current.metadata.chunkCount} chunks saved to this browser.`;
             void sayResponse("recording");
         });
         recorder.addEventListener("stop", async () => {
