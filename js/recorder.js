@@ -75,6 +75,22 @@ let displayedSessionId = null;
 let startRequest = 0;
 let recoveryPanel = null;
 
+// Small, allocation-free snapshot of the recorder's pending audio buffer.
+// This is not a measurement of total browser/process memory.
+function publishRecordingDiagnostics() {
+    const current = activeSession;
+    window.imuseRecordingDiagnostics = {
+        pendingBytes: current?.pendingBytes || 0,
+        peakPendingBytes: current?.peakPendingBytes || 0,
+        pendingChunks: current?.pendingChunks?.size || 0,
+        bufferLimitBytes: MAX_PENDING_AUDIO_BYTES,
+        recordingState: current?.recorder?.state || "inactive"
+    };
+    window.dispatchEvent(new Event("imuse-recording-diagnostics"));
+}
+publishRecordingDiagnostics();
+
+
 function openDatabase() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -1538,6 +1554,7 @@ async function startRecording() {
             persistenceError: null,
             pendingChunks: new Map(),
             pendingBytes: 0,
+            peakPendingBytes: 0,
             storageStopRequested: false,
             discard: false,
             stopHandled: false,
@@ -1563,6 +1580,7 @@ async function startRecording() {
             micUnavailableNotice: false
         };
         activeSession = current;
+        publishRecordingDiagnostics();
         // Freeze voice-command preference throughout this recording session.
         setAudioCommandsToggleLocked(true);
 
@@ -1598,6 +1616,8 @@ async function startRecording() {
             const chunk = event.data;
             current.pendingChunks.set(sequence, chunk);
             current.pendingBytes += chunk.size;
+            current.peakPendingBytes = Math.max(current.peakPendingBytes, current.pendingBytes);
+            publishRecordingDiagnostics();
 
             if (current.pendingBytes > MAX_PENDING_AUDIO_BYTES && !current.storageStopRequested) {
                 current.storageStopRequested = true;
@@ -1618,6 +1638,7 @@ async function startRecording() {
                 await persistChunk(current, sequence, chunk);
                 current.pendingChunks.delete(sequence);
                 current.pendingBytes -= chunk.size;
+                publishRecordingDiagnostics();
                 if (!current.persistenceError && !current.stopHandled) {
                     const count = current.metadata.chunkCount;
                     const progress = `${count} chunk${count === 1 ? "" : "s"} saved to this browser`;
@@ -1692,6 +1713,7 @@ async function startRecording() {
             cleanupAudioMonitor(current);
             stopStream(stream);
             if (activeSession === current) activeSession = null;
+            publishRecordingDiagnostics();
             setAudioCommandsToggleLocked(false);
             setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
             releaseScreenWakeLock();
