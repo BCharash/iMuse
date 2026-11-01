@@ -23,10 +23,22 @@ export function loadSettings() {
 let settings = loadSettings();
 export const getSettings = () => ({...settings});
 export const effectiveOverlap = deviceClass => settings.overlapFactor === "auto" ? (deviceClass === "mobile" ? .9 : .75) : Number(settings.overlapFactor);
+// Use the recorder's actual runtime classification, not a separate device guess.
+// The recorder sets window.deviceClass during module initialization.
+function updateAutomaticOverlapLabel() {
+    const select = document.getElementById("overlapFactor");
+    const option = select?.querySelector('option[value="auto"]');
+    if (!option) return;
+    const deviceClass = window.deviceClass;
+    option.textContent = deviceClass === "mobile" ? "Automatic — Mobile (0.90)"
+        : deviceClass === "desktop" ? "Automatic — Desktop (0.75)"
+        : "Automatic (detecting device…)";
+}
 const panel = document.getElementById("settingsPanel");
 const button = document.getElementById("settingsButton");
 button.addEventListener("click", () => {
     panel.hidden = !panel.hidden;
+    updateAutomaticOverlapLabel();
     button.setAttribute("aria-expanded", String(!panel.hidden));
 });
 const controls = {silencePauseSeconds:"silencePauseSeconds",wakeEngine:"wakeEngine",voicuteThreshold:"voicuteThreshold",audioCommands:"audioCommandsToggle",wakeThreshold:"wakeThreshold",commandWindow:"commandWindow",
@@ -38,6 +50,7 @@ export function setSilencePauseLocked(locked) {
     if (slider) slider.disabled = silencePauseLocked;
 }
 function render() {
+    updateAutomaticOverlapLabel();
     for (const [key,id] of Object.entries(controls)) {
         const el=document.getElementById(id);if (!el) continue;
         if (el.type === "checkbox") el.checked = settings[key]; else el.value=String(settings[key]);
@@ -58,3 +71,5 @@ for (const [key,id] of Object.entries(controls)) {
     });
 }
 render();
+
+window.addEventListener("load", updateAutomaticOverlapLabel);
