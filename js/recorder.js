@@ -65,6 +65,8 @@ const DB_NAME = "imuse-recording-breadboard";
 const DB_VERSION = 1;
 const SESSION_STORE = "sessions";
 const CHUNK_STORE = "chunks";
+// Maximum audio waiting for a committed IndexedDB write.
+const MAX_PENDING_AUDIO_BYTES = 8 * 1024 * 1024;
 
 let db = null;
 let activeSession = null;
@@ -1534,7 +1536,9 @@ async function startRecording() {
             sequence: 0,
             writeQueue: Promise.resolve(),
             persistenceError: null,
-            memoryChunks: [],
+            pendingChunks: new Map(),
+            pendingBytes: 0,
+            storageStopRequested: false,
             discard: false,
             stopHandled: false,
             audioContext: null,
@@ -1586,24 +1590,50 @@ async function startRecording() {
         recorder.addEventListener("start", () => {
 
         });
+        // Keep only audio awaiting a completed IndexedDB transaction in RAM.
+        // If storage stalls or fails, stop capture rather than buffering indefinitely.
         recorder.addEventListener("dataavailable", event => {
             if (current.discard || !event.data || !event.data.size) return;
             const sequence = current.sequence++;
-            if (sequence === 0) {
+            const chunk = event.data;
+            current.pendingChunks.set(sequence, chunk);
+            current.pendingBytes += chunk.size;
 
+            if (current.pendingBytes > MAX_PENDING_AUDIO_BYTES && !current.storageStopRequested) {
+                current.storageStopRequested = true;
+                current.persistenceError ||= new Error("Audio storage is not keeping up with recording.");
+                status.textContent = "Audio storage is too slow. Stopping to protect the recording.";
+                // Stop emits a final dataavailable event, which is also queued for storage.
+                if (recorder.state !== "inactive") {
+                    try { recorder.stop(); } catch (error) { console.error("Automatic storage stop failed:", error); }
+                }
             }
-            current.memoryChunks.push(event.data);
+
             current.writeQueue = current.writeQueue.then(async () => {
-                if (current.discard) return;
-                await persistChunk(current, sequence, event.data);
-                status.textContent = `Recording… Audio is being saved on this device.`;
+                if (current.discard || current.persistenceError && !current.storageStopRequested) return;
+                // A backpressure stop is not itself a failed write: attempt to
+                // commit every pending chunk, including the recorder's final chunk.
+                if (current.persistenceError && current.storageStopRequested &&
+                    current.persistenceError.message !== "Audio storage is not keeping up with recording.") return;
+                await persistChunk(current, sequence, chunk);
+                current.pendingChunks.delete(sequence);
+                current.pendingBytes -= chunk.size;
+                if (!current.persistenceError && !current.stopHandled) {
+                    status.textContent = "Recording… Audio is being saved on this device.";
+                }
             }).catch(error => {
-                current.persistenceError = error;
+                if (!current.persistenceError || current.storageStopRequested) current.persistenceError = error;
                 console.error("Audio chunk could not be persisted:", error);
-                status.textContent = "Audio storage error. Stop recording and download the audio before closing iMuse.";
+                status.textContent = "Audio storage failed. Recording is stopping; do not close iMuse.";
                 current.metadata.state = "storage-error";
                 current.metadata.lastUpdatedAt = new Date().toISOString();
                 putSession(current.metadata).catch(saveError => console.error("Could not update session state:", saveError));
+                if (!current.storageStopRequested) {
+                    current.storageStopRequested = true;
+                    if (recorder.state !== "inactive") {
+                        try { recorder.stop(); } catch (stopError) { console.error("Storage-failure stop failed:", stopError); }
+                    }
+                }
             });
         });
         recorder.addEventListener("error", event => {
@@ -1683,7 +1713,10 @@ async function startRecording() {
             await current.writeQueue;
             let finalBlob;
             try {
-                if (current.persistenceError) throw current.persistenceError;
+                if (current.persistenceError && !(current.storageStopRequested &&
+                    current.persistenceError.message === "Audio storage is not keeping up with recording.")) {
+                    throw current.persistenceError;
+                }
                 const savedChunks = await getChunks(id);
                 const parts = savedChunks.map(chunk => chunk.blob).filter(blob => blob && blob.size > 0);
                 finalBlob = new Blob(parts, { type: current.metadata.mimeType || parts.find(part => part.type)?.type || "application/octet-stream" });
@@ -1693,16 +1726,32 @@ async function startRecording() {
                 current.metadata.lastUpdatedAt = current.metadata.completedAt;
                 await putSession(current.metadata);
                 showPlayback(finalBlob, id);
-                status.textContent = `Recording saved.`;
+                status.textContent = current.storageStopRequested
+                    ? "Recording stopped because storage was slow. Saved audio is available; check playback."
+                    : "Recording saved.";
             } catch (error) {
                 console.error("Could not finalize persisted recording:", error);
-                finalBlob = new Blob(current.memoryChunks, { type: current.metadata.mimeType || current.memoryChunks.find(part => part.type)?.type || "application/octet-stream" });
+                // Rebuild from committed chunks plus only the uncommitted tail.
+                // The latter is retained in RAM solely for emergency export.
+                let fallbackParts = [];
+                try {
+                    const committed = await getChunks(id);
+                    const bySequence = new Map(committed.map(chunk => [chunk.sequence, chunk.blob]));
+                    for (const [sequence, blob] of current.pendingChunks) bySequence.set(sequence, blob);
+                    fallbackParts = [...bySequence.entries()].sort((a, b) => a[0] - b[0])
+                        .map(([, blob]) => blob).filter(blob => blob && blob.size);
+                } catch (readError) {
+                    console.error("Could not read committed audio for emergency playback:", readError);
+                    fallbackParts = [...current.pendingChunks.entries()].sort((a, b) => a[0] - b[0])
+                        .map(([, blob]) => blob);
+                }
+                finalBlob = new Blob(fallbackParts, { type: current.metadata.mimeType || fallbackParts.find(part => part.type)?.type || "application/octet-stream" });
                 if (finalBlob.size) showPlayback(finalBlob, id);
                 current.metadata.state = "storage-error";
                 current.metadata.lastUpdatedAt = new Date().toISOString();
                 try { await putSession(current.metadata); } catch (saveError) { console.error(saveError); }
                 status.textContent = finalBlob.size
-                    ? "Playback is available from memory, but durable saving failed. Do not reload this page until you have saved the audio elsewhere."
+                    ? "Storage failed. Emergency audio is available; download it before closing iMuse and check for missing sections."
                     : "Recording could not be finalized. No playable audio was available.";
             }
             setReadyUI();
