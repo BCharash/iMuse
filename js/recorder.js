@@ -426,6 +426,78 @@ function closeCommandWindow() {
     const model = commandModel;
     void stopCommands(model).catch(error => console.warn("Cannot stop command listener:", error));
 }
+// Voice Stop is provisional until an explicit Yes is recognized.
+// The original recorder remains paused and all persisted chunks are untouched.
+async function confirmVoiceStop(current) {
+    if (activeSession !== current || current.discard || current.recorder.state !== "paused") return;
+    commandActive = true;
+    const generation = ++commandGeneration;
+    if (commandInterval !== null) clearInterval(commandInterval);
+    commandInterval = null;
+    stopPausedBeep(current);
+    clearWakeDetectorTimers(current);
+    commandIndicator.hidden = true;
+    setWakeStatus("Preparing Stop confirmation…");
+    try {
+        // Do not overlap listeners: wait until Go/Stop has completely released TensorFlow.
+        await stopCommands(commandModel);
+        if (generation !== commandGeneration || activeSession !== current || !commandActive) return;
+        // Preload/model preparation is allowed; speech recognition is NOT running during playback.
+        commandModel = await loadCommands();
+        if (generation !== commandGeneration || activeSession !== current || !commandActive) return;
+        const heard = await sayResponse("confirmStop");
+        if (generation !== commandGeneration || activeSession !== current || !commandActive) return;
+        if (!heard) throw new Error("Stop confirmation prompt could not be played.");
+        // Starting a fresh listener AFTER playback prevents its audio windows from
+        // including the spoken Yes/No prompt. No artificial post-prompt delay.
+        const seconds = getSettings().commandWindow;
+        let expiresAt = Infinity;
+        commandIndicator.firstChild.textContent = "Listening for Yes or No ";
+        commandIndicator.hidden = false;
+        updateCommandTimer(1);
+        setWakeStatus("Confirm Stop: say Yes to stop, or No to remain paused.");
+        await startCommands(commandModel, current.stream, effectiveOverlap(deviceClass), scores => {
+            if (generation !== commandGeneration || !commandActive || performance.now() >= expiresAt) return;
+            const settings = getSettings();
+            if (scores.top === "yes" && scores.yes >= settings.yesThreshold) {
+                closeCommandWindow();
+                finalizeRecording();
+            } else if (scores.top === "no" && scores.no >= settings.noThreshold) {
+                closeCommandWindow();
+                if (activeSession === current && current.recorder.state === "paused") {
+                    void sayResponse("pause");
+                    scheduleWakeDetectorArm(current, 0);
+                    setWakeStatus("Stop cancelled. Recording remains paused.");
+                }
+            }
+        });
+        if (generation !== commandGeneration || !commandActive) return;
+        expiresAt = performance.now() + seconds * 1000;
+        commandInterval = window.setInterval(() => {
+            if (generation !== commandGeneration || !commandActive) return;
+            const remaining = Math.max(0, (expiresAt - performance.now()) / 1000);
+            updateCommandTimer(remaining / seconds);
+            if (remaining === 0) {
+                closeCommandWindow();
+                if (activeSession === current && current.recorder.state === "paused") {
+                    void sayResponse("pause");
+                    scheduleWakeDetectorArm(current, 0);
+                    setWakeStatus("No confirmation received. Recording remains paused.");
+                }
+            }
+        }, 100);
+    } catch (error) {
+        console.warn("Stop confirmation unavailable:", error);
+        if (generation !== commandGeneration) return;
+        closeCommandWindow();
+        if (activeSession === current && current.recorder.state === "paused") {
+            void sayResponse("pause");
+            scheduleWakeDetectorArm(current, 0);
+            setWakeStatus("Stop not confirmed; recording remains paused.");
+        }
+    }
+}
+
 async function handleWakeDetected(current) {
     if (!getSettings().audioCommands || commandActive || activeSession !== current || !current.wakeDetectorEnabled) return;
     commandActive = true;
@@ -460,6 +532,7 @@ async function handleWakeDetected(current) {
         commandStream = current.stream;
         const seconds = getSettings().commandWindow;
         const expiresAt = performance.now() + seconds * 1000;
+        commandIndicator.firstChild.textContent = "Listening for Go or Stop ";
         commandIndicator.hidden = false;
         updateCommandTimer(1);
         await startCommands(commandModel, commandStream, effectiveOverlap(deviceClass), scores => {
@@ -468,11 +541,15 @@ async function handleWakeDetected(current) {
             const command = scores.top === "go" && scores.go >= settings.goThreshold ? "go"
                 : scores.top === "stop" && scores.stop >= settings.stopThreshold ? "stop" : null;
             if (!command) return;
-            closeCommandWindow();
             if (command === "go") {
+                closeCommandWindow();
                 if (activeSession === current && current.recorder.state === "paused") current.recorder.resume();
             } else {
-                finalizeRecording();
+                // Do NOT close the command window here: closeCommandWindow() starts
+                // an unawaited recognizer shutdown and restarts pause beeps.
+                // Confirmation owns the one awaited shutdown and keeps the
+                // recording paused throughout the transition.
+                void confirmVoiceStop(current);
             }
         });
         if (generation !== commandGeneration || !commandActive) return;
@@ -1666,6 +1743,7 @@ pauseButton.addEventListener("click", () => {
             pauseButton.textContent = "Resume";
             status.textContent = "Pausing recording...";
         } else if (current.recorder.state === "paused") {
+            if (commandActive) closeCommandWindow();
             current.recorder.resume();
             pauseButton.textContent = "Pause";
             status.textContent = "Resuming recording...";

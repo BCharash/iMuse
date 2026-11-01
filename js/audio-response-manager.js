@@ -4,7 +4,8 @@ const FILES = Object.freeze({
     yes: "audio/yes.wav",
     recording: "audio/recording.wav",
     newRecording: "audio/new-recording.wav",
-    stopped: "audio/recording-stopped.wav"
+    stopped: "audio/recording-stopped.wav",
+    confirmStop: "audio/confirm-stop-recording.wav"
 });
 const cache = new Map();
 let output = null;

@@ -2,7 +2,7 @@
 // unchanged until the Heed/TensorFlow integration is tested in later stages.
 const KEY = "imuse.voice-settings.v1";
 const defaults = Object.freeze({audioCommands:false, wakeEngine:"voicute", wakeThreshold:0.667, voicuteThreshold:0.90, commandWindow:5,
-    goThreshold:0.60, stopThreshold:0.85, overlapFactor:"auto"});
+    goThreshold:0.60, stopThreshold:0.85, yesThreshold:0.85, noThreshold:0.55, overlapFactor:"auto"});
 const allowedOverlap = new Set(["auto", "0.5", "0.75", "0.9"]);
 const clamp = (value,min,max,fallback) => Number.isFinite(Number(value)) ? Math.min(max,Math.max(min,Number(value))) : fallback;
 export function loadSettings() {
@@ -15,6 +15,8 @@ export function loadSettings() {
         commandWindow:Math.round(clamp(stored.commandWindow,2,15,defaults.commandWindow)),
         goThreshold:clamp(stored.goThreshold,.3,.99,defaults.goThreshold),
         stopThreshold:clamp(stored.stopThreshold,.3,.99,defaults.stopThreshold),
+        yesThreshold:clamp(stored.yesThreshold,.3,.99,defaults.yesThreshold),
+        noThreshold:clamp(stored.noThreshold,.3,.99,defaults.noThreshold),
         overlapFactor:allowedOverlap.has(String(stored.overlapFactor)) ? String(stored.overlapFactor) : "auto"};
 }
 let settings = loadSettings();
@@ -27,7 +29,7 @@ button.addEventListener("click", () => {
     button.setAttribute("aria-expanded", String(!panel.hidden));
 });
 const controls = {wakeEngine:"wakeEngine",voicuteThreshold:"voicuteThreshold",audioCommands:"audioCommandsToggle",wakeThreshold:"wakeThreshold",commandWindow:"commandWindow",
-    goThreshold:"goThreshold",stopThreshold:"stopThreshold",overlapFactor:"overlapFactor"};
+    goThreshold:"goThreshold",stopThreshold:"stopThreshold",yesThreshold:"yesThreshold",noThreshold:"noThreshold",overlapFactor:"overlapFactor"};
 function render() {
     for (const [key,id] of Object.entries(controls)) {
         const el=document.getElementById(id);if (!el) continue;
