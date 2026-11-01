@@ -1,5 +1,5 @@
 import { playSpokenResponse, prepareSpokenResponses } from "./audio-response-manager.js";
-import { acquireRecordingMicrophone, releaseRecordingMicrophone } from "./microphone-manager.js";
+import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSelectionLocked } from "./microphone-manager.js";
 import { loadVoicuteWakeWord } from "./voicute/voicute-adapter.js";
 import { loadHeedWakeWord } from "./heed/heed-adapter.js";
 import { getSettings, effectiveOverlap } from "./settings.js";
@@ -950,6 +950,7 @@ function setAudioCommandsToggleLocked(locked) {
 
 function setReadyUI() {
     setAudioCommandsToggleLocked(false);
+    setMicrophoneSelectionLocked(false);
     recordButton.textContent = "Start Recording";
     recordButton.disabled = false;
     pauseButton.textContent = "Pause";
@@ -1390,6 +1391,7 @@ function closeAudioContext(context) {
 }
 
 async function startRecording() {
+    setMicrophoneSelectionLocked(true);
     recordButton.disabled = true;
     pauseButton.disabled = true;
 
@@ -1398,6 +1400,7 @@ async function startRecording() {
     clearPlayback();
 
     if (!db) {
+        setMicrophoneSelectionLocked(false);
         status.textContent = "IndexedDB is unavailable, so durable recording cannot start safely.";
         return;
     }
@@ -1410,6 +1413,7 @@ async function startRecording() {
         stream = await acquireRecordingMicrophone();
         if (requestId !== startRequest) {
             stopStream(stream);
+            setMicrophoneSelectionLocked(false);
             return;
         }
         const recorderChoice = createCompatibleRecorder(stream);
@@ -1431,6 +1435,7 @@ async function startRecording() {
         if (requestId !== startRequest) {
             stopStream(stream);
             await deleteSessionData(id);
+            setMicrophoneSelectionLocked(false);
             return;
         }
         const current = {
@@ -1563,6 +1568,7 @@ async function startRecording() {
             stopStream(stream);
             if (activeSession === current) activeSession = null;
             setAudioCommandsToggleLocked(false);
+            setMicrophoneSelectionLocked(false);
             releaseScreenWakeLock();
             setWakeStatus("Wake-word detector idle. Start a recording to test it.");
             if (current.discard) {
@@ -1637,7 +1643,7 @@ async function startRecording() {
         recordButton.disabled = false;
         recordButton.textContent = "Start Recording";
         pauseButton.disabled = true;
-        if (!activeSession) setAudioCommandsToggleLocked(false);
+        if (!activeSession) { setAudioCommandsToggleLocked(false); setMicrophoneSelectionLocked(false); }
         status.textContent = `Could not start durable recording: ${error.message || "microphone unavailable"}`;
     }
 }
@@ -1680,6 +1686,7 @@ deleteButton.addEventListener("click", async () => {
         current.deleteRequested = true;
         activeSession = null;
         setAudioCommandsToggleLocked(false);
+        setMicrophoneSelectionLocked(false);
         cleanupAudioMonitor(current);
         releaseScreenWakeLock();
         setWakeStatus("Wake-word detector stopped because the recording was deleted.");
