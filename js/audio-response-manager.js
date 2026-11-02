@@ -39,7 +39,6 @@ async function playOne(name) {
     if (!FILES[name]) return {ok:false,error:`Unknown spoken response: ${name}`};
     prepareSpokenResponses();
     const player = getOutput();
-    window.imuseAudioFlightEvent?.("spoken-response-playback-preparing", { name });
     const source = await cache.get(name);
     return new Promise(resolve => {
         let done = false;
@@ -47,7 +46,6 @@ async function playOne(name) {
             if (done) return;
             done = true;
             clearTimeout(watchdog);
-            window.imuseAudioFlightEvent?.("spoken-response-playback-finished", { name, ok, error: error || null });
             player.removeEventListener("ended", onEnded);
             player.removeEventListener("error", onError);
             resolve({ok,error});
@@ -62,7 +60,6 @@ async function playOne(name) {
         // Prevent an unresolvable playback promise from blocking command entry.
         const watchdog = setTimeout(() => finish(false, `Playback timed out: ${name}`), 6000);
         try {
-            window.imuseAudioFlightEvent?.("spoken-response-play-call", { name });
             Promise.resolve(player.play()).catch(error => finish(false, error?.message || String(error)));
         } catch (error) {
             finish(false, error?.message || String(error));
