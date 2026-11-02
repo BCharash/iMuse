@@ -426,7 +426,7 @@ function setRecordingControlState(state) {
 }
 
 function finalizeRecording(source = "unspecified") {
-    closeCommandWindow();
+    closeCommandWindow({ restorePauseReminder: false });
     const current = activeSession;
     if (!current || !["recording", "paused"].includes(current.recorder.state)) return;
     current.stopIntent = source;
@@ -531,22 +531,44 @@ async function sayResponse(name) {
     }
     return result.ok;
 }
-function closeCommandWindow() {
+function closeCommandWindow({ restorePauseReminder = true } = {}) {
     commandActive = false;
     ++commandGeneration;
     if (commandInterval !== null) clearInterval(commandInterval);
     commandInterval = null;
     commandIndicator.hidden = true;
-    // Restore the pause reminder only after command listening has ended.
-    // A closed window must not restart beeps after Stop, Resume, or Delete.
     const pausedSession = activeSession;
-    if (pausedSession && !pausedSession.discard && pausedSession.recorder.state === "paused" &&
+    if (pausedSession) stopPausedBeep(pausedSession);
+    // Do not play a pause reminder when transitioning to Resume or Stop.
+    if (restorePauseReminder && pausedSession && !pausedSession.discard &&
+        pausedSession.recorder.state === "paused" &&
         pausedSession.metadata.state !== "finalizing") {
         startPausedBeep(pausedSession);
     }
-    const model = commandModel;
-    void stopCommands(model).catch(error => console.warn("Cannot stop command listener:", error));
+    const shutdown = stopCommands(commandModel);
+    void shutdown.catch(error => console.warn("Cannot stop command listener:", error));
+    return shutdown;
 }
+
+// Both voice Go and the manual button must await command shutdown before capture resumes.
+async function resumeAfterCommandShutdown(current) {
+    if (activeSession !== current || current.discard || current.recorder.state !== "paused") return;
+    const shutdown = closeCommandWindow({ restorePauseReminder: false });
+    try {
+        await shutdown;
+        if (activeSession !== current || current.discard || current.recorder.state !== "paused" ||
+            current.metadata.state === "finalizing") return;
+        current.recorder.resume();
+        status.textContent = "Resuming recording...";
+    } catch (error) {
+        console.error("Command listener did not shut down; recording remains paused:", error);
+        if (activeSession === current && current.recorder.state === "paused") {
+            startPausedBeep(current);
+            status.textContent = "Could not safely resume. Recording remains paused; check voice commands.";
+        }
+    }
+}
+
 // Voice Stop is provisional until an explicit Yes is recognized.
 // The original recorder remains paused and all persisted chunks are untouched.
 async function confirmVoiceStop(current) {
@@ -581,7 +603,7 @@ async function confirmVoiceStop(current) {
             if (generation !== commandGeneration || !commandActive || performance.now() >= expiresAt) return;
             const settings = getSettings();
             if (scores.top === "yes" && scores.yes >= settings.yesThreshold) {
-                closeCommandWindow();
+                closeCommandWindow({ restorePauseReminder: false });
                 finalizeRecording("voice-stop-confirmed-yes");
             } else if (scores.top === "no" && scores.no >= settings.noThreshold) {
                 closeCommandWindow();
@@ -663,8 +685,7 @@ async function handleWakeDetected(current) {
                 : scores.top === "stop" && scores.stop >= settings.stopThreshold ? "stop" : null;
             if (!command) return;
             if (command === "go") {
-                closeCommandWindow();
-                if (activeSession === current && current.recorder.state === "paused") current.recorder.resume();
+                void resumeAfterCommandShutdown(current);
             } else {
                 // Do NOT close the command window here: closeCommandWindow() starts
                 // an unawaited recognizer shutdown and restarts pause beeps.
@@ -1841,7 +1862,7 @@ async function startRecording() {
             lastRecordingPeakBytes = current.peakPendingBytes;
             current.resolvePauseAnnouncement?.();
             current.resolvePauseAnnouncement = null;
-            closeCommandWindow();
+            closeCommandWindow({ restorePauseReminder: false });
             cleanupAudioMonitor(current);
             stopStream(stream);
             if (activeSession === current) activeSession = null;
@@ -1948,14 +1969,15 @@ recordButton.addEventListener("click", () => {
         startRecording();
         return;
     }
-    closeCommandWindow();
+    if (current.recorder.state === "paused") {
+        void resumeAfterCommandShutdown(current);
+        return;
+    }
+    closeCommandWindow({ restorePauseReminder: false });
     try {
         if (current.recorder.state === "recording") {
             current.recorder.pause();
             status.textContent = "Pausing recording...";
-        } else if (current.recorder.state === "paused") {
-            current.recorder.resume();
-            status.textContent = "Resuming recording...";
         }
     } catch (error) {
         console.error(error);
@@ -1970,7 +1992,7 @@ pauseButton.addEventListener("click", () => {
 
 deleteButton.addEventListener("click", async () => {
     startRequest++;
-    closeCommandWindow();
+    closeCommandWindow({ restorePauseReminder: false });
     const current = activeSession;
     const savedSessionId = current ? current.id : displayedSessionId;
     if (current) {

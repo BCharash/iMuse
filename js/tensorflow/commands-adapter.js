@@ -24,27 +24,62 @@ export async function loadCommands() {
   })().catch(error => { loadPromise = null; throw error; });
   return loadPromise;
 }
-// The lab shared an existing microphone by temporarily returning a cloned track.
-// Always restore getUserMedia, including when starting inference throws.
+// Track asynchronous listener startup so a Stop request cannot race with listen().
+const listenerStates = new WeakMap();
+function stateFor(model) {
+  let state = listenerStates.get(model.recognizer);
+  if (!state) {
+    state = { starting: null, stopping: null, generation: 0 };
+    listenerStates.set(model.recognizer, state);
+  }
+  return state;
+}
+
+// Reuse the recording microphone by cloning its track during listener startup.
 export async function startCommands(model, stream, overlapFactor, callback) {
+  const state = stateFor(model);
+  if (state.stopping) await state.stopping;
+  if (state.starting || model.recognizer.isListening()) {
+    throw new Error('Command recognizer is already starting or listening');
+  }
+  const generation = ++state.generation;
   const media = navigator.mediaDevices;
   const original = media.getUserMedia;
-  media.getUserMedia = function (constraints) {
-    if (!constraints?.audio) return original.call(media, constraints);
-    const track = stream?.getAudioTracks()?.[0];
-    if (!track || track.readyState !== 'live') return Promise.reject(new Error('Shared microphone unavailable'));
-    return Promise.resolve(new MediaStream([track.clone()]));
-  };
-  try {
-    await model.recognizer.listen(result => {
-      const scores = Array.from(result.scores);
-      const index = scores.indexOf(Math.max(...scores));
-      callback({ top: model.labels[index], go: scores[model.labels.indexOf('go')], stop: scores[model.labels.indexOf('stop')], yes: scores[model.labels.indexOf('yes')], no: scores[model.labels.indexOf('no')] });
-    }, { probabilityThreshold: 0, overlapFactor, invokeCallbackOnNoiseAndUnknown: true });
-  } finally {
-    media.getUserMedia = original;
-  }
+  const startup = (async () => {
+    media.getUserMedia = function (constraints) {
+      if (!constraints?.audio) return original.call(media, constraints);
+      const track = stream?.getAudioTracks()?.[0];
+      if (!track || track.readyState !== 'live') return Promise.reject(new Error('Shared microphone unavailable'));
+      return Promise.resolve(new MediaStream([track.clone()]));
+    };
+    try {
+      await model.recognizer.listen(result => {
+        if (generation !== state.generation) return;
+        const scores = Array.from(result.scores);
+        const index = scores.indexOf(Math.max(...scores));
+        callback({ top: model.labels[index], go: scores[model.labels.indexOf('go')], stop: scores[model.labels.indexOf('stop')], yes: scores[model.labels.indexOf('yes')], no: scores[model.labels.indexOf('no')] });
+      }, { probabilityThreshold: 0, overlapFactor, invokeCallbackOnNoiseAndUnknown: true });
+    } finally {
+      media.getUserMedia = original;
+    }
+  })();
+  state.starting = startup;
+  try { await startup; }
+  finally { if (state.starting === startup) state.starting = null; }
 }
+
 export async function stopCommands(model) {
-  if (model?.recognizer?.isListening()) await model.recognizer.stopListening();
+  if (!model?.recognizer) return;
+  const state = stateFor(model);
+  ++state.generation; // Reject late callbacks immediately, including while startup is pending.
+  if (state.stopping) return state.stopping;
+  const stopping = (async () => {
+    if (state.starting) {
+      try { await state.starting; } catch (_) { /* startup failed; check actual state below */ }
+    }
+    if (model.recognizer.isListening()) await model.recognizer.stopListening();
+  })();
+  state.stopping = stopping;
+  try { await stopping; }
+  finally { if (state.stopping === stopping) state.stopping = null; }
 }
