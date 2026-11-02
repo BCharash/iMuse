@@ -63,9 +63,10 @@ let wakeWordLoadError = null;
 let screenWakeLock = null;
 
 const DB_NAME = "imuse-recording-breadboard";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const SESSION_STORE = "sessions";
 const CHUNK_STORE = "chunks";
+const EVENT_STORE = "recordingEvents";
 // Maximum audio waiting for a committed IndexedDB write.
 const MAX_PENDING_AUDIO_BYTES = 8 * 1024 * 1024;
 
@@ -111,6 +112,10 @@ function openDatabase() {
             if (!database.objectStoreNames.contains(SESSION_STORE)) {
                 database.createObjectStore(SESSION_STORE, { keyPath: "id" });
             }
+            if (!database.objectStoreNames.contains(EVENT_STORE)) {
+                const events = database.createObjectStore(EVENT_STORE, { keyPath: "key", autoIncrement: true });
+                events.createIndex("sessionId", "sessionId", { unique: false });
+            }
             if (!database.objectStoreNames.contains(CHUNK_STORE)) {
                 const chunks = database.createObjectStore(CHUNK_STORE, {
                     keyPath: ["sessionId", "sequence"]
@@ -130,6 +135,56 @@ function transactionDone(transaction) {
         transaction.onerror = () => reject(transaction.error || new Error("IndexedDB transaction failed."));
         transaction.onabort = () => reject(transaction.error || new Error("IndexedDB transaction was aborted."));
     });
+}
+
+// Independent IndexedDB event log: never modifies session/chunk records or their write queue.
+// Diagnostic writes are best-effort and cannot delay or stop audio capture.
+function logRecordingEvent(current, type, details = {}) {
+    if (!db || !current) return;
+    const entry = {
+        sessionId: current.id,
+        at: new Date().toISOString(),
+        elapsedMs: Math.round(performance.now() - (current.diagnosticStartedAt || performance.now())),
+        type,
+        recorderState: current.recorder?.state || "unavailable",
+        trackState: current.stream?.getAudioTracks()?.[0]?.readyState || "unavailable",
+        trackMuted: !!current.stream?.getAudioTracks()?.[0]?.muted,
+        visibility: document.visibilityState,
+        chunkCount: current.metadata?.chunkCount || 0,
+        pendingBytes: current.pendingBytes || 0,
+        ...details
+    };
+    try {
+        const transaction = db.transaction(EVENT_STORE, "readwrite");
+        transaction.objectStore(EVENT_STORE).add(entry);
+        transaction.onerror = () => console.warn("Could not save recording diagnostic event:", transaction.error);
+    } catch (error) { console.warn("Could not log recording event:", error); }
+}
+
+async function getRecordingEvents(sessionId) {
+    const transaction = db.transaction(EVENT_STORE, "readonly");
+    const request = transaction.objectStore(EVENT_STORE).index("sessionId").getAll(IDBKeyRange.only(sessionId));
+    const result = await new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+    });
+    await transactionDone(transaction);
+    return result;
+}
+
+async function downloadRecordingEvents(id) {
+    const events = await getRecordingEvents(id);
+    const item = await getSession(id);
+    const report = { sessionId: id, session: item, events };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `iMuse-stop-diagnostics-${id}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function getAllSessions() {
@@ -198,6 +253,11 @@ async function deleteSessionData(id) {
     const chunkStore = transaction.objectStore(CHUNK_STORE);
     for (const chunk of chunks) chunkStore.delete([id, chunk.sequence]);
     await transactionDone(transaction);
+    // Remove diagnostics only when the recording itself is permanently deleted.
+    const events = await getRecordingEvents(id);
+    const eventTransaction = db.transaction(EVENT_STORE, "readwrite");
+    for (const event of events) eventTransaction.objectStore(EVENT_STORE).delete(event.key);
+    await transactionDone(eventTransaction);
 }
 
 // Soft deletion retains the session and its IndexedDB audio chunks until
@@ -365,10 +425,12 @@ function setRecordingControlState(state) {
     pauseButton.disabled = !["recording", "paused"].includes(state);
 }
 
-function finalizeRecording() {
+function finalizeRecording(source = "unspecified") {
     closeCommandWindow();
     const current = activeSession;
     if (!current || !["recording", "paused"].includes(current.recorder.state)) return;
+    current.stopIntent = source;
+    logRecordingEvent(current, "stop-request", { source });
     setRecordingControlState("finalizing");
     current.metadata.state = "finalizing";
     current.metadata.lastUpdatedAt = new Date().toISOString();
@@ -520,7 +582,7 @@ async function confirmVoiceStop(current) {
             const settings = getSettings();
             if (scores.top === "yes" && scores.yes >= settings.yesThreshold) {
                 closeCommandWindow();
-                finalizeRecording();
+                finalizeRecording("voice-stop-confirmed-yes");
             } else if (scores.top === "no" && scores.no >= settings.noThreshold) {
                 closeCommandWindow();
                 if (activeSession === current && current.recorder.state === "paused") {
@@ -802,6 +864,7 @@ async function releaseScreenWakeLock() {
 }
 
 function handleVisibilityChange() {
+    if (activeSession) logRecordingEvent(activeSession, "visibility-change", { visibility: document.visibilityState });
 
     if (!activeSession) {
         setLifecycleStatus("Screen lock prevention activates during recording when available.");
@@ -1243,6 +1306,16 @@ async function renderRecoverableSessions() {
         downloadButton.textContent = "Download audio file";
         downloadButton.addEventListener("click", () => exportSavedSession(item.id, downloadButton));
         row.appendChild(downloadButton);
+        const diagnosticButton = document.createElement("button");
+        diagnosticButton.type = "button";
+        diagnosticButton.textContent = "Download stop diagnostics";
+        diagnosticButton.addEventListener("click", () => {
+            downloadRecordingEvents(item.id).catch(error => {
+                console.error("Could not export diagnostics:", error);
+                status.textContent = "Could not export recording diagnostics.";
+            });
+        });
+        row.appendChild(diagnosticButton);
         const discardButton = document.createElement("button");
         discardButton.type = "button";
         discardButton.textContent = "Delete saved session";
@@ -1410,7 +1483,7 @@ async function playSavedSession(id, button) {
         const blob = new Blob(parts, { type: item.mimeType || parts.find(part => part.type)?.type || "audio/webm" });
         if (!blob.size) throw new Error("The saved recording is empty.");
         showPlayback(blob, id);
-        status.textContent = `Recording loaded. Play it to check the audio.`;
+        status.textContent = `Recording loaded. Ready to play.`;
     } catch (error) {
         console.error("Could not load saved recording:", error);
         status.textContent = `Could not load saved recording: ${error.message || "unknown error"}`;
@@ -1592,6 +1665,8 @@ async function startRecording() {
             storageStopRequested: false,
             discard: false,
             stopHandled: false,
+            stopIntent: null,
+            diagnosticStartedAt: performance.now(),
             audioContext: null,
             audioSource: null,
             analyser: null,
@@ -1614,6 +1689,7 @@ async function startRecording() {
             micUnavailableNotice: false
         };
         activeSession = current;
+        logRecordingEvent(current, "session-created", { mimeType: actualMimeType });
         lastRecordingPeakBytes = 0;
         publishRecordingDiagnostics();
         // Freeze voice-command preference throughout this recording session.
@@ -1622,18 +1698,21 @@ async function startRecording() {
         const microphoneTrack = stream.getAudioTracks()[0];
         if (microphoneTrack) {
             microphoneTrack.addEventListener("mute", () => {
+                logRecordingEvent(current, "microphone-muted");
                 if (activeSession !== current || current.discard) return;
                 current.micUnavailableNotice = true;
                 current.silenceSince = null;
                 setLifecycleStatus("Microphone input interrupted. Unlock your device and check that recording resumes.");
             });
             microphoneTrack.addEventListener("unmute", () => {
+                logRecordingEvent(current, "microphone-unmuted");
                 if (activeSession !== current || current.discard) return;
                 current.micUnavailableNotice = false;
                 current.silenceSince = null;
                 setLifecycleStatus("Microphone input restored.");
             });
             microphoneTrack.addEventListener("ended", () => {
+                logRecordingEvent(current, "microphone-ended");
                 if (activeSession !== current || current.discard) return;
                 current.micUnavailableNotice = true;
                 current.silenceSince = null;
@@ -1641,6 +1720,7 @@ async function startRecording() {
             });
         }
         recorder.addEventListener("start", () => {
+            logRecordingEvent(current, "recorder-start");
             current.activeSinceMs = performance.now();
         });
         // Keep only audio awaiting a completed IndexedDB transaction in RAM.
@@ -1656,6 +1736,8 @@ async function startRecording() {
 
             if (current.pendingBytes > MAX_PENDING_AUDIO_BYTES && !current.storageStopRequested) {
                 current.storageStopRequested = true;
+                current.stopIntent = "storage-backpressure";
+                logRecordingEvent(current, "stop-request", { source: current.stopIntent });
                 current.persistenceError ||= new Error("Audio storage is not keeping up with recording.");
                 status.textContent = "Audio storage is too slow. Stopping to protect the recording.";
                 // Stop emits a final dataavailable event, which is also queued for storage.
@@ -1691,6 +1773,8 @@ async function startRecording() {
                 putSession(current.metadata).catch(saveError => console.error("Could not update session state:", saveError));
                 if (!current.storageStopRequested) {
                     current.storageStopRequested = true;
+                    current.stopIntent = "storage-write-error";
+                    logRecordingEvent(current, "stop-request", { source: current.stopIntent, error: String(error) });
                     if (recorder.state !== "inactive") {
                         try { recorder.stop(); } catch (stopError) { console.error("Storage-failure stop failed:", stopError); }
                     }
@@ -1698,11 +1782,13 @@ async function startRecording() {
             });
         });
         recorder.addEventListener("error", event => {
+            logRecordingEvent(current, "recorder-error", { error: String(event.error?.message || event.error || "unknown") });
             console.error("MediaRecorder error:", event.error || event);
             status.textContent = "Recording error. Some audio may not have been saved.";
             setRecordingControlState("idle");
         });
         recorder.addEventListener("pause", async () => {
+            logRecordingEvent(current, "recorder-pause", { reason: current.pauseReason || "unspecified" });
             if (activeSession !== current || current.discard) return;
             if (current.activeSinceMs !== null) {
                 current.recordedMs += Math.max(0, performance.now() - current.activeSinceMs);
@@ -1728,6 +1814,7 @@ async function startRecording() {
                 : `Paused — ${savedChunkProgress(current)}. Press Record to resume.`;
         });
         recorder.addEventListener("resume", async () => {
+            logRecordingEvent(current, "recorder-resume");
             if (activeSession !== current || current.discard) return;
             current.activeSinceMs = performance.now();
             current.metadata.state = "recording";
@@ -1744,6 +1831,7 @@ async function startRecording() {
             void sayResponse("recording");
         });
         recorder.addEventListener("stop", async () => {
+            logRecordingEvent(current, "recorder-stop", { classification: current.stopIntent || "UNEXPECTED-NO-STOP-REQUEST", stopIntent: current.stopIntent });
             if (current.stopHandled) return;
             current.stopHandled = true;
             if (current.activeSinceMs !== null) {
@@ -1797,11 +1885,13 @@ async function startRecording() {
                 current.metadata.completedAt = new Date().toISOString();
                 current.metadata.lastUpdatedAt = current.metadata.completedAt;
                 await putSession(current.metadata);
+                logRecordingEvent(current, "finalization-completed", { bytes: finalBlob.size, stopIntent: current.stopIntent });
                 showPlayback(finalBlob, id);
                 status.textContent = current.storageStopRequested
                     ? "Recording stopped because storage was slow. Saved audio is available; check playback."
                     : "Recording saved.";
             } catch (error) {
+                logRecordingEvent(current, "finalization-error", { error: String(error) });
                 console.error("Could not finalize persisted recording:", error);
                 // Rebuild from committed chunks plus only the uncommitted tail.
                 // The latter is retained in RAM solely for emergency export.
@@ -1875,7 +1965,7 @@ recordButton.addEventListener("click", () => {
 
 // Manual Stop is deliberate and does not require spoken confirmation.
 pauseButton.addEventListener("click", () => {
-    if (activeSession) finalizeRecording();
+    if (activeSession) finalizeRecording("stop-button");
 });
 
 deleteButton.addEventListener("click", async () => {
@@ -1885,6 +1975,8 @@ deleteButton.addEventListener("click", async () => {
     const savedSessionId = current ? current.id : displayedSessionId;
     if (current) {
         // Preserve any final MediaRecorder dataavailable event before soft deleting.
+        current.stopIntent = "delete-button";
+        logRecordingEvent(current, "stop-request", { source: current.stopIntent });
         current.deleteRequested = true;
         activeSession = null;
         setAudioCommandsToggleLocked(false);
