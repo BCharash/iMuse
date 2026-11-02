@@ -71,12 +71,30 @@
     <button id="settingsButton" type="button" aria-expanded="false" aria-controls="settingsPanel">Settings</button>
     <section id="settingsPanel" class="settings-panel" hidden aria-label="Voice control settings">
         <h2>Settings</h2>
+        <div class="imuse-microphone-group">
+        <h3>Recording microphone</h3>
         <label class="microphone-choice-label" for="microphoneChoice">Recording microphone</label>
         <div class="microphone-choice-controls">
             <select id="microphoneChoice"><option value="">System default</option></select>
             <button id="refreshMicrophones" type="button">Refresh</button>
         </div>
         <p class="settings-note">Selection applies to the next recording. Device names may require microphone permission.</p>
+        <div class="imuse-mic-processing-controls" role="group" aria-label="Microphone processing requests">
+            <label><input type="checkbox" id="autoGainControl"> Automatic gain control</label>
+            <label><input type="checkbox" id="noiseSuppression"> Noise suppression</label>
+            <label><input type="checkbox" id="echoCancellation"> Echo cancellation</label>
+        </div>
+        <p class="settings-note">Processing changes apply to the next recording. The diagnostics below show whether the browser honored each request.</p>
+        <div class="imuse-disclosure"><strong>Microphone levels</strong><button type="button" id="microphoneLevelsToggle" aria-expanded="false" aria-controls="microphoneLevelsDetail">View</button></div>
+        <div id="microphoneLevelsDetail" class="imuse-disclosure-detail" hidden>
+            <label class="settings-slider">Silence threshold (dBFS) <output id="silenceThresholdDbValue"></output><input type="range" id="silenceThresholdDb" min="-65" max="-20" step="0.5"></label>
+            <label class="settings-slider">Wake-word minimum level (dBFS) <output id="wakeMinimumDbValue"></output><input type="range" id="wakeMinimumDb" min="-65" max="-20" step="1"></label>
+            <p class="settings-note">Wake-word minimum level is for evaluation only; it does not yet filter activations.</p>
+            <h3>Microphone processing</h3>
+            <div id="microphoneProcessingDetails" class="imuse-mic-report" aria-live="polite">No recording microphone has been acquired yet.</div>
+            <p class="settings-note">Active values are browser-reported and may not describe additional operating-system processing. Not reported does not mean disabled.</p>
+        </div>
+        </div>
         <label class="settings-slider">Pause after no speech (seconds) <output id="silencePauseSecondsValue"></output><input type="range" id="silencePauseSeconds" min="3" max="15" step="1"></label>
         <label class="settings-check"><input type="checkbox" id="audioCommandsToggle"> Audio commands</label>
         <div id="voiceSettings">

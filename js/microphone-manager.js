@@ -1,3 +1,4 @@
+import { getSettings, setMicrophoneProcessingLocked } from "./settings.js";
 // Recorder-owned microphone selection. Never opens a microphone until recording starts.
 // Automatic mode prefers identifiable external headsets, then the system default.
 const KEY = "imuse.microphone-device.v1";
@@ -26,6 +27,7 @@ function chooseHeadset(devices) {
 }
 export function setMicrophoneSelectionLocked(value) {
     locked = Boolean(value);
+    setMicrophoneProcessingLocked(locked);
     if (select) { select.disabled = locked; select.title = locked ? "Stop recording before changing microphones." : ""; }
     if (refresh) { refresh.disabled = locked; refresh.title = locked ? "Stop recording before refreshing microphones." : ""; }
 }
@@ -64,7 +66,13 @@ document.addEventListener("visibilitychange", () => {
 export async function acquireRecordingMicrophone() {
     if (!navigator.mediaDevices?.getUserMedia) throw Error("Microphone access unavailable");
     const request = ++operation;
-    const audio = { channelCount: { ideal: 1 } };
+    const processing = getSettings();
+    const processingConstraints = {
+        autoGainControl: { ideal: processing.autoGainControl },
+        noiseSuppression: { ideal: processing.noiseSuppression },
+        echoCancellation: { ideal: processing.echoCancellation }
+    };
+    const audio = { channelCount: { ideal: 1 }, ...processingConstraints };
     let candidate = null;
     if (selectedId) {
         audio.deviceId = { exact: selectedId };
@@ -82,7 +90,7 @@ export async function acquireRecordingMicrophone() {
         if (selectedId || !candidate) throw error;
         // Automatic mode can fall back if a headset vanished or could not open.
         console.warn("Preferred headset unavailable; trying system microphone:", error);
-        stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: { ideal: 1 } } });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: { ideal: 1 }, ...processingConstraints } });
     }
     const track = stream.getAudioTracks()[0];
     if (!track || track.readyState !== "live" || request !== operation) {

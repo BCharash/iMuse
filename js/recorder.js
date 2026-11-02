@@ -288,6 +288,7 @@ async function restoreRecentlyDeletedSession(id) {
 }
 
 function stopStream(stream) {
+    if (stream?.getAudioTracks?.().length) publishMicrophoneProcessing(stream, false);
     releaseRecordingMicrophone(stream);
 }
 
@@ -455,7 +456,23 @@ function finalizeRecording(source = "unspecified") {
 }
 
 // Silence duration is configurable in Settings; snapshot per recording.
-const SILENCE_RMS_THRESHOLD = 0.015;
+// Defaults preserve the former 0.015 RMS silence threshold (~-36.48 dBFS).
+function currentSilenceRmsThreshold() {
+    return Math.pow(10, getSettings().silenceThresholdDb / 20);
+}
+function publishMicrophoneProcessing(stream, live = true) {
+    const track = stream?.getAudioTracks?.()[0];
+    if (!track) return;
+    const safe = (fn) => { try { return fn() || {}; } catch (_) { return {}; } };
+    window.imuseMicrophoneProcessing = {
+        label: track.label || "Not reported",
+        requested: safe(() => track.getConstraints?.()),
+        active: safe(() => track.getSettings?.()),
+        supported: safe(() => navigator.mediaDevices?.getSupportedConstraints?.()),
+        live
+    };
+    window.dispatchEvent(new Event("imuse-microphone-processing"));
+}
 const PAUSED_BEEP_INTERVAL_MS = 4500;
 
 
@@ -1022,7 +1039,7 @@ async function setupSilenceMonitor(current) {
             }
             const rms = Math.sqrt(sumSquares / current.audioSamples.length);
 
-            if (rms >= SILENCE_RMS_THRESHOLD) {
+            if (rms >= currentSilenceRmsThreshold()) {
                 current.silenceSince = null;
                 return;
             }
@@ -1336,16 +1353,6 @@ async function renderRecoverableSessions() {
         downloadButton.textContent = "Download audio file";
         downloadButton.addEventListener("click", () => exportSavedSession(item.id, downloadButton));
         row.appendChild(downloadButton);
-        const diagnosticButton = document.createElement("button");
-        diagnosticButton.type = "button";
-        diagnosticButton.textContent = "Download stop diagnostics";
-        diagnosticButton.addEventListener("click", () => {
-            downloadRecordingEvents(item.id).catch(error => {
-                console.error("Could not export diagnostics:", error);
-                status.textContent = "Could not export recording diagnostics.";
-            });
-        });
-        row.appendChild(diagnosticButton);
         const discardButton = document.createElement("button");
         discardButton.type = "button";
         discardButton.textContent = "Delete saved session";
@@ -1366,6 +1373,21 @@ async function renderRecoverableSessions() {
             }
         });
         row.appendChild(discardButton);
+        // Stop diagnostics are relevant only when a session needs recovery.
+        // Keep this secondary action last in the row.
+        if (item.state !== "completed") {
+            const diagnosticButton = document.createElement("button");
+            diagnosticButton.type = "button";
+            diagnosticButton.textContent = "Download stop diagnostics";
+            diagnosticButton.addEventListener("click", () => {
+                downloadRecordingEvents(item.id).catch(error => {
+                    console.error("Could not export diagnostics:", error);
+                    status.textContent = "Could not export recording diagnostics.";
+                });
+            });
+            row.appendChild(diagnosticButton);
+
+        }
         panel.appendChild(row);
     }
     if (deletedSessions.length) {
@@ -1654,6 +1676,7 @@ async function startRecording() {
     let stream;
     try {
         stream = await acquireRecordingMicrophone();
+        publishMicrophoneProcessing(stream);
         if (requestId !== startRequest) {
             stopStream(stream);
             setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
