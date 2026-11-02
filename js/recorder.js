@@ -83,9 +83,18 @@ function recordedSeconds(current) {
     const activeMs = current.activeSinceMs === null ? 0 : Math.max(0, performance.now() - current.activeSinceMs);
     return Math.floor((current.recordedMs + activeMs) / 1000);
 }
+function formatRecordedDuration(totalSeconds) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours) return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    if (minutes) return `${minutes}:${String(seconds).padStart(2, "0")}`;
+    return `${seconds}s`;
+}
+
 function savedChunkProgress(current) {
     const count = current.metadata.chunkCount;
-    return `${count} chunk${count === 1 ? "" : "s"} saved, ${recordedSeconds(current)} s recorded`;
+    return `${count} chunk${count === 1 ? "" : "s"} saved, ${formatRecordedDuration(recordedSeconds(current))} recorded`;
 }
 
 // Small, allocation-free snapshot of the recorder's pending audio buffer.
