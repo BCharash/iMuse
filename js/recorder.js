@@ -170,6 +170,19 @@ function logRecordingEvent(current, type, details = {}) {
     } catch (error) { console.warn("Could not log recording event:", error); }
 }
 
+// Passive audio-operation flight recorder. Writes to the existing diagnostic store.
+// Called synchronously before application-initiated audio actions.
+function traceAudioAction(action, details = {}) {
+    const current = activeSession;
+    if (!current || current.discard || current.stopHandled) return;
+    logRecordingEvent(current, "audio-action", {
+        action,
+        audioContextState: current.audioContext?.state || "unavailable",
+        ...details
+    });
+}
+window.imuseAudioFlightEvent = (action, details = {}) => traceAudioAction(action, details);
+
 // Passive foreground-return probe. Reads existing analyser data without changing
 // the microphone, AudioContext, recorder, or chunk boundaries.
 function logCaptureSnapshot(current, phase) {
@@ -392,6 +405,7 @@ function describeAudioFormat(mimeType) {
 // creating a new audio context for every cue, which is more reliable on iPhone.
 async function playToneCue(current, tones) {
     const context = current?.audioContext;
+    traceAudioAction("tone-cue-request", { toneCount: tones.length });
     if (!context || context.state === "closed") return false;
 
     try {
@@ -532,6 +546,7 @@ function announceInterruption(current, trigger) {
     if (activeSession !== current || current.discard || current.stopHandled ||
         current.metadata?.state === "finalizing" || current.interruptionAnnounced) return;
     current.interruptionAnnounced = true;
+    traceAudioAction("interruption-warning-play-request", { trigger });
     try {
         interruptionWarning.currentTime = 0;
         const attempt = interruptionWarning.play();
@@ -623,6 +638,7 @@ function preloadCommandModel() {
 
 // Spoken responses are serialized by one dedicated audio manager.
 async function sayResponse(name) {
+    traceAudioAction("spoken-response-request", { name });
     const result = await playSpokenResponse(name);
     if (!result.ok) {
         console.warn(`Voice response ${name} could not be heard:`, result.error);
@@ -657,6 +673,7 @@ async function resumeAfterCommandShutdown(current) {
         await shutdown;
         if (activeSession !== current || current.discard || current.recorder.state !== "paused" ||
             current.metadata.state === "finalizing") return;
+        traceAudioAction("media-recorder-resume-call");
         current.recorder.resume();
         status.textContent = "Resuming recording...";
     } catch (error) {
@@ -755,7 +772,8 @@ async function handleWakeDetected(current) {
         let resolveAnnouncement;
         current.pauseAnnouncement = new Promise(resolve => { resolveAnnouncement = resolve; });
         current.resolvePauseAnnouncement = resolveAnnouncement;
-        try { current.recorder.pause(); }
+        try { traceAudioAction("media-recorder-pause-call");
+        current.recorder.pause(); }
         catch (error) {
             current.resolvePauseAnnouncement?.();
             current.resolvePauseAnnouncement = null;
@@ -1050,6 +1068,9 @@ async function setupSilenceMonitor(current) {
         wakeProcessor.connect(wakeSilentGain);
         wakeSilentGain.connect(context.destination);
 
+        context.addEventListener("statechange", () => {
+            if (activeSession === current) logRecordingEvent(current, "audio-context-statechange", { state: context.state });
+        });
         current.audioContext = context;
         current.audioSource = source;
         current.analyser = analyser;
@@ -1131,7 +1152,8 @@ async function setupSilenceMonitor(current) {
                 current.silenceSince = null;
                 status.textContent = "Silence detected — pausing recording...";
                 try {
-                    current.recorder.pause();
+                    traceAudioAction("media-recorder-pause-call");
+        current.recorder.pause();
                 } catch (error) {
                     current.autoPausing = false;
                     current.pauseReason = null;
@@ -1163,6 +1185,7 @@ async function playPausedBeep(current) {
         activeSession !== current || current.recorder.state !== "paused") return;
 
     // Keep wake-word detection active while the reminder tone plays.
+    traceAudioAction("paused-beep-play-request");
     try {
         if (context.state === "suspended") await context.resume();
         if (context.state !== "running" || commandActive ||
@@ -1203,6 +1226,7 @@ function startPausedBeep(current) {
     stopPausedBeep(current);
     if (commandActive || activeSession !== current || current.discard ||
         current.recorder.state !== "paused") return;
+    traceAudioAction("paused-beep-timer-start");
     playPausedBeep(current);
     current.pausedBeepTimer = window.setInterval(
         () => playPausedBeep(current),
@@ -1212,6 +1236,7 @@ function startPausedBeep(current) {
 
 function stopPausedBeep(current) {
     if (current.pausedBeepTimer !== null && current.pausedBeepTimer !== undefined) {
+        traceAudioAction("paused-beep-timer-stop");
         window.clearInterval(current.pausedBeepTimer);
         current.pausedBeepTimer = null;
     }
@@ -2065,6 +2090,7 @@ async function startRecording() {
             await renderRecoverableSessions();
         });
         await setupSilenceMonitor(current);
+        traceAudioAction("media-recorder-start-call", { timesliceMs: 250 });
         recorder.start(250);
 
         setRecordingControlState("recording");
@@ -2098,7 +2124,8 @@ recordButton.addEventListener("click", () => {
     closeCommandWindow({ restorePauseReminder: false });
     try {
         if (current.recorder.state === "recording") {
-            current.recorder.pause();
+            traceAudioAction("media-recorder-pause-call");
+        current.recorder.pause();
             status.textContent = "Pausing recording...";
         }
     } catch (error) {
@@ -2129,7 +2156,8 @@ deleteButton.addEventListener("click", async () => {
         releaseScreenWakeLock();
         setWakeStatus("Voice detection stopped.");
         try {
-            if (current.recorder.state !== "inactive") current.recorder.stop();
+            if (current.recorder.state !== "inactive") traceAudioAction("media-recorder-stop-call");
+        current.recorder.stop();
             else {
                 stopStream(current.stream);
                 await current.writeQueue;
