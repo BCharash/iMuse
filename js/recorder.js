@@ -47,6 +47,7 @@ window.addEventListener("imuse-settings-changed", event => {
         WAKE_THRESHOLD = threshold;
         wakeWord?.engine?.setThreshold?.(threshold);
     }
+    if (event.detail.audioCommands) preloadCommandModel();
     if (event.detail.audioCommands && activeSession && !commandActive && wakeWord) {
         scheduleWakeDetectorArm(activeSession, 0);
     }
@@ -447,6 +448,18 @@ function updateCommandTimer(remainingFraction) {
 
 let commandActive = false, commandGeneration = 0, commandInterval = null;
 let commandModel = null, commandStream = null;
+// Warm the command recognizer without acquiring a microphone or starting listening.
+// The adapter shares one loading promise with subsequent Go/Stop and Yes/No use.
+function preloadCommandModel() {
+    if (!getSettings().audioCommands) return;
+    void loadCommands().then(model => {
+        commandModel = model;
+    }).catch(error => {
+        // A failed preload must never prevent recording or a later retry.
+        console.warn("Command model preload unavailable; will retry when needed:", error);
+    });
+}
+
 // Spoken responses are serialized by one dedicated audio manager.
 async function sayResponse(name) {
     const result = await playSpokenResponse(name);
@@ -1921,6 +1934,8 @@ window.addEventListener("pagehide", () => {
 
 initialize();
 initializeWakeWord();
+// Give startup UI and microphone setup priority, then prepare the model in advance.
+window.setTimeout(preloadCommandModel, 1000);
 // Microphone is acquired only when recording begins; no startup readiness capture.
 setLifecycleStatus("Screen lock prevention activates during recording when available.");
 
