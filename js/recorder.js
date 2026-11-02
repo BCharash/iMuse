@@ -196,6 +196,11 @@ function logCaptureSnapshot(current, phase) {
         chunksReceived: current.sequence,
         lastChunkAgeMs: current.lastChunkAtMs == null ? null : Math.round(performance.now() - current.lastChunkAtMs),
         lastChunkBytes: current.lastChunkBytes ?? null,
+        chunksReceivedAtCallback: current.receivedChunkCount ?? 0,
+        bytesReceivedAtCallback: current.receivedChunkBytes ?? 0,
+        chunksCommittedToIndexedDB: current.committedChunkCount ?? 0,
+        bytesCommittedToIndexedDB: current.committedChunkBytes ?? 0,
+        chunksAwaitingCommit: current.pendingChunks?.size ?? 0,
         analyserRms: null,
         analyserPeak: null
     };
@@ -1843,7 +1848,12 @@ async function startRecording() {
             pausedBeepTimer: null,
             micUnavailableNotice: false,
             lastChunkAtMs: null,
-            lastChunkBytes: null
+            lastChunkBytes: null,
+            receivedChunkCount: 0,
+            receivedChunkBytes: 0,
+            committedChunkCount: 0,
+            committedChunkBytes: 0,
+            lastCommittedAtMs: null
         };
         activeSession = current;
         prepareInterruptionWarning();
@@ -1890,6 +1900,9 @@ async function startRecording() {
             if (current.discard || !event.data || !event.data.size) return;
             const sequence = current.sequence++;
             const chunk = event.data;
+            // Count at the MediaRecorder callback, before any IndexedDB operation.
+            current.receivedChunkCount++;
+            current.receivedChunkBytes += chunk.size;
             current.lastChunkAtMs = performance.now();
             current.lastChunkBytes = chunk.size;
             // Log only the first chunk after foreground return, not every chunk.
@@ -1921,6 +1934,10 @@ async function startRecording() {
                 if (current.persistenceError && current.storageStopRequested &&
                     current.persistenceError.message !== "Audio storage is not keeping up with recording.") return;
                 await persistChunk(current, sequence, chunk);
+                // Only count after IndexedDB confirms transaction completion.
+                current.committedChunkCount++;
+                current.committedChunkBytes += chunk.size;
+                current.lastCommittedAtMs = performance.now();
                 current.pendingChunks.delete(sequence);
                 current.pendingBytes -= chunk.size;
                 publishRecordingDiagnostics();
@@ -1999,7 +2016,14 @@ async function startRecording() {
             void sayResponse("recording");
         });
         recorder.addEventListener("stop", async () => {
-            logRecordingEvent(current, "recorder-stop", { classification: current.stopIntent || "UNEXPECTED-NO-STOP-REQUEST", stopIntent: current.stopIntent });
+            logRecordingEvent(current, "recorder-stop", {
+                classification: current.stopIntent || "UNEXPECTED-NO-STOP-REQUEST",
+                stopIntent: current.stopIntent,
+                chunksReceivedAtCallback: current.receivedChunkCount,
+                bytesReceivedAtCallback: current.receivedChunkBytes,
+                chunksCommittedToIndexedDB: current.committedChunkCount,
+                bytesCommittedToIndexedDB: current.committedChunkBytes
+            });
             if (current.stopHandled) return;
             current.stopHandled = true;
             if (current.activeSinceMs !== null) {
@@ -2053,7 +2077,14 @@ async function startRecording() {
                 current.metadata.completedAt = new Date().toISOString();
                 current.metadata.lastUpdatedAt = current.metadata.completedAt;
                 await putSession(current.metadata);
-                logRecordingEvent(current, "finalization-completed", { bytes: finalBlob.size, stopIntent: current.stopIntent });
+                logRecordingEvent(current, "finalization-completed", {
+                    bytes: finalBlob.size,
+                    stopIntent: current.stopIntent,
+                    chunksReceivedAtCallback: current.receivedChunkCount,
+                    bytesReceivedAtCallback: current.receivedChunkBytes,
+                    chunksCommittedToIndexedDB: current.committedChunkCount,
+                    bytesCommittedToIndexedDB: current.committedChunkBytes
+                });
                 showPlayback(finalBlob, id);
                 status.textContent = current.storageStopRequested
                     ? "Recording stopped because storage was slow. Saved audio is available; check playback."
