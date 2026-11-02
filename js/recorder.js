@@ -170,6 +170,50 @@ function logRecordingEvent(current, type, details = {}) {
     } catch (error) { console.warn("Could not log recording event:", error); }
 }
 
+// Passive foreground-return probe. Reads existing analyser data without changing
+// the microphone, AudioContext, recorder, or chunk boundaries.
+function logCaptureSnapshot(current, phase) {
+    if (activeSession !== current || current.stopHandled || current.discard) return;
+    const track = current.stream?.getAudioTracks?.()[0];
+    const details = {
+        phase,
+        audioContextState: current.audioContext?.state || "unavailable",
+        recorderMimeType: current.recorder?.mimeType || "",
+        trackEnabled: track?.enabled ?? null,
+        chunksReceived: current.sequence,
+        lastChunkAgeMs: current.lastChunkAtMs == null ? null : Math.round(performance.now() - current.lastChunkAtMs),
+        lastChunkBytes: current.lastChunkBytes ?? null,
+        analyserRms: null,
+        analyserPeak: null
+    };
+    if (current.audioContext?.state === "running" && current.analyser && current.audioSamples) {
+        try {
+            current.analyser.getFloatTimeDomainData(current.audioSamples);
+            let sum = 0, peak = 0;
+            for (const sample of current.audioSamples) {
+                sum += sample * sample;
+                peak = Math.max(peak, Math.abs(sample));
+            }
+            details.analyserRms = Math.round(Math.sqrt(sum / current.audioSamples.length) * 1000000) / 1000000;
+            details.analyserPeak = Math.round(peak * 1000000) / 1000000;
+        } catch (error) { details.analyserError = String(error); }
+    }
+    logRecordingEvent(current, "capture-snapshot", details);
+}
+
+function scheduleForegroundCaptureSnapshots(current) {
+    if (!current || current.discard) return;
+    // Do not create a persistent polling loop or touch the recorder.
+    logCaptureSnapshot(current, "foreground-immediate");
+    for (const delay of [1000, 3000, 6000]) {
+        window.setTimeout(() => {
+            if (activeSession === current && document.visibilityState === "visible") {
+                logCaptureSnapshot(current, `foreground-${delay}ms`);
+            }
+        }, delay);
+    }
+}
+
 async function getRecordingEvents(sessionId) {
     const transaction = db.transaction(EVENT_STORE, "readonly");
     const request = transaction.objectStore(EVENT_STORE).index("sessionId").getAll(IDBKeyRange.only(sessionId));
@@ -919,6 +963,8 @@ function handleVisibilityChange() {
     }
     if (document.visibilityState === "visible") {
         setLifecycleStatus("iMuse is active. Checking microphone and screen settings…");
+        activeSession.awaitingForegroundChunk = true;
+        scheduleForegroundCaptureSnapshots(activeSession);
         if (activeSession.audioContext?.state === "suspended") {
             activeSession.audioContext.resume().then(() => {
                 if (
@@ -1740,7 +1786,9 @@ async function startRecording() {
             autoPausing: false,
             pauseReason: null,
             pausedBeepTimer: null,
-            micUnavailableNotice: false
+            micUnavailableNotice: false,
+            lastChunkAtMs: null,
+            lastChunkBytes: null
         };
         activeSession = current;
         logRecordingEvent(current, "session-created", { mimeType: actualMimeType });
@@ -1760,6 +1808,7 @@ async function startRecording() {
             });
             microphoneTrack.addEventListener("unmute", () => {
                 logRecordingEvent(current, "microphone-unmuted");
+                logCaptureSnapshot(current, "microphone-unmuted");
                 if (activeSession !== current || current.discard) return;
                 current.micUnavailableNotice = false;
                 current.silenceSince = null;
@@ -1783,6 +1832,13 @@ async function startRecording() {
             if (current.discard || !event.data || !event.data.size) return;
             const sequence = current.sequence++;
             const chunk = event.data;
+            current.lastChunkAtMs = performance.now();
+            current.lastChunkBytes = chunk.size;
+            // Log only the first chunk after foreground return, not every chunk.
+            if (current.awaitingForegroundChunk) {
+                current.awaitingForegroundChunk = false;
+                logRecordingEvent(current, "first-chunk-after-foreground", { bytes: chunk.size, sequence });
+            }
             current.pendingChunks.set(sequence, chunk);
             current.pendingBytes += chunk.size;
             current.peakPendingBytes = Math.max(current.peakPendingBytes, current.pendingBytes);
