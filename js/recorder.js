@@ -517,6 +517,35 @@ function publishMicrophoneProcessing(stream, live = true) {
     };
     window.dispatchEvent(new Event("imuse-microphone-processing"));
 }
+// Best-effort spoken interruption warning. The WAV is stored beside recorder.js.
+// iOS may suspend output before it can be heard; never block audio persistence.
+const interruptionWarning = new Audio(new URL("../audio/recording-interrupted.wav", import.meta.url).href);
+interruptionWarning.preload = "auto";
+interruptionWarning.playsInline = true;
+let interruptionWarningPrepared = false;
+function prepareInterruptionWarning() {
+    if (interruptionWarningPrepared) return;
+    interruptionWarningPrepared = true;
+    try { interruptionWarning.load(); } catch (_) {}
+}
+function announceInterruption(current, trigger) {
+    if (activeSession !== current || current.discard || current.stopHandled ||
+        current.metadata?.state === "finalizing" || current.interruptionAnnounced) return;
+    current.interruptionAnnounced = true;
+    try {
+        interruptionWarning.currentTime = 0;
+        const attempt = interruptionWarning.play();
+        logRecordingEvent(current, "interruption-warning-attempt", { trigger });
+        if (attempt?.then) attempt.then(() => {
+            logRecordingEvent(current, "interruption-warning-play-accepted", { trigger });
+        }).catch(error => {
+            logRecordingEvent(current, "interruption-warning-play-rejected", { trigger, error: String(error) });
+        });
+    } catch (error) {
+        logRecordingEvent(current, "interruption-warning-play-error", { trigger, error: String(error) });
+    }
+}
+
 const PAUSED_BEEP_INTERVAL_MS = 4500;
 
 
@@ -983,6 +1012,7 @@ function handleVisibilityChange() {
         }
         requestScreenWakeLock();
     } else {
+        announceInterruption(activeSession, "visibility-hidden");
         setLifecycleStatus(
             "iMuse is in the background. Audio capture or voice commands may be interrupted."
         );
@@ -1791,6 +1821,7 @@ async function startRecording() {
             lastChunkBytes: null
         };
         activeSession = current;
+        prepareInterruptionWarning();
         logRecordingEvent(current, "session-created", { mimeType: actualMimeType });
         lastRecordingPeakBytes = 0;
         publishRecordingDiagnostics();
@@ -1801,6 +1832,7 @@ async function startRecording() {
         if (microphoneTrack) {
             microphoneTrack.addEventListener("mute", () => {
                 logRecordingEvent(current, "microphone-muted");
+                announceInterruption(current, "microphone-muted");
                 if (activeSession !== current || current.discard) return;
                 current.micUnavailableNotice = true;
                 current.silenceSince = null;
@@ -1808,6 +1840,7 @@ async function startRecording() {
             });
             microphoneTrack.addEventListener("unmute", () => {
                 logRecordingEvent(current, "microphone-unmuted");
+                current.interruptionAnnounced = false;
                 logCaptureSnapshot(current, "microphone-unmuted");
                 if (activeSession !== current || current.discard) return;
                 current.micUnavailableNotice = false;
