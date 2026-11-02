@@ -1373,9 +1373,10 @@ async function renderRecoverableSessions() {
             }
         });
         row.appendChild(discardButton);
-        // Stop diagnostics are relevant only when a session needs recovery.
+        // Keep stop diagnostics available for every saved recording: an
+        // unexpected stop may still leave a session marked completed.
         // Keep this secondary action last in the row.
-        if (item.state !== "completed") {
+        {
             const diagnosticButton = document.createElement("button");
             diagnosticButton.type = "button";
             diagnosticButton.textContent = "Download stop diagnostics";
