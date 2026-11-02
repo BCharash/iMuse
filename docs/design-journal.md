@@ -1334,3 +1334,54 @@ Physical headset **media-button controls are absent** from the active iMuse desi
 Recently Deleted and bulk permanent deletion are part of the recorder's local-storage management; they do not change the fundamental capture, incremental IndexedDB persistence, recovery, or voice-command contracts. Continue prioritizing durable audio preservation and verify deletion UI behavior separately from capture fidelity.
 
 > **Retain the experimental knowledge; remove unreliable production controls. Deletion should be deliberate, recoverable until explicitly permanent, and efficient for multiple recordings.**
+
+---
+
+# DJ010 — Record Controls, Stop Confirmation, Bounded Audio Persistence, Diagnostics, and Recovery UI
+
+**Date:** 1 November 2026  
+**Status:** Changes reported implemented in the working iMuse prototype; selected MacBook tests successful. iPhone and long-recording acceptance remain outstanding. This entry updates current status without rewriting earlier historical decisions.
+
+## 78. Record and Stop button redesign
+
+The earlier plan for a large primary Record control and a separate Stop control has been implemented in the working prototype. The intended presentation follows recorder state: **New Recording** with Record available and Stop disabled; **Recording in progress** with Pause and enabled Stop; **Paused** with Resume/Record and enabled Stop; and a non-conflicting stopping/finalizing state. Manual and automatic pauses and voice-triggered state transitions must remain synchronized with the same recorder lifecycle. There is no New/Append capture mode; combining remains a separate post-recording operation.
+
+The Record/Stop controls were redesigned for clearer, more prominent icon-based operation. This is a UI milestone, not evidence that every possible rapid-click or command race has been tested. The existing spoken cues, paused double beep, microphone choice, and wake/command behavior must not regress.
+
+## 79. Stop confirmation — distinguish manual and spoken Stop
+
+**Manual Stop** is intended to end and finalize the recording directly, **without a Yes/No confirmation**. **Spoken Stop** is the destructive-risk voice action and therefore requires explicit **Yes** confirmation; **No** or timeout must not finalize the recording. This distinction was an agreed design requirement and was exercised in the recent development sequence. Preserve it when modifying the new button/state logic. The user specifically requested that today's documentation include the Stop confirmation, which had not been adequately reflected in the latest journal.
+
+Do not conflate the spoken Stop confirmation with the one-time confirmation for permanently deleting recordings from Recently Deleted.
+
+## 80. Bounded RAM queue and incremental IndexedDB writes
+
+The recording implementation was revised to avoid retaining an indefinitely growing array of unsaved MediaRecorder chunks in JavaScript memory. A **bounded pending-write queue** keeps audio pending IndexedDB persistence and releases the temporary in-memory reference after successful write completion. The configured pending-audio safety limit is **8 MB**; recording should transition safely on persistence failure or excessive backlog rather than silently discard audio or allow unbounded accumulation. Audio already committed in IndexedDB remains the recovery source.
+
+This addresses the *capture-time pending queue*. It does **not** establish bounded total browser memory, and does not resolve the separate playback/export/finalization path that uses IndexedDB `getAll()` and assembles a Blob from retrieved parts. The latter remains an explicit scaling question for long recordings. Browser quota/eviction, pending final data, and crash timing remain residual risks.
+
+## 81. Settings diagnostics and observed MacBook results
+
+A Settings diagnostics section was added to show pending audio in RAM, peak pending audio, pending chunk count, the 8 MB limit, saved recordings/chunks/audio bytes, browser origin-wide storage usage and quota estimates, and JavaScript heap where the browser exposes it. Display units were refined to avoid needless decimal places and switch to GB above 500 MB, using approximately four significant figures. The storage estimate is **origin-wide**: on GitHub Pages, iMuse and Memora share an origin, so cached models and other site data can contribute; the estimate is not iMuse audio alone.
+
+In early tests, pending audio and pending chunks were usually zero, with a brief pending flash. A peak of **8.986 KB** was observed. During a later **seven-minute MacBook recording**, peak pending audio reached approximately **27 KB**, then cleared on Stop in the earlier diagnostic behavior. Both peaks are far below the 8 MB queue limit and are encouraging evidence that IndexedDB writes kept up during these tests. They do not prove long-session stability or data durability under every failure condition.
+
+The diagnostics were subsequently revised to **retain the final peak after Stop** (until a new recording or reload) and show **active recorded seconds alongside the saved chunk count**. Duration should be measured from active recording time, excluding pauses, rather than assuming each chunk represents exactly the nominal 250 ms timeslice. The displayed time is a progress indicator, not independent proof of playable media duration. JavaScript heap naturally rises and falls with allocation and garbage collection; a sustained rising baseline, rather than ordinary fluctuations, would be concerning. Syntax checks were reported for these code revisions; device acceptance remains distinct.
+
+## 82. Interrupted recording recovery becomes an ordinary saved recording
+
+The user verified that a recording interrupted by reloading the page can be recovered and that the resulting audio is **playable and downloadable**. Previously the list continued to show **Recover audio** because the persisted session remained marked `interrupted`, even after successful reconstruction. The recorder was updated so that **successful recovery transitions the session to completed**, while retaining metadata about the original interruption, and the control becomes **Play saved recording**. This completed state is intended to persist across subsequent reloads. On failed recovery, do not falsely mark the session complete or delete the recovery chunks.
+
+The change was delivered and syntax-checked, but the follow-up test of recovering, reloading again, and verifying the persistent **Play saved recording** label has **not yet been reported**. Recovery cannot recreate the last samples that were never committed before a crash, and browser playback alone does not certify every container or codec edge case.
+
+## 83. Next acceptance gates and priorities
+
+1. **Focused recovery UI regression on MacBook:** interrupt a short active recording by reload; recover it; confirm playback and download; reload again and confirm **Play saved recording** persists. Verify the interrupted-history metadata is preserved and other saved recordings are unaffected.
+2. **iPhone real-device test:** 10–15 minutes of recording with manual and silence-triggered pauses; Stop, playback, download, and inspect beginning/middle/end. Check the new Record/Stop UI, spoken Stop confirmation, and paused cues without revisiting already-settled headset media buttons.
+3. **iPhone interruption test:** reload during active capture, recover, reload again, and verify normal saved-recording behavior and control label.
+4. **Long-recording finalization:** 30 minutes on iPhone initially (and longer if needed), record Stop/finalization latency, memory behavior, successful playback/seek/export, and file integrity across pauses. The `getAll()`/Blob assembly approach should be reviewed in light of these results before introducing a more complex media pipeline.
+5. **Targeted reliability audit:** storage failure/backpressure, pending final write completion, cleanup after Stop, and the boundary between recoverable chunks and completed output. Keep the original persisted chunks safe on any failure.
+6. **After acceptance:** progress to durable finalized-recording lifecycle, UUID/metadata and validation work; then optional naming and separate Combine workflow, aligned with the Memora integration handoff. Do not make Whisper or voice recognition a dependency of capture.
+
+**Documentation rule:** DJ001–DJ009 remain historical snapshots. This entry is the latest recording/memory/recovery checkpoint. The companion `iMuse next steps.md` has been revised to distinguish completed work from outstanding tests. Obtain the latest code from the user before further source changes.
+

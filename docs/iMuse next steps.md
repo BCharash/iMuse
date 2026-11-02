@@ -1,8 +1,20 @@
 # iMuse next steps
 
-**Updated:** 1 November 2026  
+**Updated:** 1 November 2026 (end-of-day checkpoint)  
 **Status:** Agreed development roadmap and architectural handoff. Planning document, not a runtime certification.  
-**Authoritative working source:** `iMuse(9).zip`, confirmed by user on 1 November 2026. Obtain the latest files again before any later code modification if this version changes.
+**Source rule:** `iMuse(9).zip` was an earlier confirmed baseline, not necessarily the current patched build. Obtain the latest relevant source files from the user before any subsequent code change.
+
+## Current checkpoint — 1 November 2026 (supersedes the older “first implementation” instruction below)
+
+**Implemented/reported today:** redesigned Record/Pause/Resume and separate Stop controls; direct manual Stop versus Yes/No-confirmed spoken Stop; bounded **8 MB** pending-audio RAM queue with incremental IndexedDB persistence; Settings storage/heap/pending diagnostics with readable KB/MB/GB formatting; retained peak pending audio after Stop; saved-chunk count accompanied by active recorded seconds; and successful-recovery state promoted from **Recover audio** to **Play saved recording** while retaining interruption history.
+
+**Observed on MacBook:** seven-minute recording with approximately **27 KB peak pending audio** (earlier 8.986 KB), usually zero pending chunks/audio; no demonstrated accumulating pending backlog. Recovery after page reload yielded playable/downloadable audio. The latest post-recovery button persistence change was syntax-checked but has **not yet received a reported reload-after-recovery acceptance test**. Heap fluctuation alone is not a leak indicator. These results are encouraging, not a multi-hour or iPhone certification.
+
+**Immediate next action:** perform the focused recovery-button persistence test, then the 10–15-minute iPhone normal recording, iPhone interrupted-recording recovery, and 30-minute iPhone finalization tests. Evaluate `getAll()`/Blob final assembly only after collecting those results. **Do not restart Phase 1 or redo the bounded-queue implementation.**
+
+**Current scope correction:** headset media-button controls were retired on both desktop and mobile on 31 October. Shokz microphone selection remains supported; remove headset-button regression requirements from active testing. Recently Deleted and bulk permanent deletion exist; bulk deletion still needs its own focused acceptance test.
+
+---
 
 ## 1. Goal and non-negotiable invariants
 
@@ -22,14 +34,14 @@ Develop iMuse's Record capability for eventual integration into Memora (which al
 - Wake during recording pauses first; wake while paused acknowledges “Yes?”. Automatic silence pause and manual pause do not themselves launch TensorFlow.
 - Command window uses a small solid light-blue circular countdown, emptying counterclockwise from 12 o'clock. Preserve existing thresholds, window, overlap settings, and tested recognition sequencing.
 - Spoken cues: “New recording” on initial start, “Pause” on pause, “Recording” on resume, “Recording stopped” on stop, and “Yes?” for wake while paused. Retain periodic **double beep approximately every 4.5 seconds** while paused.
-- Microphone manager selects available input, with manual override; maintain headset/built-in behavior and microphone release. Shared spoken-response manager serializes WAV cues. Existing settings include silence duration and wake/command thresholds.
+- Microphone manager selects available input, with manual override; maintain Shokz/built-in microphone selection and microphone release (headset media-button control has been retired). Shared spoken-response manager serializes WAV cues. Existing settings include silence duration and wake/command thresholds.
 - Current paths include `js/heed/`, `js/voicute/`, `js/tensorflow/`, `js/microphone-manager.js`, and `js/audio-response-manager.js`; do not revive obsolete `js/voice/` proposal.
 - Idle wake before first Record remains **deferred**; do not add it as part of the present roadmap without a separate decision.
 - Existing code was reported to persist chunks and session metadata in IndexedDB, reconstructing Blobs for playback/finalization; an in-memory `memoryChunks` fallback may grow throughout recording. Re-audit the exact latest implementation before changing it. Do not treat prior conversational code descriptions as formal verification.
 
 ## 3. Agreed implementation sequence
 
-### Phase 1 — Record button redesign (first; low risk)
+### Phase 1 — Record button redesign (**implemented; regression testing remains**)
 
 Make a focused UI/state change without changing audio capture, persistence, or speech recognition.
 
@@ -44,7 +56,7 @@ Make a focused UI/state change without changing audio capture, persistence, or s
 
 **Acceptance:** MacBook and iPhone manual Record/Pause/Resume/Stop; silence pause; wake/Go/Stop/Yes/No; repeated transitions; reload recovery; no regression in audio or cues. Freeze a stable commit.
 
-### Phase 2 — Memory management and persistence audit (before Combine)
+### Phase 2 — Memory management and persistence audit (**bounded queue implemented; targeted validation remains**)
 
 Audit and then replace unbounded in-memory retention with a **bounded pending-write queue**:
 
@@ -55,6 +67,8 @@ Audit and then replace unbounded in-memory retention with a **bounded pending-wr
 - Maintain sequence integrity and session metadata atomically where practical. Ensure stop/finalization waits for pending writes, handles the final data event, and does not race pause/resume or command callbacks.
 - Avoid `getAll()` of the entire recording for long files where possible; examine cursor/streaming assembly and browser Blob memory behavior. A cursor alone does not guarantee bounded memory if all Blob references are accumulated.
 - Preserve recovery of interrupted sessions and the ability to reconstruct the saved audio after a forced reload. Test long sessions and multiple pause/resume cycles.
+
+**Current evidence:** The 8 MB bounded pending-write queue and diagnostics were implemented. Seven-minute MacBook test peaked around 27 KB pending audio, usually returning to zero. This does not validate storage failure paths, iPhone behavior, or long recording finalization.
 
 **Acceptance:** No indefinitely growing JS-managed audio-chunk array; stable memory over extended recording within realistic browser limits; successful recovery after forced reload; explicit handling of storage failure; no lost committed chunks. Freeze a stable commit.
 
@@ -109,11 +123,24 @@ Decide and implement a clear two-stage lifecycle: **incremental recovery chunks 
 
 **Acceptance:** Ordered selections, nested combinations, duplicate sources, correct duration/offsets/UUIDs, metadata surviving export and reimport, playable output on MacBook/iPhone, failure without source loss. Freeze a stable commit.
 
+## 3A. Next test sequence — actionable checklist
+
+1. **MacBook recovery UI:** interrupt during active recording → reload → Recover audio → play/download → reload again → verify **Play saved recording** remains, with no lost previously committed segments.
+2. **iPhone 10–15 minutes:** normal recording with manual and auto-pause; verify new Record/Stop states, Stop, playback, download, and audio throughout. Note peak pending audio, but do not overinterpret rapidly changing heap.
+3. **iPhone recovery:** interrupt during active recording, recover, reload again, verify playback and persisted button label.
+4. **iPhone 30 minutes:** evaluate finalization time, responsiveness, seek/playback near the end, downloaded media, and memory. Record actual failure details if any.
+5. **Only then:** decide whether `getAll()` and `new Blob(parts)` need replacement. Avoid equating browser playback with validated container structure; preserve recovery chunks through any migration or finalization failure.
+6. **Separate low-risk check:** confirm Recently Deleted multi-select, cancellation, Select all, and one-confirmation permanent deletion of selected items, without touching unrelated recordings.
+
+**Stop confirmation acceptance:** manual Stop finalizes directly; spoken Stop requires Yes; No or timeout must not finalize. Preserve the existing cue and countdown behavior.
+
+---
+
 ## 4. Cross-cutting tests and architecture audit
 
 Before or alongside each affected phase, review: single-owner microphone acquisition/disposal; temporary `getUserMedia` interception by TensorFlow adapter; stale callbacks and races between pause/stop, cue playback, confirmation, command-window generation, and manual actions; microphone-status accuracy; storage queue backpressure; cleanup on failures. Recognition must never block or invalidate durable capture.
 
-Regression matrix: MacBook built-in and Shokz microphones; iPhone supported browser/PWA; both wake engines; manual and automatic pause; voice Go/Stop/Yes/No; command timeout; spoken cue ordering; periodic double beep; timer sweep; microphone release; recovery after forced reload; recording playback and download; short and long recordings; browser storage errors. Capture reproducible failures with steps, actual states, and device/browser details. Do not treat syntax checks as device certification.
+Regression matrix: MacBook built-in and Shokz microphones; iPhone supported browser/PWA; both wake engines; manual and automatic pause; voice Go/Stop/Yes/No; command timeout; spoken cue ordering; periodic double beep; timer sweep; microphone release; recovery after forced reload and subsequent reload; recording playback and download; short and long recordings; browser storage errors. Headset media-button controls are retired and are not a regression requirement. Capture reproducible failures with steps, actual states, and device/browser details. Do not treat syntax checks as device certification.
 
 ## 5. Memora integration and future items
 
@@ -124,7 +151,7 @@ Regression matrix: MacBook built-in and Shokz microphones; iPhone supported brow
 
 ## 6. Working rules and immediate next action
 
-- **First implementation:** Phase 1 Record button/UI only, against the confirmed `iMuse(9).zip` source. Do not combine it with a storage migration.
+- **Next implementation/test:** Phase 1 UI and the Phase 2 bounded queue are already implemented. First verify recovered-recording button persistence after a second reload; then run the iPhone 10–15-minute normal, interrupted-recovery, and 30-minute finalization tests. Do not start a new storage migration before reviewing those results.
 - User provides latest authoritative source before any later modifications; do not assume an older ZIP remains current.
 - Deliver **only changed code files**, bundled in a ZIP with exact original filenames and relative paths; no suffixes/parentheses added to filenames inside the ZIP. Provide complete file replacements. Remove temporary diagnostics after tests.
 - For each phase, explain the change and test checklist; user verifies on MacBook/iPhone before next phase. Maintain stable commits and update this roadmap when decisions change.
