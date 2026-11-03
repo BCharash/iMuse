@@ -1414,16 +1414,3 @@ Earlier flight-recorder instrumentation produced startup lockups and was reverte
 The next proposed step is a bounded iPhone standalone audio-session investigation, with actual background speech as the success criterion and a stopping point if the host continues interrupting capture. An explicit Audio Session intent is an untested candidate, not a validated workaround. Recovery/truthful completion status is separate from uninterrupted capture; native recording is a conditional feasibility decision, not a migration already approved or begun.
 
 The [documentation index](README.md) now names the authoritative current files. The [recording investigation](recording-investigation.md) consolidates the handoff, lab evidence and remaining architecture questions. The [active roadmap](iMuse%20next%20steps.md) owns priorities; Memora and Swift documents retain distinct integration/proposal roles. The old stabilization review, November 2 handoff and detailed November 1 roadmap moved into Archive. The redundant lab-design file was removed after its evidence was incorporated. Earlier entries remain intact as history, not instructions to repeat completed experiments or restore retired controls.
-
-
----
-
-# DJ012 — Microphone Activation Must Run Directly from a Tap
-
-**Date:** 3 November 2026. **Status:** Corrected experiment implemented; device outcome pending.
-
-The user reverted both the unsuccessful Automatic / Play and record experiment and the subsequent microphone-state checkbox experiment. The latter was rejected in both Safari and installed iPhone iMuse. Saved standalone diagnostics for session `2084d719-74dc-4151-8e98-6b52c70aaadd` confirmed supported API but InvalidStateError requiring a user-gesture handler. Its call followed asynchronous recording setup, so rejection did not test an accepted declaration. The same log showed 22 received/committed chunks, mute, brief unmute without renewed acquisition, and later interruption classification.
-
-The user authorized a corrected separate-button test. **Test microphone activation** invokes the API directly on its synchronous click stack after recording starts, reports exact errors, and clears accepted state during stream cleanup with delayed-response ownership guards. Untapped recordings make no capture-state API calls; no old settings, warnings or labs were restored. Syntax and mocked direct-click/cleanup/button-state checks passed. Device acceptance and background speech preservation remain unverified; use the [current instructions](recording-investigation.md#corrected-direct-button-test--implemented-awaiting-device-result).
-
-The user reports iPhone 12 Pro Max on iOS 26.7.2 and prefers web development before native migration. They would consider upgrading if relevant evidence supports it. Safari 27 notes establish inclusion of a related audio-session fix, not a verified repair for this PWA. A volunteer iOS 27 control test should leave the new button untapped.

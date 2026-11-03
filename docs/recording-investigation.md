@@ -1,6 +1,6 @@
 # Recording and iPhone standalone background investigation
 
-Updated 3 November 2026. **Latest checkpoint:** the separate-button microphone activation experiment is implemented and awaiting device testing; see [instructions below](#corrected-direct-button-test--implemented-awaiting-device-result). The earlier Automatic / Play and record and asynchronous declaration experiments were reverted. This consolidates the former recording handoff, background lab notes, and remaining architecture audit questions. Historical startup regressions and earlier source reviews are in the [archive](Archive/README.md). The [roadmap](iMuse%20next%20steps.md) owns work priorities.
+Updated 3 November 2026. This consolidates the former recording handoff, background lab notes, and remaining architecture audit questions. Historical startup regressions and earlier source reviews are in the [archive](Archive/README.md). The [roadmap](iMuse%20next%20steps.md) owns work priorities.
 
 ## Conclusion and evidence boundary
 
@@ -104,37 +104,3 @@ Preserve the old recorder's final data before replacing it where possible. If re
 ## Cleanup completed
 
 Removed `Lab.html`, `BackgroundCaptureLab.html`, `js/labs/background-capture-lab.js`, the interruption-warning setting/code and `audio/recording-interrupted.wav`. Written findings, visual lifecycle notices, normal cues, pre-existing command labs and production recording data remain. Old lab IndexedDB data was not deleted. No capture workaround was added as part of cleanup.
-
-## Microphone-declaration test rejected; timing needs correction
-
-On 3 November the user reported that the temporary `mediaSession.setMicrophoneActive(true)` experiment was rejected in both installed iPhone iMuse and the Safari tab. The repository shows experiment commit `ea8563b` reverted by `8da486e`; the helper/setting are absent. Rejection is not evidence of an accepted configuration failing to preserve background capture.
-
-Subsequent [WebKit source inspection](https://github.com/WebKit/WebKit/blob/main/Source/WebCore/Modules/mediasession/MediaSession.cpp) found that `updateCaptureState` requires activation to run in a current user-gesture handler, as well as a visible, fully active document. The tested implementation invoked it after asynchronous microphone, storage and Web Audio setup. Loss of user-gesture context is therefore a plausible implementation-level reason for rejection; the actual saved error has not yet been reviewed and the inspected main branch is not proof of exact shipped-version behavior. The initial test checked visibility but did not ensure a current user gesture.
-
-Before another change, inspect the `microphone-declaration` event's error in the recording's existing Download stop diagnostics JSON. If that confirms the gesture requirement, the corrected test would use an explicit button pressed after recording starts, calling the method synchronously in that click handler. Do not automatically restore the reverted experiment or interpret the rejection as proof that all Media Session approaches fail. No new application code was added for this finding.
-
-The user prefers web development before native work. Automatic / Play and record previously showed no benefit and was also reverted. An iOS 27 same-build test by another person remains useful direct evidence; the official Safari 27 notes establish inclusion of a relevant audio-session fix, not a verified repair of this installed-PWA behavior.
-
-### Rejection confirmed by saved production diagnostics
-
-Reviewed `iMuse-stop-diagnostics-2084d719-74dc-4151-8e98-6b52c70aaadd.json` on 3 November 2026. This is a standalone run (`standalone: true`). The method was available (`supported: true`) but rejected at +142 ms with **InvalidStateError: Activating capture must be called from a user gesture handler.** This confirms the tested call failed the gesture requirement; it did not exercise an accepted microphone declaration. Earlier API-support uncertainty should not be treated as the explanation for this run.
-
-Capture reached 22 received/committed chunks (536,798 bytes) with zero pending bytes. Track mute was logged at +23.475 s, preceding the hidden visibility event at +26.007 s; that ordering does not identify which user/system action initiated interruption. On foreground return the track briefly unmuted and the context ran, but snapshots remained at 22 chunks with zero analyser input, then the track muted again. No stop-request/recorder-stop event is present in this export. Session metadata was marked interrupted on a later initialization; do not describe this as a clean user Stop or a proven application crash.
-
-A corrected experiment would issue the activation synchronously from a separate button while recording is already active. The reverted experiment remains absent; no further application change was made while reviewing this JSON.
-
-## Corrected direct-button test — implemented, awaiting device result
-
-After the diagnostic confirmed the user-gesture rejection, the user authorized a separate-button test. The temporary settings checkbox remains removed. A button **Test microphone activation** now appears below microphone status, enabled only during an active recording and disabled while pending, accepted, paused or finalizing. Each recording creates an inert test handle; no capture-state API is accessed or called until the button is tapped.
-
-The synchronous click handler calls [microphone-activation-test.js](../js/microphone-activation-test.js) directly, with no await, timer or Promise continuation before `setMicrophoneActive(true)`. The exact resolved/rejected result and error are displayed beside the button and stored in existing diagnostic events. No background retries, warning playback, silent keep-alive audio or recorder replacement were added. Pause does not clear an accepted declaration, since the microphone remains in use; stream cleanup clears it once after acceptance. Delayed acceptance is cleared after Stop unless a newer recording owns capture, in which case stale cleanup is skipped and the status requests a reload before further comparison.
-
-Test on the user's iPhone 12 Pro Max, reported iOS 26.7.2:
-
-1. Keep Audio commands off and microphone/processing settings fixed. First record without tapping the test button: say before, switch apps for about 20 seconds and say background, return and say after, Stop and listen.
-2. Save the control recording, reload, start a fresh recording and tap **Test microphone activation** while iMuse is visible. Wait for **Browser accepted microphone activation**. If rejected, retain the exact displayed error or export that session's stop diagnostics; do not interpret this as an applied-configuration comparison.
-3. After acceptance, repeat identical before/background/after speech, Stop and listen. Report the message, beep/indicator and whether each spoken section survived. Save/export diagnostics before deleting the recording. Reload before another comparison if cleanup fails or is superseded.
-
-Static/mocked checks passed for direct synchronous invocation through the actual click handler, no untapped API calls, rejection details, support/visibility checks, retries after rejection, duplicate suppression, delayed responses, newer-recording ownership, cleanup, and button availability in idle/pause/finalizing states. These are implementation checks, not proof of real-device acceptance or background continuity.
-
-The user prefers web completion before native development, but is willing to consider an iOS update with relevant evidence. [Safari 27's official notes](https://webkit.org/blog/18325/webkit-features-for-safari-27-0/) include audio-session capture-continuity fix 180505014 and confirm shipping with iOS 27; this does not establish that iMuse's standalone loss is repaired or whether the fix is backported to 26.7.2. A volunteer iOS 27 test should use the same warning-free iMuse build **without tapping the new button**, compare browser and installed modes separately, and verify actual background speech. No volunteer result is recorded.
