@@ -200,7 +200,7 @@ button:active {
 .microphone-level-dial text { fill:var(--text); font-size:12px; text-anchor:middle; }
 .microphone-meter-arc { fill:none; stroke:var(--border); stroke-width:8; }
 .microphone-level-dial .microphone-meter-unit { font-size:11px; fill:var(--muted); }
-.microphone-meter-needle { transition:transform 160ms ease-out; }
+.microphone-meter-needle { transition:transform 240ms ease-out; }
 .microphone-meter-needle line { stroke:var(--accent-dark); stroke-width:2.5; }
 .microphone-meter-needle circle { fill:var(--accent-dark); }
 .microphone-room-marker[hidden] { display:none; }

@@ -114,6 +114,10 @@ const liveLevelNeedle = document.getElementById("microphoneLevelNeedle");
 const quietRoomButton = document.getElementById("markQuietRoom");
 const noisyRoomButton = document.getElementById("markNoisyRoom");
 let lastLiveDbfs = null;
+let smoothedLiveDbfs = null;
+// Display-only damping: at the 200 ms refresh rate, settle most of a change
+// over roughly two seconds. Detection continues to use its original samples.
+const LIVE_LEVEL_SMOOTHING = 0.25;
 let liveLevelTimer = null;
 function microphoneLevelAngle(dbfs) {
     return -90 + Math.min(1, Math.max(0, (dbfs + 70) / 70)) * 180;
@@ -141,10 +145,15 @@ quietRoomButton?.addEventListener("click", () => markMicrophoneRoom("quietRoomMa
 noisyRoomButton?.addEventListener("click", () => markMicrophoneRoom("noisyRoomMarker", "noisyRoomValue", "N Noisy room"));
 function renderLiveMicrophoneLevel(detail = {}) {
     const live = detail.state === "live" && (Number.isFinite(detail.dbfs) || detail.dbfs === -Infinity);
+    if (live && Number.isFinite(detail.dbfs)) {
+        smoothedLiveDbfs = smoothedLiveDbfs === null ? detail.dbfs
+            : smoothedLiveDbfs + LIVE_LEVEL_SMOOTHING * (detail.dbfs - smoothedLiveDbfs);
+    } else smoothedLiveDbfs = null;
+    const displayedDbfs = live ? (smoothedLiveDbfs ?? -Infinity) : null;
     const value = live
-        ? detail.dbfs === -Infinity ? "−∞ dBFS" : `${detail.dbfs.toFixed(1)} dBFS`
+        ? displayedDbfs === -Infinity ? "−∞ dBFS" : `${displayedDbfs.toFixed(1)} dBFS`
         : detail.state === "inactive" ? "Microphone inactive" : "Input unavailable";
-    setMicrophoneDial(live ? detail.dbfs : null, value);
+    setMicrophoneDial(displayedDbfs, value);
 }
 function requestLiveMicrophoneLevel() {
     window.dispatchEvent(new Event("imuse-request-microphone-level"));
@@ -152,6 +161,7 @@ function requestLiveMicrophoneLevel() {
 function stopLiveMicrophoneLevel() {
     if (liveLevelTimer !== null) window.clearInterval(liveLevelTimer);
     liveLevelTimer = null;
+    smoothedLiveDbfs = null;
     setMicrophoneDial(null, "—");
 }
 function syncLiveMicrophoneLevel() {
