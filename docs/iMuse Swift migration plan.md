@@ -2,7 +2,7 @@
 
 **Originally drafted:** 30 October 2026; reviewed 3 November 2026
 **Status:** Conditional architecture proposal; no Swift implementation or migration decision established.
-**Current relationship:** First complete the bounded iPhone standalone investigation in the [recording brief](recording-investigation.md) and follow the [active roadmap](iMuse%20next%20steps.md). If a web workaround is not demonstrated, decide whether to test native capture. Memora integration remains a separate goal, not a prerequisite to a small native feasibility decision.
+**Current relationship:** The Automatic / Play and record experiment showed no improvement and was reverted; see the [recording brief](recording-investigation.md) and [active roadmap](iMuse%20next%20steps.md). The user prefers to complete web development first and avoid recurring development-signing installation. Native is deferred while specific PWA leads and the working Safari-tab route are pursued. Memora integration remains a separate goal, not a prerequisite to a small native feasibility decision.
 
 ## 1. Proposed direction
 
@@ -171,7 +171,7 @@ The distribution observations above are planning context, not newly verified acc
 
 ## 10. Recommended phased roadmap
 
-**Phase A — Resolve the platform direction.** Finish the bounded installed-iPhone workaround investigation, then choose whether a native spike is warranted. Use the successful Safari-tab route as the practical web option under its tested conditions. Memora integration can be scheduled independently; preserve its non-destructive handoff contract.
+**Phase A — Resolve the platform direction.** The bounded Audio Session comparison is complete without demonstrated benefit. Choose whether a native spike is warranted. Use the successful Safari-tab route as the practical web option under its tested conditions. Memora integration can be scheduled independently; preserve its non-destructive handoff contract.
 
 **Phase B — Native feasibility spike.** Create a minimal SwiftUI shell with one Start/Pause/Resume/Stop recording flow; test microphone permission, headset route, actual screen locking, interruption recovery, and one complete audio export. The first gate is real-device capture continuity and valid recoverable export; do not make Siri or voice models prerequisites for that test. Evaluate a Start Recording App Intent only after capture feasibility is established.
 

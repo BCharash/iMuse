@@ -79,6 +79,9 @@
             <button id="refreshMicrophones" type="button">Refresh</button>
         </div>
         <p class="settings-note">Selection applies to the next recording. Device names may require microphone permission.</p>
+        <label class="settings-check"><input type="checkbox" id="declareMicrophoneActive" aria-describedby="microphoneDeclarationHelp microphoneDeclarationStatus"> Declare microphone active (experimental)</label>
+        <p id="microphoneDeclarationHelp" class="settings-note">Tests whether telling iOS that microphone capture is active helps background recording. Choose before starting; this does not play audio or guarantee background access.</p>
+        <p id="microphoneDeclarationStatus" class="settings-note" role="status">Start a recording to check the experiment's browser support and request result.</p>
         <div class="imuse-mic-processing-controls" role="group" aria-label="Microphone processing requests">
             <label><input type="checkbox" id="autoGainControl"> Automatic gain control</label>
             <label><input type="checkbox" id="noiseSuppression"> Noise suppression</label>

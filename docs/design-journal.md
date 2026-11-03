@@ -1414,3 +1414,27 @@ Earlier flight-recorder instrumentation produced startup lockups and was reverte
 The next proposed step is a bounded iPhone standalone audio-session investigation, with actual background speech as the success criterion and a stopping point if the host continues interrupting capture. An explicit Audio Session intent is an untested candidate, not a validated workaround. Recovery/truthful completion status is separate from uninterrupted capture; native recording is a conditional feasibility decision, not a migration already approved or begun.
 
 The [documentation index](README.md) now names the authoritative current files. The [recording investigation](recording-investigation.md) consolidates the handoff, lab evidence and remaining architecture questions. The [active roadmap](iMuse%20next%20steps.md) owns priorities; Memora and Swift documents retain distinct integration/proposal roles. The old stabilization review, November 2 handoff and detailed November 1 roadmap moved into Archive. The redundant lab-design file was removed after its evidence was incorporated. Earlier entries remain intact as history, not instructions to repeat completed experiments or restore retired controls.
+
+---
+
+# DJ012 — Audio Session Comparison Failed to Improve Capture; Commit Reverted
+
+**Date:** 3 November 2026. **Status:** User-reported installed-iPhone result; experiment removed.
+
+The user approved a reversible Automatic / Play and record setting, applied before microphone acquisition and restored at stream cleanup. Implementation checks covered API fallback, assignment/restoration and startup failure paths. The user reported identical installed-PWA behavior for both choices: double beep and loss of the recording pipeline after more than a few seconds backgrounded. Explicit browser acceptance/readback was not reported, so the result establishes no benefit from the tested change rather than proving every audio-session configuration impossible.
+
+The user reverted the entire experiment commit (`d132ac5`; revert `7bdec07`), removing both application changes and their documentation. The current documentation now records the result again. Warning removal, lab cleanup and earlier consolidation remain. No application code was reintroduced during this documentation repair.
+
+The next recommendation is to choose between the demonstrated Safari-tab path and a separate minimal native background-capture prototype. Native development is not yet approved or begun. Foreground recovery remains distinct from capturing missing background speech. Do not repeat the rejected setting experiment without a specific new reason.
+
+---
+
+# DJ013 — Microphone Capture Declaration Experiment and iOS 27 Evidence
+
+**Date:** 3 November 2026. **Status:** User-authorized opt-in experiment implemented; device result pending.
+
+The user prefers completing the web app before native development and avoiding recurring development-signing installation. They report an iPhone 12 Pro Max on iOS 26.7.2, but would consider an upgrade given evidence of a fix. Official Safari 27 release notes include the previously identified audio-session capture-continuity fix; this establishes release inclusion, not a verified repair of iMuse's installed-host failure or absence of a backport. A same-build test by another person with iOS 27 would provide direct evidence; none has been reported.
+
+The user approved testing the separate Media Session microphone-capture declaration. Settings now offers **Declare microphone active (experimental)**, default off. On enables a single visible-state request after MediaRecorder starts; cleanup clears accepted declarations, including delayed acceptance after Stop, with newer-recording ownership protection. Disabled mode makes no capture-state API calls. The setting is persisted/locked during capture; Settings and existing events report request and cleanup status. It neither adds warning playback nor restores the reverted Automatic / Play and record setting.
+
+Syntax and mocked request, rejection, cleanup, async-ownership, settings and stream-release checks passed. The installed-iPhone off/on comparison remains the immediate test, as described in the [investigation](recording-investigation.md). No browser API acceptance or status icon substitutes for listening to saved background speech.

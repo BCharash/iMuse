@@ -4,6 +4,7 @@ import { loadVoicuteWakeWord } from "./voicute/voicute-adapter.js";
 import { loadHeedWakeWord } from "./heed/heed-adapter.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { loadCommands, startCommands, stopCommands } from "./tensorflow/commands-adapter.js";
+import { declareRecordingMicrophone } from "./microphone-capture-declaration.js";
 
 const recordButton = document.getElementById("recordButton");
 const pauseButton = document.getElementById("pauseButton");
@@ -72,6 +73,7 @@ const MAX_PENDING_AUDIO_BYTES = 8 * 1024 * 1024;
 
 let db = null;
 let activeSession = null;
+const microphoneDeclarations = new WeakMap();
 let recordingUrl = null;
 let displayedSessionId = null;
 let startRequest = 0;
@@ -178,6 +180,7 @@ function logCaptureSnapshot(current, phase) {
     const details = {
         phase,
         audioContextState: current.audioContext?.state || "unavailable",
+        microphoneDeclaration: current.microphoneDeclaration?.snapshot() || null,
         recorderMimeType: current.recorder?.mimeType || "",
         trackEnabled: track?.enabled ?? null,
         chunksReceived: current.sequence,
@@ -333,7 +336,14 @@ async function restoreRecentlyDeletedSession(id) {
 
 function stopStream(stream) {
     if (stream?.getAudioTracks?.().length) publishMicrophoneProcessing(stream, false);
-    releaseRecordingMicrophone(stream);
+    try {
+        releaseRecordingMicrophone(stream);
+    } finally {
+        if (stream) {
+            microphoneDeclarations.get(stream)?.release();
+            microphoneDeclarations.delete(stream);
+        }
+    }
 }
 
 // Prefer a format this browser can both record and play, with M4A/AAC first.
@@ -1791,7 +1801,11 @@ async function startRecording() {
             lastChunkBytes: null
         };
         activeSession = current;
-        logRecordingEvent(current, "session-created", { mimeType: actualMimeType });
+        logRecordingEvent(current, "session-created", {
+            mimeType: actualMimeType,
+            declareMicrophoneActive: getSettings().declareMicrophoneActive,
+            standalone: window.matchMedia?.("(display-mode: standalone)")?.matches || navigator.standalone === true
+        });
         lastRecordingPeakBytes = 0;
         publishRecordingDiagnostics();
         // Freeze voice-command preference throughout this recording session.
@@ -2033,6 +2047,14 @@ async function startRecording() {
         });
         await setupSilenceMonitor(current);
         recorder.start(250);
+        current.microphoneDeclaration = declareRecordingMicrophone(getSettings().declareMicrophoneActive, (message, declaration) => {
+            logRecordingEvent(current, "microphone-declaration", declaration);
+            if (activeSession === current || !activeSession) {
+                const target = document.getElementById("microphoneDeclarationStatus");
+                if (target) target.textContent = message;
+            }
+        });
+        microphoneDeclarations.set(stream, current.microphoneDeclaration);
 
         setRecordingControlState("recording");
         status.textContent = `Recording… Audio is being saved on this device.`;
