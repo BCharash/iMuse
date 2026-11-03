@@ -1,190 +1,9 @@
-"""Run with python3 tests/test_emergency_recordings.py.
-
-Exercises production recorder functions with a minimal DOM/storage harness.
-Uses Node when installed, otherwise the macOS JavaScriptCore framework.
-No microphone, browser database, or existing recording is accessed.
-"""
-import ctypes
+"""Regression coverage for emergency audio preservation and saved-player isolation."""
 import json
-from pathlib import Path
 import re
-import shutil
-import subprocess
-import sys
+import unittest
+from recording_test_support import SOURCE, MOCKS, FUNCTIONS, evaluate
 
-
-SOURCE = (Path(__file__).resolve().parents[1] / "js/recorder.js").read_text()
-
-
-def between(start, end):
-    offset = SOURCE.index(start)
-    return SOURCE[offset:SOURCE.index(end, offset)]
-
-
-def evaluate(code):
-    node = shutil.which("node")
-    if node:
-        subprocess.run([node, "-e", code + "\nsetTimeout(() => { if (globalThis.testResult !== 'PASS') throw Error(globalThis.testResult); }, 0);"], check=True)
-        return
-    if sys.platform != "darwin":
-        raise RuntimeError("Install Node to run these tests on this platform.")
-    library = ctypes.CDLL("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
-    pointer = ctypes.c_void_p
-    declarations = [
-        ("JSGlobalContextCreate", pointer, [pointer]),
-        ("JSStringCreateWithUTF8CString", pointer, [ctypes.c_char_p]),
-        ("JSEvaluateScript", pointer, [pointer, pointer, pointer, pointer, ctypes.c_int, ctypes.POINTER(pointer)]),
-        ("JSValueToStringCopy", pointer, [pointer, pointer, ctypes.POINTER(pointer)]),
-        ("JSStringGetUTF8CString", ctypes.c_size_t, [pointer, ctypes.c_char_p, ctypes.c_size_t]),
-        ("JSStringRelease", None, [pointer]),
-        ("JSGlobalContextRelease", None, [pointer]),
-    ]
-    for name, result, arguments in declarations:
-        function = getattr(library, name)
-        function.restype, function.argtypes = result, arguments
-    context = library.JSGlobalContextCreate(None)
-
-    def run(script):
-        exception = pointer()
-        source = library.JSStringCreateWithUTF8CString(script.encode())
-        try:
-            value = library.JSEvaluateScript(context, source, None, None, 1, ctypes.byref(exception))
-        finally:
-            library.JSStringRelease(source)
-        string = library.JSValueToStringCopy(context, exception if exception.value else value, None)
-        buffer = ctypes.create_string_buffer(65536)
-        library.JSStringGetUTF8CString(string, buffer, len(buffer))
-        library.JSStringRelease(string)
-        text = buffer.value.decode()
-        if exception.value:
-            raise AssertionError(text)
-        return text
-
-    try:
-        run(code)
-        for _ in range(100):
-            result = run("globalThis.testResult")
-            if result != "pending":
-                break
-        assert result == "PASS", result
-    finally:
-        library.JSGlobalContextRelease(context)
-
-
-MOCKS = r"""
-const assert = (value, message) => { if (!value) throw Error(message); };
-const console = {error(){}};
-const FINALIZATION_NOTICE_MS = 10000, STORAGE_READ_TIMEOUT_MS = 2000;
-const timers = new Map();
-let timerSequence = 0;
-function setTimeout(callback) { const id = ++timerSequence; timers.set(id, callback); return id; }
-function clearTimeout(id) { timers.delete(id); }
-class Element {
-    constructor() { this.children = []; this.style = {}; this.events = {}; }
-    append(...items) { for (const item of items) {if (typeof item === 'object') item.parentElement = this; this.children.push(item);} }
-    appendChild(item) { this.append(item); }
-    prepend(item) { this.children.unshift(item); }
-    replaceChildren(...items) { this.children = items; }
-    setAttribute() {}
-    removeAttribute() {}
-    addEventListener(name, handler) { this.events[name] = handler; }
-    click() { return this.events.click(); }
-    pause() {}
-    load() {}
-    showModal() { this.open = true; }
-    close() { this.open = false; this.events.close?.(); }
-    remove() { if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(item => item !== this); }
-}
-class Blob {
-    constructor(parts, options = {}) {
-        this.content = parts.map(part => part.content ?? part).join('');
-        this.size = this.content.length;
-        this.type = options.type || '';
-    }
-}
-const location = new Element();
-const document = {body: new Element(), createElement: () => new Element(), createTextNode: text => text, getElementById: () => location};
-const window = {lastRecording: null};
-const audioPlayer = new Element(), recordingControls = new Element(), status = {};
-const revoked = [];
-const URL = {createObjectURL: () => 'blob:test', revokeObjectURL: url => revoked.push(url)};
-let recordingUrl = null, displayedSessionId = null, activeSession = null, db = null;
-let savedPlayback = null, savedPlaybackRequest = 0;
-let recoveryPanel = null, lastRecordingPeakBytes = 0, startRequest = 0, recordingLease = null;
-const writingSessions = new Set();
-let leaseAcquisitions = 0, leaseReleases = 0;
-const recordingStorage = {
-    run: operation => Promise.resolve().then(operation),
-    async hold() { leaseAcquisitions++; return {async release() {leaseReleases++;}}; }
-};
-let startupFailure = 'permission';
-async function acquireRecordingMicrophone() {
-    if (startupFailure === 'permission') throw Error('permission rejected');
-    if (startupFailure === 'cancel') startRequest++;
-    return {};
-}
-function publishMicrophoneProcessing() {}
-function createCompatibleRecorder() { throw Error('recorder initialization test'); }
-const emergencyRecordings = new Map(), downloads = [], disk = new Map();
-let preservationTestEnabled = false, preservationTestResult = null;
-let downloadFails = false, storageReadable = true;
-let reads = 0, writes = 0;
-async function getSession() { reads++; throw Error('must not read partial stored session'); }
-async function getChunks(id) {
-    reads++;
-    if (!storageReadable) throw Error('storage unavailable');
-    return disk.get(id) || [];
-}
-async function putSession() { writes++; }
-async function getAllSessions() {
-    if (!storageReadable) throw Error('storage unavailable');
-    return [...disk].map(([id, parts]) => ({id, state: 'interrupted',
-        startedAt: '2026-11-03T10:00:00Z', chunkCount: parts.length,
-        bytesStored: parts.reduce((n, part) => n + part.blob.size, 0)}));
-}
-function downloadAudioBlob(blob, name) {
-    if (downloadFails) throw Error('download failed');
-    downloads.push({blob, name});
-}
-function logRecordingEvent() {} function closeCommandWindow() {}
-function cleanupAudioMonitor() {} function stopStream() {}
-function publishRecordingDiagnostics() {} function setAudioCommandsToggleLocked() {}
-function setMicrophoneSelectionLocked() {} function setSilencePauseLocked() {}
-function releaseScreenWakeLock() {} function setWakeStatus() {}
-function setRecordingControlState() {} function setReadyUI() {}
-function sayResponse() {}
-let current, id, stream = {};
-function seed(name) {
-    db = {};
-    id = name;
-    current = {
-        id, metadata: {id, startedAt: '2026-11-03T10:00:00Z', mimeType: 'audio/mp4'},
-        stopHandled: false, activeSinceMs: null, peakPendingBytes: 0,
-        writeQueue: Promise.resolve(), persistenceError: Error('quota exceeded'),
-        storageStopRequested: true,
-        pendingChunks: new Map([[1, new Blob(['tail-' + name])]])
-    };
-    disk.set(id, [{sequence: 0, blob: new Blob(['header-' + name])}]);
-    activeSession = current;
-    writingSessions.add(id);
-}
-"""
-
-stop_marker = '        recorder.addEventListener("stop", async () => {'
-stop_offset = SOURCE.index(stop_marker) + len(stop_marker)
-stop_body = SOURCE[stop_offset:SOURCE.index('        });\n        await setupSilenceMonitor(current);', stop_offset)]
-FUNCTIONS = (
-    (Path(__file__).resolve().parents[1] / "js/recording-integrity.js").read_text().replace("export ", "")
-    + between("function boundedStorageRead(", "function updatePreservationTestControls(")
-    + between("function clearPlayback()", "function setAudioCommandsToggleLocked(")
-    + between("function showPlayback(", "function audioFileExtension(")
-    + between("function sessionFilename(", "function ensureCurrentDownloadButton(")
-    + between("function ensureRecoveryPanel(", "async function playSavedSession(")
-    + between("async function playSavedSession(", "async function initialize(")
-    + between("function assertSessionIdle(", "// Soft deletion")
-    + between("async function startRecording()", 'recordButton.addEventListener("click"')
-    + "async function stopHandler() {" + stop_body + "}\n"
-)
 
 TESTS = r"""
 globalThis.testResult = 'pending';
@@ -280,7 +99,11 @@ globalThis.testResult = 'pending';
 })().catch(error => { globalThis.testResult = String(error.stack || error); });
 """
 
+class EmergencyRecordingsTests(unittest.TestCase):
+    def test_emergency_preservation(self):
+        syntax_source = re.sub(r"^import .*?;\n", "", SOURCE, flags=re.M)
+        evaluate("new Function(" + json.dumps(syntax_source) + ");\n" + MOCKS + FUNCTIONS + TESTS)
+
+
 if __name__ == "__main__":
-    syntax_source = re.sub(r"^import .*?;\n", "", SOURCE, flags=re.M)
-    evaluate("new Function(" + json.dumps(syntax_source) + ");\n" + MOCKS + FUNCTIONS + TESTS)
-    print("PASS: recorder syntax; actual failure finalization; new-recording playback clearing; multiple emergencies; rendered controls; complete exports; database-independent access; recovery safeguards")
+    unittest.main()

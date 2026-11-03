@@ -23,11 +23,11 @@ Passing a recording to Transcribe, exporting, suggesting a title, or creating a 
 ## Recording behavior to preserve
 
 - Committed chunks have been recovered after reload in user tests, with playable/downloadable output; a short uncommitted tail may be lost. Recovery is not an absolute crash/eviction guarantee.
-- Current recovery promotes successfully rebuilt audio to normal saved-recording behavior while retaining interruption history. The follow-up reload-after-recovery label test remains unreported; see the roadmap.
+- Recovery offers the fullest available audio and retains interruption/error classification. Structural checks do not prove media decoding or continuous capture. Keep emergency memory copies independent of player changes; do not make transcription release them.
 - Manual Stop finalizes directly. Spoken Stop requests Yes/No confirmation: Yes finalizes; No/timeout leaves capture paused. Wake during recording pauses before command listening; wake while paused acknowledges “Yes?”. Silence/manual pause do not themselves start a command listener.
 - Keep ordinary startup/pause/resume/stopped/confirmation WAV cues and periodic paused reminder tones. The external iPhone background-transition beep is distinct from those application cues.
 - Support exposed headset microphones through selection. Physical headset media-button controls were retired on both platforms; do not import the older desktop control pathway.
-- Ordinary deletion uses Recently Deleted; permanent deletion is explicit. A new recording does not disturb other sessions. The normal Delete control is hidden during active capture; that historical UI statement is not a guarantee against every asynchronous deletion race.
+- Ordinary deletion uses Recently Deleted; permanent deletion is explicit. Writer ownership protects active/finalizing sessions, and unsaved emergency copies cannot be deleted through saved-list controls. The separate saved-player dialog leaves the top in-memory player intact. Integration must retain the storage-coordination boundary.
 
 ## Integration sequence, when scheduled
 

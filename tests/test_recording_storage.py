@@ -1,8 +1,9 @@
 """Run with python3 tests/test_recording_storage.py. Controlled concurrency tests;
 not a substitute for browser IndexedDB/Web Locks or device acceptance tests.
 """
+import unittest
 from pathlib import Path
-from test_emergency_recordings import SOURCE, between, evaluate
+from recording_test_support import SOURCE, between, evaluate
 
 
 coordinator = (Path(__file__).resolve().parents[1] / "js/recording-storage-coordinator.js").read_text().replace("export ", "")
@@ -173,6 +174,10 @@ globalThis.testResult = 'pending';
 })().catch(error => { globalThis.testResult = String(error) + '\n' + (error.stack || ''); });
 """
 
+class RecordingStorageTests(unittest.TestCase):
+    def test_coordinated_storage(self):
+        evaluate(coordinator + mock + functions + tests)
+
+
 if __name__ == "__main__":
-    evaluate(coordinator + mock + functions + tests)
-    print("PASS: exclusive ownership; competing initialization/deletion; serialized lifecycle/chunk writes; exact counters; abort rollback; queue recovery; orphan recovery; deletion/restore; unsupported coordination")
+    unittest.main()

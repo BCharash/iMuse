@@ -2,23 +2,24 @@
 
 Updated 3 November 2026. This is the active work queue. See the [documentation index](README.md) and [recording investigation](recording-investigation.md) for evidence and source details. The detailed 1 November roadmap is [archived](Archive/roadmap-2026-11-01.md); it retains later feature requirements but no longer sets today's priority.
 
-## Recommended immediate sequence
+## Current priorities
 
-1. **Use the warning-free baseline.** Warning code, setting, WAV and temporary background labs are removed. Identify the deployed revision before the next device comparison. Existing user tests establish Safari-tab background success without warning playback; do not repeat the entire component matrix.
-2. **Retain completed negative tests; pause speculative PWA patches.** Automatic / Play and record showed no improvement. The first asynchronous microphone declaration was rejected for missing a user gesture; its corrected direct-tap version was accepted and cleaned up but did not preserve installed-app background capture. The new minimal installed getUserMedia → MediaRecorder lab also beeped and lost capture without the iMuse audio subsystems. All experiments were reverted; do not recreate their settings, helper modules or lab by default.
-3. **Continue web-first and await stronger platform evidence.** The user prefers finishing the web app before native work. Use the successful Safari-tab recording route for other development. An iOS 27 volunteer comparison may take days, and a missing cable currently prevents Mac device logging. The minimal reproducer remains available in Git commit `1cf3423` if explicitly needed for that comparison or a WebKit report. A related Safari 27 fix exists, but no result establishes that upgrading fixes this PWA. No native project is scheduled.
-4. **Address truthful interruption/recovery behavior separately.** Detect acquisition failure without interpreting silence or intentional pause as failure; handle interrupted contexts; retain source audio; distinguish interrupted output from clean completion. Context resume alone is not a recorder repair. Do not silently create and concatenate independent MP4 recordings.
+1. **Finish the requested interface acceptance.** Check the saved-player dialog, unchanged top player, compact actions, KB sizes in both lists and Settings auto-refresh on iPhone and Mac. Use the [single manual checklist](recording-investigation.md#focused-manual-checks), not the archived stage instructions.
+2. **Keep preservation regressions covered.** Four stages are implemented: emergency retention, coordinated writes/ownership, truthful completion checks/delayed recovery and browser-persistence reporting. Run `python3 -m unittest discover -s tests -v` after relevant changes. Details and limits live in [tests/README.md](../tests/README.md).
+3. **Continue web-first.** Safari-tab capture is the reported working iPhone route. Keep completed negative PWA tests; do not reinstate warning playback or speculative activation/keep-alive patches. Await new platform evidence, an iOS 27 comparison or connected-device logging when available. No native project is scheduled.
+4. **Choose further work with the user.** No fifth stage is authorized. Automatic retry of memory-only emergency tails, capture-stall detection/foreground repair and long-file memory improvements are distinct possible projects. None can reconstruct microphone audio never delivered by the OS.
 
 A candidate background workaround must retain actual spoken background audio, not merely the recording icon, microphone indicator, running context, or eventual chunk callbacks. Keep production changes small; test the affected browser and installed modes separately. Screen lock and app switching need distinct acceptance results.
 
 ## Implemented foundation to preserve
 
 - Independent Record/Pause/Resume and manual Stop; spoken Stop requires Yes confirmation. No or timeout leaves capture paused. Wake-triggered command mode is separate from automatic silence/manual pause.
-- Incremental IndexedDB storage and reload recovery; an **8 MiB** pending-audio limit and release of chunks after commit. This bounds the pending capture buffer, not total browser memory or final assembly.
+- Atomic incremental IndexedDB storage and reload recovery; an **8 MiB** pending threshold requests a protective stop. Chunks release after commit. The threshold is not a hard bound on final chunks, retained emergencies, total memory or assembly.
 - Separate session IDs, ordered chunk sequences, actual MIME type, supported format preference and appropriate export extension.
 - Microphone selection including exposed Shokz inputs, with acquisition/release centralized in the microphone manager. Headset media-button controls are retired on **both** desktop and mobile.
 - Selectable Heed/Voicute wake engines; TensorFlow Go/Stop and Yes/No listeners; serialized normal spoken responses and paused reminder tones. No always-on idle wake before first Record.
-- Saved recordings, recovery-to-saved-recording promotion, Recently Deleted, restore and selected permanent deletion. Source recordings are not deleted by starting a new session, exporting or sending audio to transcription.
+- Unified saved-recording playback/export, retained emergency copies, interrupted/error history, structural checks, Recently Deleted, restore and explicit permanent deletion. Source audio is not released by starting another recording or requesting an export. Recovery does not imply normal completion.
+- Serialized session/chunk updates, exclusive writer coordination through finalization, delayed-finalization recovery actions and browser-controlled persistent-storage requests/reporting.
 
 The earlier seven-minute MacBook test reported about 27 KB peak pending audio with no accumulating queue. It is not multi-hour or iPhone memory certification. General syntax checks and mocked tests are not microphone/device acceptance.
 
@@ -28,10 +29,10 @@ The following were not established as completed by the latest background tests. 
 
 | Work | Required evidence |
 | --- | --- |
-| Recovered-recording UI persistence | Recover after reload, play/download, reload again, verify saved state and interruption history remain |
+| Recovered-recording UI persistence | Load after reload using ▶, play/download, reload again, verify availability and interruption history remain |
 | iPhone session duration | 10–15-minute supported-mode recording, then 30-minute finalization/seek/export; inspect beginning/middle/end |
-| Persistence failure/backpressure | Retain committed and pending audio appropriately; safe stop includes final recorder data; no false completion |
-| Unexpected stop and acquisition stall | Correct session status; no restored/completed claim based only on state or nonempty Blob |
+| Persistence failure/backpressure | Automated coverage and a reported short device test exist; broader device/long-file acceptance remains |
+| Unexpected stop and acquisition stall | Error/stop classification is implemented and mock-tested; actual acquisition-stall detection and foreground repair remain open |
 | Voice/controller races | Late callbacks cannot affect another session; serialized listener teardown; manual Stop versus confirmed spoken Stop |
 | Bulk permanent deletion | Use disposable recordings: cancel changes nothing; confirm deletes only selected deleted sessions; preserve other recordings |
 | Deployment/versioning | Identify actual module revision without clearing IndexedDB; top-level URL cache busting alone does not version imported modules |
@@ -40,7 +41,7 @@ Do not restart the Record UI redesign or bounded-queue implementation. Recheck t
 
 ## Later roadmap, retained but not started by this update
 
-1. **Durable finalization and identity.** Separate interrupted capture from clean completion and validated final output. Preserve recovery chunks until any new finalized artifact is committed/read back and validated. Distinguish storage checks, container validity and audible completeness. Audit long-file `getAll()`/Blob memory before choosing a new storage architecture. Use nondestructive migrations only when justified.
+1. **Further preservation and long-file work.** Structural checks and interrupted outcomes are implemented. Consider automatic persistence retries for emergency tails and audit `getAll()`/Blob memory before choosing another architecture. A future separate finalized artifact needs commit/readback validation while preserving original chunks. Container decoding and audible completeness remain distinct from structural checks; migrations must be nondestructive.
 2. **UUID and provenance metadata.** New capture and combined outputs have their own IDs; titles never define identity. Preserve source dates/IDs, ordered segment occurrences (including repeated use), verified durations/offsets and export/reimport metadata. Existing recordings need a non-destructive backfill design before schema changes.
 3. **Optional naming after finalization.** Timestamp fallback and editable title first; optional opening-audio Whisper Tiny suggestion only after safe persistence, using Memora's existing model management where available. Naming failure cannot change audio or recording status.
 4. **Separate Combine workflow.** A Combine Recordings button below Saved Recordings; select and order library recordings, produce a new recording, preserve originals. No capture-time append mode or new standalone Combine tab. Use compatible AAC/M4A remuxing only with verified format checks; independent MP4 files cannot be byte-concatenated. Detailed requirements remain in the [archived roadmap](Archive/roadmap-2026-11-01.md).

@@ -1,5 +1,6 @@
 """Safe failure-injection control tests; run with python3 tests/test_preservation_failure_control.py."""
-from test_emergency_recordings import SOURCE, MOCKS, FUNCTIONS, between, evaluate
+import unittest
+from recording_test_support import SOURCE, MOCKS, FUNCTIONS, between, evaluate
 
 
 data_marker = '        recorder.addEventListener("dataavailable", event => {'
@@ -116,6 +117,10 @@ globalThis.testResult = 'pending';
 })().catch(error => { globalThis.testResult = String(error) + '\n' + (error.stack || ''); });
 """
 
+class PreservationFailureControlTests(unittest.TestCase):
+    def test_failure_control(self):
+        evaluate(MOCKS + FUNCTIONS + extra_mocks + controls + storage + "function dataHandler(event) {" + data_body + "}\n" + tests)
+
+
 if __name__ == "__main__":
-    evaluate(MOCKS + FUNCTIONS + extra_mocks + controls + storage + "function dataHandler(event) {" + data_body + "}\n" + tests)
-    print("PASS: default-off control; active/committed/paused guards; actual write-error-stop pipeline; final tail retention/export; next session writes normally; cancellation and request failure")
+    unittest.main()

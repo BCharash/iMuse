@@ -4,18 +4,19 @@ Updated 3 November 2026. Start here; current findings take precedence over older
 
 | Document | Purpose |
 | --- | --- |
-| [Recording investigation](recording-investigation.md) | Authoritative environment matrix, background-capture evidence, current source observations, unresolved issues, and proposed experiment |
+| [Recording reliability](recording-investigation.md) | Current behavior, evidence, limitations and one manual acceptance checklist |
+| [Regression tests](../tests/README.md) | One test command, suite purposes and testing limits |
 | [Next steps](iMuse%20next%20steps.md) | Current priorities and remaining acceptance work; implementation versus testing status |
 | [Memora integration handoff](iMuse%20Memora%20integration%20handoff.md) | Record-to-Transcribe contract, source ownership, and integration boundaries |
 | [Swift migration proposal](iMuse%20Swift%20migration%20plan.md) | Conditional native alternative; not a decision to migrate or a claim of implemented native behavior |
-| [Design journal](design-journal.md) | Chronological history; DJ011 records the November background investigation and documentation consolidation |
+| [Design journal](design-journal.md) | Chronological decisions; DJ013 records completed preservation work and current document ownership |
 | [Archive index](Archive/README.md) | Superseded reviews, detailed earlier roadmap, installation checklists, and voice/headset experiments |
 
 ## Current checkpoint
 
-The interruption-warning playback, warning setting, WAV, and temporary background labs have been removed. On the user's iPhone, Safari-tab recording succeeds without the warning, whereas installed iMuse and an installed lab lose background capture with an external double beep. MacBook browser and installed-app tests succeed. The new capture-only installed lab also failed with the same beep, and its commit was reverted. Accepted microphone declaration and explicit audio-session selection provided no benefit. No iPhone standalone workaround is established. Continue web-first using the tested Safari-tab route while awaiting an iOS 27 comparison or new platform evidence; the minimal reproducer is recoverable from Git. Device tests and code inspection are recorded separately in the investigation.
+The four recording-preservation stages and interface cleanup are implemented. The user reported Stage 2 and Stage 3 looked satisfactory and supplied browser-specific storage-protection results. Current dialog layout, long-recording and other acceptance limits are listed in the recording brief; this is not blanket device certification.
 
-Recording preservation now consolidates recovery controls, coordinates storage writers across tabs, checks chunk consistency and retains interrupted/error outcomes. Stage 4 requests persistent browser storage without blocking recording and reports the result in Settings. The [Stage 4 checkpoint](recording-investigation.md#stage-4-persistent-browser-storage) records implementation limits and acceptance steps. Automatic persistence retries for emergency audio remain separate, unapproved work.
+The iPhone installed-app background microphone failure remains unresolved; Safari-tab capture is the reported working route. The warning and temporary background labs are removed. No further preservation stage, native migration or speculative capture patch is underway. Automatic retries for memory-only emergency audio remain a possible separately approved improvement.
 
 ## Document maintenance
 

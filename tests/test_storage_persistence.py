@@ -3,9 +3,10 @@ Tests browser-policy responses and actual Settings integration with mock APIs/DO
 Never accesses browser storage, the microphone, or user recordings.
 """
 import json
+import unittest
 from pathlib import Path
 import re
-from test_emergency_recordings import evaluate
+from recording_test_support import evaluate
 
 ROOT = Path(__file__).resolve().parents[1]
 controller = (ROOT / 'js/storage-persistence.js').read_text().replace('export ', '')
@@ -111,7 +112,11 @@ globalThis.testResult='pending';
 })().catch(error=>{globalThis.testResult=String(error)+'\n'+(error.stack||'');});
 """
 
-if __name__ == '__main__':
-    syntax = re.sub(r'^import .*?;\n', '', settings, flags=re.M).replace('export ', '')
-    evaluate('new Function(' + json.dumps(syntax) + ');\n' + MOCKS + controller + ui + TESTS)
-    print('PASS: Settings syntax/integration; automatic nonblocking request; grant/denial/unsupported/partial APIs; refresh/retry; concurrent calls; exceptions/timeouts; live status; no data or microphone access')
+class StoragePersistenceTests(unittest.TestCase):
+    def test_storage_policy_and_settings(self):
+        syntax = re.sub(r'^import .*?;\n', '', settings, flags=re.M).replace('export ', '')
+        evaluate('new Function(' + json.dumps(syntax) + ');\n' + MOCKS + controller + ui + TESTS)
+
+
+if __name__ == "__main__":
+    unittest.main()

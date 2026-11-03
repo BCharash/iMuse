@@ -1,7 +1,8 @@
 """Stage 3 checks using production functions and controlled storage/timers.
 Run: python3 tests/test_recording_finalization.py
 """
-from test_emergency_recordings import SOURCE, MOCKS, FUNCTIONS, between, evaluate
+import unittest
+from recording_test_support import SOURCE, MOCKS, FUNCTIONS, between, evaluate
 
 marker = '        recorder.addEventListener("error", event => {'
 offset = SOURCE.index(marker) + len(marker)
@@ -182,6 +183,10 @@ globalThis.testResult = 'pending';
 })().catch(error => {globalThis.testResult = String(error) + '\n' + (error.stack || '');});
 """
 
-if __name__ == '__main__':
-    evaluate(MOCKS + FUNCTIONS + EXTRA + 'function errorHandler(event) {' + error_body + '}\n' + TESTS)
-    print('PASS: integrity checks; normal/error/unexpected stops; recovery/export classification; missing stop and delayed writes; ownership retention; bounded reads; full emergency preservation; stale watchdog')
+class RecordingFinalizationTests(unittest.TestCase):
+    def test_finalization_and_integrity(self):
+        evaluate(MOCKS + FUNCTIONS + EXTRA + 'function errorHandler(event) {' + error_body + '}\n' + TESTS)
+
+
+if __name__ == "__main__":
+    unittest.main()

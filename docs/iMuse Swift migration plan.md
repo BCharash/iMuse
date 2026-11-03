@@ -2,7 +2,7 @@
 
 **Originally drafted:** 30 October 2026; reviewed 3 November 2026
 **Status:** Conditional architecture proposal; no Swift implementation or migration decision established.
-**Current relationship:** First complete the bounded iPhone standalone investigation in the [recording brief](recording-investigation.md) and follow the [active roadmap](iMuse%20next%20steps.md). If a web workaround is not demonstrated, decide whether to test native capture. Memora integration remains a separate goal, not a prerequisite to a small native feasibility decision.
+**Current relationship:** The minimal installed recorder reproduced the background failure; no web workaround is established. The user prefers continued web development, and no native project is scheduled. Use the [recording brief](recording-investigation.md) and [active roadmap](iMuse%20next%20steps.md) for the current checkpoint. This proposal requires a separate decision before any native feasibility work; Memora integration remains independent.
 
 ## 1. Proposed direction
 

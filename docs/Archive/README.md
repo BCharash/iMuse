@@ -4,6 +4,7 @@ Reviewed 3 November 2026. These are historical source reviews, installation snap
 
 | Snapshot | Why retained / what supersedes it |
 | --- | --- |
+| [Recording investigation/stage history, 3 November](recording-investigation-stages-2026-11-03.md) | Detailed lab evidence, negative experiments and four preservation-stage implementation notes; current behavior and one acceptance checklist now live in the concise recording brief |
 | [Architecture stabilization review](architecture-stabilization-review.md) | Earlier iMuse(7).zip audit; current source observations and remaining questions consolidated into the recording investigation |
 | [Recording handoff, 2 November](recording-investigation-handoff-2026-11-02.md) | Detailed startup-instrumentation regressions, cache incident, older timeline and file-version caveats; later installed-host evidence supersedes its iMuse-specific hypothesis |
 | [Roadmap, 1 November](roadmap-2026-11-01.md) | Detailed finalization/UUID/naming/Combine requirements; active priorities now live in Next steps |

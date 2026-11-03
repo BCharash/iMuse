@@ -1,6 +1,6 @@
 # iMuse Design Journal
 
-Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated historical snapshots; DJ011 supersedes earlier background-capture assumptions and priority ordering.
+Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated snapshots. DJ012 records the minimal installed failure; DJ013 records the completed preservation work. Older proposals and labels are historical, not current instructions.
 
 ---
 
@@ -1427,3 +1427,17 @@ The separate direct-tap microphone declaration was accepted and cleared successf
 The minimal lab was reverted (`1cf3423`, revert `a739a57`); its exact source can be retrieved for a later iOS 27 comparison without retaining experimental files in the current app. No latest minimal JSON or new browser-control result was supplied with the report. The installed-host failure no longer requires any of the isolated iMuse subsystems. Its exact OS mechanism remains unresolved.
 
 The user prefers continued web development before native migration, lacks a cable for connected-device logging, and may wait days for an iOS 27 volunteer. Pause speculative production patches, retain the negative results, and develop on the successful Safari-tab route. The related Safari 27 release fix is not proof of restored standalone capture. Current details and priorities remain in the investigation and roadmap.
+
+---
+
+# DJ013 — Recording Preservation and Interface Consolidation
+
+**Date:** 3 November 2026. **Status:** Four separately approved implementation stages and interface cleanup completed; device acceptance remains bounded by reported results.
+
+Emergency copies now survive starting another recording; serialized updates and writer ownership protect stored sessions; chunk checks and delayed-finalization handling retain honest interrupted/error outcomes; persistent browser storage is requested without blocking capture. The user reported Stage 2 and Stage 3 looked satisfactory and supplied different storage grants by browser/container. Those grants do not fix installed-iPhone background microphone capture.
+
+The user requested a simpler interface: status-only storage protection, automatic checks on Settings opening, a compact saved-player control opening a separate dialog, an unchanged top in-memory player, shorter actions, compact diagnostics and KB sizes in saved/deleted lists. Unsaved audio notices and explicit permanent-deletion safeguards remain.
+
+The five Python suites are retained regression coverage, with a shared harness and standard unittest discovery. They are development tools, not runtime requirements or device certification. The current recording brief owns behavior, evidence boundaries and one manual checklist; detailed stage history moved to Archive. The roadmap and Memora handoff now preserve interrupted status rather than instruct recovery-to-completed promotion.
+
+Automatic retries for memory-only emergency tails, acquisition repair, long-file memory work and native development remain separate future decisions. No additional stage, deployment or storage migration is authorized by this cleanup.
