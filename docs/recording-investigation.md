@@ -48,6 +48,8 @@ Web Locks protection covers cooperating updated pages in the same storage scope.
 
 ### Passive microphone-level evaluation
 
+The separate [wake-word review lab](wake-word-evaluation.md) now retains replayable trigger/near-trigger clips and manual missed-phrase clips for evaluation. Production wake behavior is unchanged.
+
 Refactoring is stopped. **Settings → Microphone levels → View** shows one needle-style RMS dBFS meter above both thresholds; the initial duplicate readouts were consolidated at the user's request. The dial spans −70 to 0 dBFS, with an exact numeric reading even below that range. Start recording first; readings continue while paused. It measures normalized input after browser microphone processing, before Heed's filtering/preprocessing—not model confidence, peak level or calibrated room sound pressure. Less-negative values mean louder input.
 
 **Mark quiet room** and **Mark noisy room** place Q/N reference markers at the current measured level. No universal room-to-dBFS bands are assumed. Markers last until reload, do not affect thresholds and should be remeasured after microphone/gain changes. They are available only for finite live readings. The dial includes text/shape identifiers rather than relying on color, and respects reduced-motion preferences.

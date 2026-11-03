@@ -1501,3 +1501,15 @@ Nine controlled checks pass. Actual input/device layout remains a manual check. 
 **Requested damping:** Added display-only exponential smoothing (0.25 per 200 ms reading) and a 240 ms needle transition. Readout and room markers match the damped value. Hidden/inactive/unavailable states reset smoothing, so reopening does not reuse old levels. Capture, silence and wake algorithms are untouched; all nine checks pass.
 
 **Processing-report correction:** Preserved a per-stream copy of the actual successful microphone request, including the automatic headset fallback. The report now distinguishes iMuse requested, Browser reports and Browser control. Unsupported controls are Not exposed; failed support queries remain Unknown. Missing browser settings do not imply processing is off. Capture preferences and behavior remain unchanged. Ten controlled tests pass, including omitted iPhone fields, Chrome-reported false, immutable request snapshots and support-query failure. Device presentation remains a manual check.
+
+---
+
+# DJ019 — Retain Wake-Word Evaluation Audio
+
+**Date:** 3 November 2026. **Status:** Standalone lab implemented; real-browser acceptance pending.
+
+The user supplied a standalone Heed/Voicute comparison tool and requested audio around triggers/near triggers with replay and later classification. Its embedded Heed model and detector match production, but scheduling and processing defaults differ. The enhanced repository `lab.html` retains five seconds before/two after candidate events, groups nearby scores, and supports manually marked low-score misses. A separate IndexedDB store retains WAV clips, labels and notes across runs; an export/import archive includes the audio. Existing score exports remain separate. Trigger/near-trigger labels require review, and selected clips do not measure all missed phrases. Production capture/recognition and the Desktop original remain unchanged.
+
+See [wake-word evaluation](wake-word-evaluation.md) for the comparison, workflow and limitations. All 13 controlled repository tests pass, including clip bounds, truncated history, WAV encoding, UI/storage wiring, archive round trips and write-failure retention. Actual microphone, playback, long-run and browser persistence checks remain manual.
+
+**Requested compression and tuning data:** New review clips are encoded as mono 64 kbps MP3 in a worker using pinned lamejs 1.2.1. Existing WAV clips/archives remain readable; failed compression retains the WAV safety copy. Original inference scores/levels are measured before compression. Schema 2 adds completed run logs without clearing clips; version 2 archives include audio MIME types, clip score traces and complete stopped-run frames/events/marks, capture duration, settings/model information and inference/backlog measurements. This supports parameter comparisons but does not implement an optimizer or make MP3 a bit-exact training source. All 14 controlled tests pass, including mock worker success/failure, run-log persistence and legacy WAV import. Real MP3 encoding/playback remains a browser acceptance check.

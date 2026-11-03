@@ -5,6 +5,7 @@ Updated 3 November 2026. Start here; current findings take precedence over older
 | Document | Purpose |
 | --- | --- |
 | [Recording reliability](recording-investigation.md) | Current behavior, evidence, limitations and one manual acceptance checklist |
+| [Wake-word evaluation](wake-word-evaluation.md) | Standalone lab comparison, retained trigger/near-trigger audio, review labels and portable archives |
 | [Regression tests](../tests/README.md) | One test command, suite purposes and testing limits |
 | [Next steps](iMuse%20next%20steps.md) | Current priorities and remaining acceptance work; implementation versus testing status |
 | [Memora integration handoff](iMuse%20Memora%20integration%20handoff.md) | Record-to-Transcribe contract, source ownership, and integration boundaries |
