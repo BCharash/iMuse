@@ -7,6 +7,7 @@ import { loadCommands, startCommands, stopCommands } from "./tensorflow/commands
 import { createRecordingStorageCoordinator } from "./recording-storage-coordinator.js";
 import { inspectRecordingChunks, recordingCompletion } from "./recording-integrity.js";
 import { createRecordingLibrary } from "./recording-library.js";
+import { createRecordingStore, RECORDING_DB_NAME } from "./recording-store.js";
 
 const recordButton = document.getElementById("recordButton");
 const pauseButton = document.getElementById("pauseButton");
@@ -65,18 +66,16 @@ let wakeWordPhrase = "Hey Friday";
 let wakeWordLoadError = null;
 let screenWakeLock = null;
 
-const DB_NAME = "imuse-recording-breadboard";
-const DB_VERSION = 2;
-const SESSION_STORE = "sessions";
-const CHUNK_STORE = "chunks";
-const EVENT_STORE = "recordingEvents";
-const recordingStorage = createRecordingStorageCoordinator(navigator.locks, `${DB_NAME}/writer`);
+const recordingStorage = createRecordingStorageCoordinator(navigator.locks, `${RECORDING_DB_NAME}/writer`);
 // Includes finalization after activeSession is cleared.
 const writingSessions = new Set();
+const recordingStore = createRecordingStore({
+    coordinator: recordingStorage,
+    assertSessionIdle
+});
 // Maximum audio waiting for a committed IndexedDB write.
 const MAX_PENDING_AUDIO_BYTES = 8 * 1024 * 1024;
 
-let db = null;
 let activeSession = null;
 let recordingUrl = null;
 let displayedSessionId = null;
@@ -89,7 +88,7 @@ const emergencyRecordings = new Map();
 const recordingLibrary = createRecordingLibrary({
     container: document.getElementById("savedRecordingsLocation"),
     status,
-    getAllSessions: () => db ? boundedStorageRead(getAllSessions()) : Promise.resolve([]),
+    getAllSessions: () => recordingStore.isOpen() ? boundedStorageRead(getAllSessions()) : Promise.resolve([]),
     getEmergencyRecordings: () => emergencyRecordings,
     isSessionWriting: id => writingSessions.has(id),
     recoverSession, exportSavedSession, moveSessionToRecentlyDeleted, getSession,
@@ -236,42 +235,13 @@ publishRecordingDiagnostics();
 
 
 function openDatabase() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = () => {
-            const database = request.result;
-            if (!database.objectStoreNames.contains(SESSION_STORE)) {
-                database.createObjectStore(SESSION_STORE, { keyPath: "id" });
-            }
-            if (!database.objectStoreNames.contains(EVENT_STORE)) {
-                const events = database.createObjectStore(EVENT_STORE, { keyPath: "key", autoIncrement: true });
-                events.createIndex("sessionId", "sessionId", { unique: false });
-            }
-            if (!database.objectStoreNames.contains(CHUNK_STORE)) {
-                const chunks = database.createObjectStore(CHUNK_STORE, {
-                    keyPath: ["sessionId", "sequence"]
-                });
-                chunks.createIndex("sessionId", "sessionId", { unique: false });
-            }
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error || new Error("Could not open IndexedDB."));
-        request.onblocked = () => reject(new Error("The recording database is blocked by another open page."));
-    });
-}
-
-function transactionDone(transaction) {
-    return new Promise((resolve, reject) => {
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error || new Error("IndexedDB transaction failed."));
-        transaction.onabort = () => reject(transaction.error || new Error("IndexedDB transaction was aborted."));
-    });
+    return recordingStore.open();
 }
 
 // Independent IndexedDB event log: never modifies session/chunk records or their write queue.
 // Diagnostic writes are best-effort and cannot delay or stop audio capture.
 function logRecordingEvent(current, type, details = {}) {
-    if (!db || !current) return;
+    if (!recordingStore.isOpen() || !current) return;
     const entry = {
         sessionId: current.id,
         at: new Date().toISOString(),
@@ -285,11 +255,7 @@ function logRecordingEvent(current, type, details = {}) {
         pendingBytes: current.pendingBytes || 0,
         ...details
     };
-    try {
-        const transaction = db.transaction(EVENT_STORE, "readwrite");
-        transaction.objectStore(EVENT_STORE).add(entry);
-        transaction.onerror = () => console.warn("Could not save recording diagnostic event:", transaction.error);
-    } catch (error) { console.warn("Could not log recording event:", error); }
+    recordingStore.appendEvent(entry);
 }
 
 // Passive foreground-return probe. Reads existing analyser data without changing
@@ -336,15 +302,8 @@ function scheduleForegroundCaptureSnapshots(current) {
     }
 }
 
-async function getRecordingEvents(sessionId) {
-    const transaction = db.transaction(EVENT_STORE, "readonly");
-    const request = transaction.objectStore(EVENT_STORE).index("sessionId").getAll(IDBKeyRange.only(sessionId));
-    const result = await new Promise((resolve, reject) => {
-        request.onsuccess = () => resolve(request.result || []);
-        request.onerror = () => reject(request.error);
-    });
-    await transactionDone(transaction);
-    return result;
+function getRecordingEvents(sessionId) {
+    return recordingStore.getRecordingEvents(sessionId);
 }
 
 async function downloadRecordingEvents(id) {
@@ -362,52 +321,15 @@ async function downloadRecordingEvents(id) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function getAllSessions() {
-    const transaction = db.transaction(SESSION_STORE, "readonly");
-    const result = await new Promise((resolve, reject) => {
-        const request = transaction.objectStore(SESSION_STORE).getAll();
-        request.onsuccess = () => resolve(request.result || []);
-        request.onerror = () => reject(request.error);
-    });
-    await transactionDone(transaction);
-    return result;
-}
-
-async function getSession(id) {
-    const transaction = db.transaction(SESSION_STORE, "readonly");
-    const result = await new Promise((resolve, reject) => {
-        const request = transaction.objectStore(SESSION_STORE).get(id);
-        request.onsuccess = () => resolve(request.result || null);
-        request.onerror = () => reject(request.error);
-    });
-    await transactionDone(transaction);
-    return result;
-}
-
-async function putSessionNow(record) {
-    const transaction = db.transaction(SESSION_STORE, "readwrite");
-    const done = transactionDone(transaction);
-    const store = transaction.objectStore(SESSION_STORE);
-    const request = store.get(record.id);
-    request.onsuccess = () => {
-        const stored = request.result;
-        // Lifecycle snapshots must never roll back committed audio counters.
-        const updated = stored ? { ...stored, ...record,
-            chunkCount: stored.chunkCount, bytesStored: stored.bytesStored,
-            lastPersistedAt: stored.lastPersistedAt } : { ...record };
-        if (stored?.state === "deleted" && record.state !== "deleted") {
-            delete updated.previousState;
-            delete updated.deletedAt;
-        }
-        store.put(updated);
-    };
-    await done;
-}
-
-function putSession(record) {
-    const snapshot = { ...record };
-    return recordingStorage.run(() => putSessionNow(snapshot));
-}
+function getAllSessions() { return recordingStore.getAllSessions(); }
+function getSession(id) { return recordingStore.getSession(id); }
+function getChunks(id) { return recordingStore.getChunks(id); }
+function putSession(record) { return recordingStore.putSession(record); }
+// Called only within recordingStorage.run during recovery/initialization.
+function putSessionNow(record) { return recordingStore.putSessionOwned(record); }
+function deleteSessionData(id) { return recordingStore.deleteSessionData(id); }
+function moveSessionToRecentlyDeleted(id) { return recordingStore.moveSessionToRecentlyDeleted(id); }
+function restoreRecentlyDeletedSession(id) { return recordingStore.restoreRecentlyDeletedSession(id); }
 
 async function persistChunk(record, sequence, blob) {
     if (preservationTestEnabled && record.simulateNextChunkFailure) {
@@ -418,92 +340,14 @@ async function persistChunk(record, sequence, blob) {
         // handlers retain this chunk and the final recorder tail for export.
         throw new Error("Simulated storage failure (preservation test).");
     }
-    return recordingStorage.run(async () => {
-        const transaction = db.transaction([SESSION_STORE, CHUNK_STORE], "readwrite");
-        const done = transactionDone(transaction);
-        const sessions = transaction.objectStore(SESSION_STORE);
-        const chunks = transaction.objectStore(CHUNK_STORE);
-        let updated;
-        const request = sessions.get(record.id);
-        request.onsuccess = () => {
-            if (!request.result || request.result.state === "deleted") {
-                transaction.abort();
-                return;
-            }
-            const stored = request.result;
-            const previous = chunks.get([record.id, sequence]);
-            previous.onsuccess = () => {
-                updated = { ...stored,
-                    chunkCount: Math.max(stored.chunkCount || 0, sequence + 1),
-                    bytesStored: (stored.bytesStored || 0) - (previous.result?.bytes || 0) + blob.size,
-                    lastPersistedAt: new Date().toISOString() };
-                chunks.put({ sessionId: record.id, sequence,
-                    type: blob.type || stored.mimeType, blob, bytes: blob.size });
-                sessions.put(updated);
-            };
-        };
-        await done;
-        // A pause/stop may have changed the in-memory state while this write ran.
-        Object.assign(record.metadata, { chunkCount: updated.chunkCount,
-            bytesStored: updated.bytesStored, lastPersistedAt: updated.lastPersistedAt });
-    });
-}
-
-async function getChunks(id) {
-    const transaction = db.transaction(CHUNK_STORE, "readonly");
-    const result = await new Promise((resolve, reject) => {
-        const request = transaction.objectStore(CHUNK_STORE).index("sessionId").getAll(IDBKeyRange.only(id));
-        request.onsuccess = () => resolve(request.result || []);
-        request.onerror = () => reject(request.error);
-    });
-    await transactionDone(transaction);
-    return result.sort((a, b) => a.sequence - b.sequence);
-}
-
-async function deleteSessionData(id) {
-    return recordingStorage.run(async () => {
-        assertSessionIdle(id);
-        const chunks = await getChunks(id);
-        const transaction = db.transaction([SESSION_STORE, CHUNK_STORE], "readwrite");
-        transaction.objectStore(SESSION_STORE).delete(id);
-        const chunkStore = transaction.objectStore(CHUNK_STORE);
-        for (const chunk of chunks) chunkStore.delete([id, chunk.sequence]);
-        await transactionDone(transaction);
-        // Remove diagnostics only when the recording itself is permanently deleted.
-        const events = await getRecordingEvents(id);
-        const eventTransaction = db.transaction(EVENT_STORE, "readwrite");
-        for (const event of events) eventTransaction.objectStore(EVENT_STORE).delete(event.key);
-        await transactionDone(eventTransaction);
-    });
+    const counters = await recordingStore.persistChunk(record.id, sequence, blob);
+    // Update counters only; capture may have advanced its lifecycle while saving.
+    Object.assign(record.metadata, counters);
 }
 
 function assertSessionIdle(id) {
     if (writingSessions.has(id)) throw new Error("Stop and finish this recording before loading or deleting it.");
     if (emergencyRecordings.has(id)) throw new Error("This recording contains unsaved audio. Download it before closing the page; it remains available in the recordings list.");
-}
-
-// Soft deletion retains the session and its IndexedDB audio chunks until
-// the user explicitly chooses permanent deletion.
-async function moveSessionToRecentlyDeleted(id) {
-    return recordingStorage.run(async () => {
-        assertSessionIdle(id);
-        const item = await getSession(id);
-        if (!item) throw new Error("This recording no longer exists.");
-        if (item.state === "deleted") return;
-        await putSessionNow({ ...item, previousState: item.state, state: "deleted",
-            deletedAt: new Date().toISOString() });
-    });
-}
-
-async function restoreRecentlyDeletedSession(id) {
-    return recordingStorage.run(async () => {
-        assertSessionIdle(id);
-        const item = await getSession(id);
-        if (!item || item.state !== "deleted") throw new Error("This deleted recording is no longer available.");
-        const { previousState, deletedAt, ...rest } = item;
-        const state = previousState === "completed" ? "completed" : "interrupted";
-        await putSessionNow({ ...rest, state, lastUpdatedAt: new Date().toISOString() });
-    });
 }
 
 function stopStream(stream) {
@@ -1606,7 +1450,7 @@ async function recoverSession(id, button, present = showPlayback) {
 async function initialize() {
     try {
         if (!("indexedDB" in window)) throw new Error("IndexedDB is not available in this browser.");
-        db = await openDatabase();
+        await openDatabase();
         try {
             await recordingStorage.run(async () => {
                 const sessions = await getAllSessions();
@@ -1705,7 +1549,7 @@ async function startRecording() {
     // emergency audio remains independently accessible in emergencyRecordings.
     clearPlayback();
 
-    if (!db) {
+    if (!recordingStore.isOpen()) {
         setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
         status.textContent = "IndexedDB is unavailable, so durable recording cannot start safely.";
         return;

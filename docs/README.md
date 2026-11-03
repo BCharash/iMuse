@@ -18,7 +18,7 @@ The four recording-preservation stages and interface cleanup are implemented. Th
 
 The iPhone installed-app background microphone failure remains unresolved; Safari-tab capture is the reported working route. The warning and temporary background labs are removed. No further preservation stage, native migration or speculative capture patch is underway. Automatic retries for memory-only emergency audio remain a possible separately approved improvement.
 
-The first approved recorder refactoring step moves saved-list rendering and its player dialog into `js/recording-library.js`; recording/storage behavior remains in `recorder.js`. Further extractions await separate approval and the usual focused regression checks.
+Two approved recorder refactoring steps move saved-list/player UI into `js/recording-library.js` and recording database I/O into `js/recording-store.js`. Capture, emergency memory, recovery decisions and finalization remain in `recorder.js`. The first step's device checks were reported successful; the second awaits focused device verification. Further extractions require separate approval.
 
 ## Document maintenance
 

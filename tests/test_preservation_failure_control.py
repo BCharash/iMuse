@@ -1,6 +1,6 @@
 """Safe failure-injection control tests; run with python3 tests/test_preservation_failure_control.py."""
 import unittest
-from recording_test_support import SOURCE, MOCKS, FUNCTIONS, between, evaluate
+from recording_test_support import SOURCE, MOCKS, FUNCTIONS, STORE_SOURCE, between, evaluate
 
 
 data_marker = '        recorder.addEventListener("dataavailable", event => {'
@@ -8,7 +8,7 @@ data_offset = SOURCE.index(data_marker) + len(data_marker)
 data_body = SOURCE[data_offset:SOURCE.index('        });\n        recorder.addEventListener("error"', data_offset)]
 
 controls = between("function updatePreservationTestControls()", "// Count actual active recording time")
-storage = between("function transactionDone(", "// Independent IndexedDB") + between("async function persistChunk(", "async function getChunks(")
+storage = between("async function persistChunk(", "function assertSessionIdle(")
 extra_mocks = r"""
 let preservationTestButton = null;
 document.createTextNode = text => text;
@@ -36,9 +36,14 @@ const testDatabase = {transaction() {
     return tx;
 }};
 let recorder, stopRequests = 0, requestedData = 0;
-function begin(name) {
+recordingStore = createRecordingStore({
+    coordinator:recordingStorage,assertSessionIdle,
+    databaseFactory:{open(){const request={};Promise.resolve().then(()=>{request.result=testDatabase;request.onsuccess();});return request;}}
+});
+async function begin(name) {
     seed(name);
     db = testDatabase;
+    await recordingStore.open();
     current.persistenceError = null;
     current.storageStopRequested = false;
     current.sequence = 1;
@@ -60,12 +65,12 @@ globalThis.testResult = 'pending';
     initializePreservationTest();
     const panel = location.children[0], enable = panel.children[2].children[0];
     assert(!preservationTestEnabled && preservationTestButton.disabled, 'test defaults off');
-    begin('disabled');
+    await begin('disabled');
     current.simulateNextChunkFailure = true;
     await persistChunk(current, 1, new Blob(['real audio']));
     assert(transactionCount === 1 && !current.simulatedStorageFailure, 'disabled mode never injects failure');
 
-    begin('simulated');
+    await begin('simulated');
     enable.checked = true;
     enable.events.change();
     assert(!preservationTestButton.disabled, 'enabled after committed audio exists');
@@ -97,7 +102,7 @@ globalThis.testResult = 'pending';
     assert(downloads[0].blob === emergency.blob, 'test export contains unsaved tail');
 
     // The failure belongs to one recording, even while the control stays enabled.
-    begin('next');
+    await begin('next');
     const nextBefore = transactionCount;
     await persistChunk(current, 1, new Blob(['normal next recording']));
     assert(transactionCount === nextBefore + 1 && !current.persistenceError, 'next session writes normally without rearming');
@@ -119,7 +124,7 @@ globalThis.testResult = 'pending';
 
 class PreservationFailureControlTests(unittest.TestCase):
     def test_failure_control(self):
-        evaluate(MOCKS + FUNCTIONS + extra_mocks + controls + storage + "function dataHandler(event) {" + data_body + "}\n" + tests)
+        evaluate(MOCKS + FUNCTIONS + STORE_SOURCE + extra_mocks + controls + storage + "function dataHandler(event) {" + data_body + "}\n" + tests)
 
 
 if __name__ == "__main__":

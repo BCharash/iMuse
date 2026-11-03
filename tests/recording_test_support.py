@@ -105,6 +105,7 @@ const audioPlayer = new Element(), recordingControls = new Element(), status = {
 const revoked = [];
 const URL = {createObjectURL: () => 'blob:test', revokeObjectURL: url => revoked.push(url)};
 let recordingUrl = null, displayedSessionId = null, activeSession = null, db = null;
+let recordingStore = {isOpen: () => Boolean(db)};
 let lastRecordingPeakBytes = 0, startRequest = 0, recordingLease = null;
 function getRecoveryPanel() { return location.children.find(element => element.id === 'recoveryPanel'); }
 function getSavedPlayback() {
@@ -178,7 +179,10 @@ stop_marker = '        recorder.addEventListener("stop", async () => {'
 stop_offset = SOURCE.index(stop_marker) + len(stop_marker)
 stop_body = SOURCE[stop_offset:SOURCE.index('        });\n        await setupSilenceMonitor(current);', stop_offset)]
 LIBRARY_SOURCE = (Path(__file__).resolve().parents[1] / "js/recording-library.js").read_text().replace("export ", "")
+STORE_SOURCE = (Path(__file__).resolve().parents[1] / "js/recording-store.js").read_text().replace("export ", "")
+STORE_WIRING = between("const recordingStore = createRecordingStore(", "// Maximum audio waiting")
 assert 'import { createRecordingLibrary } from "./recording-library.js";' in SOURCE
+assert 'import { createRecordingStore, RECORDING_DB_NAME } from "./recording-store.js";' in SOURCE
 FUNCTIONS = (
     (Path(__file__).resolve().parents[1] / "js/recording-integrity.js").read_text().replace("export ", "")
     + LIBRARY_SOURCE
@@ -188,7 +192,7 @@ FUNCTIONS = (
     + between("function sessionFilename(", "function ensureCurrentDownloadButton(")
     + between("function renderRecoverableSessions(", "async function playSavedSession(")
     + between("async function playSavedSession(", "async function initialize(")
-    + between("function assertSessionIdle(", "// Soft deletion")
+    + between("function assertSessionIdle(", "function stopStream(")
     + between("async function startRecording()", 'recordButton.addEventListener("click"')
     + "async function stopHandler() {" + stop_body + "}\n"
     + between("const recordingLibrary = createRecordingLibrary(", "// Deliberately session-only")

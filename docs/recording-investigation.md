@@ -2,13 +2,15 @@
 
 Updated 3 November 2026. This is the current recording reference. The four preservation stages and interface cleanup are implemented; no further stage is underway. The [roadmap](iMuse%20next%20steps.md) owns future priorities. Detailed experiment/stage history is [archived](Archive/recording-investigation-stages-2026-11-03.md).
 
-## Code ownership after the first refactoring step
+## Code ownership after two refactoring steps
 
 [recording-library.js](../js/recording-library.js) now owns the Saved/Recently Deleted lists, selection and confirmation controls, saved-player dialog and its object URL. It receives callbacks for reading sessions, recovery/export, deletion/restore, diagnostics and pausing current playback. Constructing it does not acquire a microphone, open a database, or render the page.
 
-[recorder.js](../js/recorder.js) retains capture, recording transitions, database operations, emergency audio ownership, validation/recovery, finalization, voice logic and the top in-memory player. It creates the library and delegates list refreshes to it. The UI receives current emergency copies and write-ownership state through callbacks; it does not mutate those collections or implement storage transactions.
+[recording-store.js](../js/recording-store.js) owns recording database initialization, session/chunk reads and writes, delete/restore transactions and diagnostic-event I/O. It receives the existing write coordinator and an idle-session guard. It keeps the database name, version 2, keys, indexes and transaction behavior. Construction is lazy; opening/readiness remain explicit. A blocked open that later succeeds closes the unused connection instead of silently marking failed initialization ready.
 
-This is the first approved extraction, not a storage redesign. The subsequent proposed storage/controller extractions are not started or authorized by this change. Existing manual checks below still apply, especially saved-player isolation, emergency selection, Delete/Restore and cancelling bulk permanent deletion.
+[recorder.js](../js/recorder.js) retains capture, recording transitions, emergency memory, validation/recovery, finalization, voice logic and the top player. It creates the library/store and delegates through their interfaces. The recorder updates in-memory counters only after the store confirms a chunk commit; the store does not own or release pending audio. Recovery/initialization use an explicitly owned metadata-write entry point inside the existing coordinator callback, avoiding a nested queue. Settings' existing read-only diagnostics remain a separate read path.
+
+These are approved extractions, not a storage redesign or an implementation of strict durability/OPFS. No schema migration or audio format change was added. The user confirmed the first extraction's device checks worked. The second extraction has controlled test coverage; its focused device checks remain outstanding. Further controller/recovery/voice extractions require a separate approval.
 
 ## Current behavior
 
@@ -71,7 +73,7 @@ From the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-Five suites (six test methods) cover emergency preservation/player isolation, the library component directly, the failure control, coordinated writes/ownership, finalization/integrity, and persistence policy/Settings. They share one harness. See [tests/README.md](../tests/README.md) for coverage, prerequisites and limitations. Python is a development test runner, not an application dependency; no real user recording or microphone is accessed.
+Five suites (seven test methods) cover emergency preservation/player isolation, the library component directly, the failure control, store schema/open failures, coordinated writes/ownership, finalization/integrity, and persistence policy/Settings. They share one harness. Store checks execute the complete module, including actual recorder wiring, transaction aborts, per-session diagnostic cleanup and preservation of unrelated records. See [tests/README.md](../tests/README.md) for limits. Python is a development test runner, not an application dependency; no real user recording or microphone is accessed.
 
 The suites execute production functions with controlled DOM/storage/lock/timer mocks. They do not prove native player rendering, actual IndexedDB behavior, browser permission decisions, container decoding, background capture or multi-hour memory reliability.
 

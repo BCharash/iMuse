@@ -3,29 +3,25 @@ not a substitute for browser IndexedDB/Web Locks or device acceptance tests.
 """
 import unittest
 from pathlib import Path
-from recording_test_support import SOURCE, between, evaluate
+from recording_test_support import SOURCE, STORE_SOURCE, STORE_WIRING, between, evaluate
 
 
 coordinator = (Path(__file__).resolve().parents[1] / "js/recording-storage-coordinator.js").read_text().replace("export ", "")
 functions = (
-    between("function transactionDone(", "// Independent IndexedDB")
-    + between("async function getAllSessions(", "async function getChunks(")
-    + between("async function deleteSessionData(", "function stopStream(")
+    between("function openDatabase(", "// Independent IndexedDB")
+    + between("function getAllSessions(", "function stopStream(")
     + between("async function initialize()", "// Run a short, disposable")
 )
 
 mock = r"""
 const assert = (value, message) => { if (!value) throw Error(message); };
 const clone = value => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
-const console = {error(){}};
+const console = {error(){},warn(){}};
 const status = {}, window = {indexedDB: {}};
 let rendered = 0;
 async function renderRecoverableSessions() { rendered++; }
-async function getRecordingEvents() { return []; }
-async function getChunks(id) { return [...chunks.values()].filter(value => value.sessionId === id); }
-async function openDatabase() { return db; }
 const SESSION_STORE = 'sessions', CHUNK_STORE = 'chunks', EVENT_STORE = 'events';
-let sessions = new Map(), chunks = new Map(), transactions = [], committed = 0;
+let sessions = new Map(), chunks = new Map(), events = new Map(), transactions = [], committed = 0;
 let preservationTestEnabled = false;
 function logRecordingEvent() {}
 const writingSessions = new Set(), emergencyRecordings = new Map();
@@ -38,6 +34,8 @@ let db = {transaction(names) {
             return {
                 get(key) { const request = {}; operations.push({name, type:'get', key, request}); return request; },
                 getAll() { const request = {}; operations.push({name, type:'all', request}); return request; },
+                index() { return {getAll(query) {const request={};operations.push({name,type:'index',query,request});return request;}}; },
+                add(value) { operations.push({name,type:'put',value:clone({...value,key:events.size+1})}); },
                 put(value) { operations.push({name, type:'put', value:clone(value)}); },
                 delete(key) { operations.push({name, type:'delete', key}); }
             };
@@ -48,20 +46,20 @@ let db = {transaction(names) {
 }};
 function commit() {
     const tx = transactions.shift();
-    const oldSessions = new Map(sessions), oldChunks = new Map(chunks);
+    const oldSessions = new Map(sessions), oldChunks = new Map(chunks), oldEvents = new Map(events);
     while (tx.operations.length && !tx.aborted) {
-        const op = tx.operations.shift(), store = op.name === SESSION_STORE ? sessions : chunks;
+        const op = tx.operations.shift(), store = op.name === SESSION_STORE ? sessions : op.name === CHUNK_STORE ? chunks : events;
         const key = Array.isArray(op.key) ? JSON.stringify(op.key) : op.key;
-        if (op.type === 'get' || op.type === 'all') {
-            op.request.result = clone(op.type === 'all' ? [...store.values()] : store.get(key));
+        if (op.type === 'get' || op.type === 'all' || op.type === 'index') {
+            op.request.result = clone(op.type === 'index' ? [...store.values()].filter(value=>value.sessionId===op.query) : op.type === 'all' ? [...store.values()] : store.get(key));
             op.request.onsuccess?.();
         } else if (op.type === 'put') {
-            const id = op.name === SESSION_STORE ? op.value.id : JSON.stringify([op.value.sessionId,op.value.sequence]);
+            const id = op.name === SESSION_STORE ? op.value.id : op.name === CHUNK_STORE ? JSON.stringify([op.value.sessionId,op.value.sequence]) : op.value.key;
             store.set(id, op.value);
         } else store.delete(key);
     }
     if (tx.aborted) {
-        sessions = oldSessions; chunks = oldChunks;
+        sessions = oldSessions; chunks = oldChunks; events = oldEvents;
         Promise.resolve().then(() => tx.onabort?.());
     } else { committed++; Promise.resolve().then(() => tx.oncomplete?.()); }
 }
@@ -90,11 +88,23 @@ const locks = {request(name, options, callback) {
 const first = createRecordingStorageCoordinator(locks, 'recording-storage');
 const second = createRecordingStorageCoordinator(locks, 'recording-storage');
 let recordingStorage = first;
+const opened = [];
+const databaseFactory = {open(name,version){
+    opened.push([name,version]);
+    const request={};
+    Promise.resolve().then(()=>{request.result=db;request.onsuccess();});
+    return request;
+}};
+const secondStore = createRecordingStore({coordinator:second,assertSessionIdle,databaseFactory,keyRange:{only:id=>id}});
+globalThis.indexedDB = databaseFactory;
+globalThis.IDBKeyRange = {only:id=>id};
 """
 
 tests = r"""
 globalThis.testResult = 'pending';
 (async () => {
+    await recordingStore.open();
+    assert(recordingStore.isOpen() && opened[0][0]==='imuse-recording-breadboard' && opened[0][1]===2,'same database and schema version');
     const lease = await first.hold();
     await rejects(second.run(() => { throw Error('must not enter'); }), 'another tab');
     await rejects(second.hold(), 'another tab');
@@ -117,8 +127,13 @@ globalThis.testResult = 'pending';
     assert(sessions.get('live').bytesStored === 4 && chunks.size === 1, 'repeated sequence does not double-count bytes');
     await drain(persistChunk(record, 1, {size:5, type:'audio/mp4'}));
     assert(sessions.get('live').chunkCount === 2 && sessions.get('live').bytesStored === 9, 'subsequent chunk counts match storage');
+    firstStore.appendEvent({sessionId:'live',type:'first'});
+    await drain(firstStore.getRecordingEvents('live'));
+    firstStore.appendEvent({sessionId:'other',type:'unrelated'});
+    await drain(firstStore.getRecordingEvents('other'));
+    assert(events.size===2 && chunks.size===2,'diagnostics do not change audio chunks');
 
-    recordingStorage = second;
+    recordingStorage = second; recordingStore = secondStore;
     const before = committed;
     await drain(initialize());
     assert(sessions.get('live').state === 'finalizing', 'second-page initialization leaves live session untouched');
@@ -127,7 +142,7 @@ globalThis.testResult = 'pending';
     await rejects(deleteSessionData('live'), 'another tab');
     assert(chunks.size === 2, 'competing deletion preserves live audio');
 
-    recordingStorage = first;
+    recordingStorage = first; recordingStore = firstStore;
     writingSessions.add('live');
     await rejects(moveSessionToRecentlyDeleted('live'), 'Stop and finish');
     await rejects(deleteSessionData('live'), 'Stop and finish');
@@ -145,7 +160,7 @@ globalThis.testResult = 'pending';
     await Promise.all([pendingWrite, releasing]);
     // The Web Locks request settles on a later microtask after release.
     for(let i=0;i<6;i++) await Promise.resolve();
-    recordingStorage = second;
+    recordingStorage = second; recordingStore = secondStore;
     globalThis.checkpoint = 'second initialization';
     await drain(initialize());
     assert(sessions.get('live').state === 'interrupted', 'orphan can be recovered after ownership ends');
@@ -160,6 +175,7 @@ globalThis.testResult = 'pending';
     globalThis.checkpoint = 'permanent deletion';
     await drain(deleteSessionData('live'));
     assert(!sessions.has('live') && chunks.size === 0, 'permanent deletion works after ownership release');
+    assert(events.size===1 && [...events.values()][0].sessionId==='other','permanent deletion cleans only target diagnostics');
 
     // A failed transaction must not poison subsequent operations or release an
     // active owner's lock. Missing/deleted sessions may not be recreated by chunks.
@@ -174,9 +190,71 @@ globalThis.testResult = 'pending';
 })().catch(error => { globalThis.testResult = String(error) + '\n' + (error.stack || ''); });
 """
 
+schema_tests = r"""
+const assert=(value,message)=>{if(!value)throw Error(message);};
+const warnings=[];
+const console={warn:(...args)=>warnings.push(args)};
+globalThis.testResult='pending';
+(async()=>{
+    const schemas=new Map(),indexes=[];
+    let opens=0,closed=0,request,lastStore=null,transactions=[];
+    const database={
+        objectStoreNames:{contains:name=>schemas.has(name)},
+        createObjectStore(name,options){
+            schemas.set(name,options);
+            return {createIndex:(...args)=>indexes.push([name,...args])};
+        },
+        close(){closed++;},
+        transaction(name,mode){
+            transactions.push([name,mode]);
+            throw Error('diagnostic write denied');
+        }
+    };
+    const factory={open(name,version){
+        assert(name==='imuse-recording-breadboard'&&version===2,'existing name/version retained');
+        opens++;request={result:database};return request;
+    }};
+    const coordinator={run:operation=>operation()};
+    const store=createRecordingStore({coordinator,assertSessionIdle(){},databaseFactory:factory});
+    assert(opens===0&&!store.isOpen(),'constructor does not open storage');
+    store.appendEvent({sessionId:'test'});
+    assert(transactions.length===0,'diagnostics before initialization are ignored');
+    const opening=store.open();
+    request.onupgradeneeded();
+    request.onsuccess();
+    await opening;
+    assert(store.isOpen()&&schemas.size===3,'new database creates all existing stores');
+    assert(schemas.get('sessions').keyPath==='id','session key preserved');
+    assert(schemas.get('chunks').keyPath.join(',')==='sessionId,sequence','chunk compound key preserved');
+    assert(schemas.get('recordingEvents').autoIncrement===true,'event key generation preserved');
+    assert(indexes.length===2&&indexes.every(index=>index[1]==='sessionId'&&index[2]==='sessionId'&&index[3].unique===false),'session lookup indexes preserved');
+    const reopening=store.open();
+    request.onupgradeneeded();request.onsuccess();await reopening;
+    assert(schemas.size===3&&indexes.length===2,'existing schemas are not recreated');
+    store.appendEvent({sessionId:'test'});
+    assert(warnings.length===1&&transactions.length===1&&transactions[0][0]==='recordingEvents','diagnostic failure is best effort and isolated');
+
+    const blocked=createRecordingStore({coordinator,assertSessionIdle(){},databaseFactory:factory});
+    const pending=blocked.open().then(()=>null,error=>error);
+    request.onblocked();
+    assert((await pending).message.includes('blocked')&&!blocked.isOpen(),'blocked opening reports unavailable');
+    request.onsuccess();
+    assert(closed===1&&!blocked.isOpen(),'late opening cannot make failed initialization ready');
+    const failed=createRecordingStore({coordinator,assertSessionIdle(){},databaseFactory:factory});
+    const failure=failed.open().then(()=>null,error=>error);
+    request.error=Error('opening failed');request.onerror();
+    assert((await failure).message==='opening failed'&&!failed.isOpen(),'opening failure preserves unavailable state');
+    globalThis.testResult='PASS';
+})().catch(error=>{globalThis.testResult=String(error)+'\n'+(error.stack||'');});
+"""
+
 class RecordingStorageTests(unittest.TestCase):
     def test_coordinated_storage(self):
-        evaluate(coordinator + mock + functions + tests)
+        wiring = STORE_WIRING.replace("const recordingStore", "let recordingStore") + "const firstStore = recordingStore;\n"
+        evaluate(coordinator + STORE_SOURCE + mock + functions + wiring + tests)
+
+    def test_store_schema_and_open_failures(self):
+        evaluate(STORE_SOURCE + schema_tests)
 
 
 if __name__ == "__main__":
