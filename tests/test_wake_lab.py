@@ -69,8 +69,8 @@ class Element {
 class Option extends Element {constructor(text,value){super();this.textContent=text;this.value=value;}}
 const elements=new Map();const $=id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id);};
 const document={createElement:()=>new Element()};
-const window={addEventListener:()=>{}};
-let objectUrls=0;const URL={createObjectURL:()=>String(++objectUrls),revokeObjectURL:()=>{}};
+let confirmClear=false;const window={addEventListener:()=>{},confirm:()=>confirmClear};
+let objectUrls=0,lastPlayedBlob=null;const URL={createObjectURL:blob=>{lastPlayedBlob=blob;return String(++objectUrls);},revokeObjectURL:()=>{}};
 class Blob {
  constructor(parts,{type}={}){this.type=type;this.bytes=[];for(const part of parts){const bytes=part instanceof ArrayBuffer?new Uint8Array(part):part;this.bytes.push(...bytes);}this.size=this.bytes.length;}
  async arrayBuffer(){return Uint8Array.from(this.bytes).buffer;}
@@ -78,14 +78,15 @@ class Blob {
 const btoa=input=>{const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';let result='';for(let i=0;i<input.length;i+=3){const a=input.charCodeAt(i),b=input.charCodeAt(i+1),c=input.charCodeAt(i+2);const value=(a<<16)|((b||0)<<8)|(c||0);result+=alphabet[(value>>>18)&63]+alphabet[(value>>>12)&63]+(i+1<input.length?alphabet[(value>>>6)&63]:'=')+(i+2<input.length?alphabet[value&63]:'=');}return result;};
 const atob=input=>{const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';let result='';for(let i=0;i<input.length;i+=4){const v=(alphabet.indexOf(input[i])<<18)|(alphabet.indexOf(input[i+1])<<12)|((alphabet.indexOf(input[i+2])&63)<<6)|(alphabet.indexOf(input[i+3])&63);result+=String.fromCharCode((v>>>16)&255);if(input[i+2]!=='=')result+=String.fromCharCode((v>>>8)&255);if(input[i+3]!=='=')result+=String.fromCharCode(v&255);}return result;};
 const stored=new Map(),runStored=new Map();let failWrites=false;
-const db={transaction:(name,mode)=>{const tx={objectStore:()=>({
- put:entry=>{Promise.resolve().then(()=>{if(failWrites){tx.error=Error('quota');tx.onabort();}else{(name==='runs'?runStored:stored).set(entry.id,entry);tx.oncomplete();}});},
- getAll:()=>{const request={};Promise.resolve().then(()=>{request.result=[...(name==='runs'?runStored:stored).values()];request.onsuccess();});return request;}
+const db={transaction:(names,mode)=>{let clearing=false;const clearNames=[];const tx={objectStore:(selected=names)=>({
+ put:entry=>{Promise.resolve().then(()=>{if(failWrites){tx.error=Error('quota');tx.onabort();}else{(selected==='runs'?runStored:stored).set(entry.id,entry);tx.oncomplete();}});},
+ getAll:()=>{const request={};Promise.resolve().then(()=>{request.result=[...(selected==='runs'?runStored:stored).values()];request.onsuccess();});return request;},
+ clear:()=>{clearNames.push(selected);if(clearing)return;clearing=true;Promise.resolve().then(()=>{if(failWrites){tx.error=Error('clear failed');tx.onabort();}else{for(const name of clearNames)(name==='runs'?runStored:stored).clear();tx.oncomplete();}});}
 })};return tx;}};
 const indexedDB={open:()=>{const request={};Promise.resolve().then(()=>{request.result=db;request.onsuccess();});return request;}};
 const fmt=value=>Number.isFinite(value)?value.toFixed(3):'—';
 const now=()=>new Date().toISOString();let running=false,stream=null,frames=[],events=[],marks=[],ended=now(),engineName='heed';
-const downloads=[];const download=(name,text,type)=>downloads.push({name,text,type});
+const render=()=>{};const downloads=[];const download=(name,text,type)=>downloads.push({name,text,type});
 """ + HELPERS + ui + r"""
 (async()=>{
  await reviewReady;
@@ -101,6 +102,10 @@ const downloads=[];const download=(name,text,type)=>downloads.push({name,text,ty
  assert(stored.get('test-1').label==='false positive'&&stored.get('test-1').notes===note.value,'classification and notes persist');
  row.children[4].children[0].onclick();
  assert($('reviewAudio').src&&$('reviewPlaying').textContent.includes('Hey Doc'),'table Play opens retained WAV in shared player');
+ running=true;updateReviewPlayback();const beforePlay=objectUrls;row.children[4].children[0].onclick();assert(objectUrls===beforePlay&&row.children[4].children[0].disabled,'monitoring blocks playback to prevent the lab hearing itself');running=false;updateReviewPlayback();
+ const raw=reviewClips[0].audio;reviewClips[0].audio=new Blob([new Uint8Array([255,243,0,1])],{type:'audio/mpeg'});playReviewAudio(reviewClips[0],true);assert(lastPlayedBlob===raw&&$('reviewPlaying').textContent.includes('original WAV'),'original comparison plays pre-encoding source rather than MP3');reviewClips[0].audio=raw;
+ const level=reviewSourceStats(new Float32Array([.001,.001]));assert(Math.abs(level.rmsDbfs+60)<1e-5&&level.clippedSamples===0,'original levels are measured without amplification');const clipped=reviewSourceStats(new Float32Array([1,-1,NaN]));assert(clipped.clippedSamples===2&&clipped.nonFiniteSamples===1&&clipped.peakDbfs===0,'diagnostics identify clipping and invalid source samples');
+ for(let i=0;i<4;i++)rememberReviewOriginal({id:'bounded-'+i,audio:raw});assert(reviewOriginals.size===3&&!reviewOriginals.has('bounded-0'),'temporary original audio is bounded to three clips');
  await $('reviewExport').onclick();const archive=downloads.at(-1).text;
  assert(JSON.parse(archive).clips[0].audioBase64&&JSON.parse(archive).runs[0].frames[1].inputRmsDbfs===-25,'archive includes audio and original optimization data');
  await initializeReview();assert(reviewClips[0].label==='false positive','reload restores audio review classification');
@@ -114,6 +119,14 @@ const downloads=[];const download=(name,text,type)=>downloads.push({name,text,ty
  await $('reviewExport').onclick();assert(JSON.parse(downloads.at(-1).text).clips[0].label==='uncertain','archive retains unsaved edits when storage fails');
  const legacy=JSON.parse(archive);legacy.version=1;legacy.clips=legacy.clips.map(clip=>({...clip,id:'legacy',wavBase64:clip.audioBase64,audioBase64:undefined,audioMimeType:undefined}));legacy.runs=[];
  failWrites=false;$('reviewImport').files=[{text:async()=>JSON.stringify(legacy)}];await $('reviewImport').onchange();await reviewWrites;assert(reviewClips.find(clip=>clip.id==='legacy')?.audio.type==='audio/wav','previous WAV archives remain importable');
+
+ events=[{at:now(),type:'old'}];renderEventLog();clearEventLogDisplay();assert(events.length===1&&$('log').textContent==='','clearing display preserves diagnostic events');events.push({at:now(),type:'new'});renderEventLog();assert($('log').textContent.includes('new')&&!$('log').textContent.includes('old'),'new events do not restore hidden old entries');
+ const countBefore=reviewClips.length;await clearReviewHistory();assert(reviewClips.length===countBefore,'cancelled clear preserves reviews');
+ confirmClear=true;failWrites=true;await clearReviewHistory();assert(reviewClips.length===countBefore&&stored.size>0&&runStored.size>0,'failed clear keeps both memory and stored history');
+ failWrites=false;let release;const wait=new Promise(resolve=>release=resolve);const late=wait.then(()=>queueReviewSave(reviewClips[0]));compressionJobs.add(late);
+ const clearing=clearReviewHistory();await Promise.resolve();assert(reviewMaintenance,'clear locks review mutations while waiting for compression');release();await clearing;compressionJobs.delete(late);await reviewWrites;
+ assert(reviewClips.length===0&&reviewRuns.length===0&&stored.size===0&&runStored.size===0,'confirmed clear waits for late saves then clears both stores');
+ assert(reviewOriginals.size===0&&$('reviewCount').textContent==='0'&&!reviewMaintenance,'clear releases originals and updates UI');
  globalThis.testResult='PASS';
 })().catch(error=>{globalThis.testResult=String(error)+String(error.stack||'');});
 """)

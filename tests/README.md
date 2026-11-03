@@ -16,7 +16,7 @@ Python 3 runs JavaScript through Node when available, otherwise the macOS JavaSc
 | `test_recording_finalization.py` | Complete recovery module and recorder wiring: integrity/error/delay handling, fullest-copy retention, truthful status, confirmed discard with failure retention and current-player isolation |
 | `test_storage_persistence.py` | Grants/refusals/unsupported APIs, errors/timeouts and automatic Settings refresh |
 | `test_microphone_levels.py` | Passive RMS math, dial range/clamping, measured Q/N references, inactive/paused/unavailable states, separate buffers, visible-only polling and original microphone requests versus browser reports |
-| `test_wake_lab.py` | Standalone lab clip boundaries/grouping, WAV encoding, script parsing, review playback/labels, local storage, portable audio/run-log archives, MP3 worker wiring and encoding-failure retention |
+| `test_wake_lab.py` | Standalone lab clip boundaries/grouping, WAV encoding, script parsing, review playback/labels, local storage, portable audio/run-log archives, MP3 worker wiring/failure retention, original-audio comparison, playback blocking and safe history clearing |
 
 There are seven suites with fourteen test methods. `recording_test_support.py` contains the shared engine bridge, source extraction and recorder fixtures. Complete library/store/recovery modules and actual recorder wiring run in integration checks; direct component tests supply fake callbacks, DOM or IndexedDB services. Test suites do not import another suite. Each JavaScript evaluation has a fresh context. Individual files still run with `python3 tests/test_recording_storage.py`, for example.
 

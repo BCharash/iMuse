@@ -10,12 +10,12 @@
 <section class="panel"><h2>Results by sound condition</h2><div style="overflow-x:auto"><table><thead><tr><th>Condition</th><th>Frames</th><th>Peak raw</th><th>Triggers</th><th>Candidate crossings*</th><th>Miss marks</th><th>False marks</th></tr></thead><tbody id="summary"></tbody></table></div><p class="hint">*Candidate crossings count runs of two above-threshold raw scores, ignoring refractory timing; this is a comparison metric, not a predicted number of actual wake events. Results depend on microphone, distance and background sound.</p></section>
 <section class="panel"><h2>Audio review · <span id="reviewCount">0</span> clips</h2>
 <div class="grid"><div><label for="nearThreshold">Near-trigger score: <output id="nearThresholdValue">0.500</output></label><input id="nearThreshold" type="range" min="0.1" max="0.99" step="0.01" value="0.5"><p class="hint">Capture a score at or above this value, or any actual trigger. This does not change detection. Repeated nearby scores are grouped into one clip.</p></div><p class="hint">Clips contain 3 seconds before and 2 seconds after an event (up to 15 seconds when grouped). Press “Mark missed wake phrase” promptly for a miss that never reached the near-trigger score. Stop finishes pending clips with a short-ending label. New clips are encoded as mono 64 kbps MP3; if compression fails, their WAV safety copy is kept.</p></div>
-<div class="controls"><button id="reviewExport">Export review archive (audio + labels + run data)</button><label>Import review archive <input id="reviewImport" type="file" accept="application/json,.json"></label></div>
+<div class="controls"><button id="reviewExport">Export review archive (audio + labels + run data)</button><button id="reviewClear">Clear review history…</button><label>Import review archive <input id="reviewImport" type="file" accept="application/json,.json"></label></div>
 <p id="reviewStatus" class="note" role="status">Opening local clip storage…</p>
 <p class="hint">Trigger containing the intended phrase → true positive; unrelated trigger → false positive. Untriggered clip containing an intended phrase → false negative; otherwise true negative. A near trigger is not automatically a miss. Uncaptured low-score misses require a manual mark; this table alone cannot measure the total miss rate.</p>
-<p id="reviewPlaying" class="note"></p><audio id="reviewAudio" controls hidden preload="none"></audio>
+<p class="hint">Stop monitoring before playback. “Play original” compares the uncompressed microphone audio; temporary originals are kept for the three newest clips in this page only. RMS/peak values describe the original input, not MP3 playback.</p><p id="reviewPlaying" class="note"></p><audio id="reviewAudio" controls hidden preload="none"></audio>
 <div class="review-wrap"><table class="review-table"><thead><tr><th>Time</th><th>Phrase / condition</th><th>Event / duration</th><th>Peak / live threshold</th><th>Audio</th><th>Classification</th><th>Notes</th><th>Storage</th></tr></thead><tbody id="reviewRows"></tbody></table></div></section>
-<section class="panel"><h2>Event log</h2><pre id="log" class="log"></pre></section>
+<section class="panel"><h2>Event log</h2><button id="clearEventLog">Clear displayed log</button><p class="hint">Hides earlier entries here; keeps them in diagnostic exports.</p><pre id="log" class="log"></pre></section>
 <p class="note">For comparisons with iPhone behavior, match the model, threshold and microphone settings. This lab uses its own microphone capture and does not prove identical false-trigger rates across devices. Review audio is stored separately from iMuse recordings. Browser storage can be removed; export a review archive to preserve audio and labels.</p></main>
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script><script>
 
@@ -815,10 +815,63 @@ function collectReviewFrame(frame,end) {
 }
 function retainReviewClip(entry,pcm) {
  const trace=frames.filter(frame=>frame.audioEndSample>=entry.capturedStart&&frame.audioEndSample<=entry.capturedEnd).map(frame=>({...frame}));
- const clip={...entry,scoreTrace:trace,id:entry.id||`${runId}-${++clipSequence}`,audio:new Blob([wakeClipWav(pcm,entry.sampleRate)],{type:'audio/wav'}),saved:false};
- entry.id=clip.id;reviewClips.push(clip);appendReviewRow(clip);queueReviewSave(clip);if(pcm.length)compressReviewClip(clip,pcm);
+ const clip={...entry,sourceStats:reviewSourceStats(pcm),scoreTrace:trace,id:entry.id||`${runId}-${++clipSequence}`,audio:new Blob([wakeClipWav(pcm,entry.sampleRate)],{type:'audio/wav'}),saved:false};
+ entry.id=clip.id;reviewClips.push(clip);appendReviewRow(clip);rememberReviewOriginal(clip);queueReviewSave(clip);if(pcm.length)compressReviewClip(clip,pcm);
 }
 function finishReviewCapture() {if(clipBuffer)clipBuffer.flush(true);clipBuffer=null;}
+// BEGIN REVIEW MAINTENANCE
+const reviewOriginals=new Map();
+let reviewMaintenance=false,eventLogStart=0;
+function rememberReviewOriginal(clip) {
+ reviewOriginals.set(clip.id,clip.audio);
+ while(reviewOriginals.size>3)reviewOriginals.delete(reviewOriginals.keys().next().value);
+ for(const existing of reviewClips)updateReviewRow(existing);
+}
+function reviewSourceStats(pcm) {
+ let power=0,peak=0,clippedSamples=0,nonFiniteSamples=0;
+ for(const value of pcm){if(!Number.isFinite(value)){nonFiniteSamples++;continue;}const magnitude=Math.abs(value);power+=value*value;peak=Math.max(peak,magnitude);if(magnitude>=1)clippedSamples++;}
+ const count=pcm.length-nonFiniteSamples;
+ return {rmsDbfs:power>0&&count?10*Math.log10(power/count):null,peakDbfs:peak>0?20*Math.log10(peak):null,clippedSamples,nonFiniteSamples,sampleCount:pcm.length};
+}
+function playReviewAudio(clip,original=false) {
+ if(running){reviewStatus('Stop monitoring before playback so the microphone cannot hear the lab’s own clips.');return;}
+ const audio=original?(reviewOriginals.get(clip.id)||(clip.audio.type==='audio/wav'?clip.audio:null)):clip.audio;
+ if(!audio){reviewStatus('The temporary original is no longer available. Capture a new clip to compare.');return;}
+ if(reviewPlayerUrl)URL.revokeObjectURL(reviewPlayerUrl);reviewPlayerUrl=URL.createObjectURL(audio);
+ $('reviewAudio').src=reviewPlayerUrl;$('reviewAudio').hidden=false;
+ $('reviewPlaying').textContent=`${clip.phrase} · ${new Date(clip.at).toLocaleTimeString()} · ${original?'original WAV':reviewAudioExtension(clip).toUpperCase()} · event at ${(((clip.triggerSample??clip.eventSample)-clip.capturedStart)/clip.sampleRate).toFixed(1)} s in clip`;
+ $('reviewAudio').play().catch(error=>reviewStatus('Press the player’s Play control: '+error.message));
+}
+function updateReviewPlayback() {for(const clip of reviewClips)updateReviewRow(clip);}
+function renderEventLog() {
+ $('log').textContent=events.slice(eventLogStart).slice(-35).map(v=>`${v.at.slice(11,19)} ${v.type} ${JSON.stringify(Object.fromEntries(Object.entries(v).filter(([k])=>!['at','type','elapsedMs'].includes(k))))}`).join('\n');
+ $('log').scrollTop=$('log').scrollHeight;
+}
+function clearEventLogDisplay() {eventLogStart=events.length;renderEventLog();}
+async function clearReviewHistory() {
+ if(running||reviewMaintenance)return;
+ await reviewReady;if(running||reviewMaintenance)return;
+ if(!window.confirm('Delete all saved review audio, labels, notes and completed run logs from this lab? This cannot be undone. Export an archive first if you want to keep them. iMuse recordings are unaffected.'))return;
+ reviewMaintenance=true;$('reviewClear').disabled=true;$('reviewRows').inert=true;reviewStatus('Finishing pending saves before clearing review history…');
+ try {
+  await Promise.allSettled([...compressionJobs]);await reviewWrites;
+  if(clipDatabase)await new Promise((resolve,reject)=>{
+   const tx=clipDatabase.transaction(['clips','runs'],'readwrite');
+   tx.objectStore('clips').clear();tx.objectStore('runs').clear();
+   tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('Clear aborted'));
+  });
+  $('reviewAudio').pause?.();$('reviewAudio').removeAttribute?.('src');$('reviewAudio').load?.();$('reviewAudio').hidden=true;$('reviewPlaying').textContent='';
+  if(reviewPlayerUrl)URL.revokeObjectURL(reviewPlayerUrl);reviewPlayerUrl=null;
+  reviewClips=[];reviewRuns=[];reviewOriginals.clear();frames=[];events=[];marks=[];eventLogStart=0;currentRunInfo=null;runId='';started=null;ended=null;device=null;$('last').textContent='No detections yet.';
+  renderReview();renderEventLog();render();
+  reviewStatus(clipDatabase?'Review history cleared.':'Loaded review history cleared from memory. Browser storage is unavailable; older stored data could not be checked or cleared.');
+ }catch(error){reviewStatus('Could not clear review history; loaded clips were kept. '+error.message);}
+ finally{reviewMaintenance=false;$('reviewClear').disabled=false;$('reviewRows').inert=false;}
+}
+$('reviewClear').onclick=clearReviewHistory;
+$('clearEventLog').onclick=clearEventLogDisplay;
+// END REVIEW MAINTENANCE
+
 function reviewCell(row,text) {const cell=document.createElement('td');if(text!==undefined)cell.textContent=text;row.append(cell);return cell;}
 function appendReviewRow(clip) {
  const row=document.createElement('tr');
@@ -827,11 +880,9 @@ function appendReviewRow(clip) {
  const detail=reviewCell(row,'');
  const score=reviewCell(row,`${fmt(clip.prob)} / ${fmt(clip.threshold)}`);
  const audioCell=reviewCell(row),play=document.createElement('button');play.textContent='▶ Play';
- play.onclick=()=>{if(reviewPlayerUrl)URL.revokeObjectURL(reviewPlayerUrl);reviewPlayerUrl=URL.createObjectURL(clip.audio);
-  $('reviewAudio').src=reviewPlayerUrl;$('reviewAudio').hidden=false;
-  $('reviewPlaying').textContent=`${clip.phrase} · ${new Date(clip.at).toLocaleTimeString()} · event at ${(((clip.triggerSample??clip.eventSample)-clip.capturedStart)/clip.sampleRate).toFixed(1)} s in clip`;
-  $('reviewAudio').play().catch(error=>reviewStatus('Press the player’s Play control: '+error.message));};
- play.disabled=clip.duration<=0;const save=document.createElement('button');save.textContent='↓ Audio';save.onclick=()=>download(clip.id+'.'+reviewAudioExtension(clip),clip.audio,clip.audio.type);audioCell.append(play,save);
+ play.onclick=()=>playReviewAudio(clip);
+ const originalPlay=document.createElement('button');originalPlay.textContent='Play original';originalPlay.title='Original WAV for the three most recent clips from this page; not added to the archive';originalPlay.onclick=()=>playReviewAudio(clip,true);
+ play.disabled=clip.duration<=0;const save=document.createElement('button');save.textContent='↓ Audio';save.onclick=()=>download(clip.id+'.'+reviewAudioExtension(clip),clip.audio,clip.audio.type);audioCell.append(play,save,originalPlay);
  const labelCell=reviewCell(row),label=document.createElement('select');
  const choices=clip.triggered?['unreviewed','true positive','false positive','uncertain']:['unreviewed','false negative','true negative','uncertain'];
  for(const value of choices)label.add(new Option(value,value));label.value=choices.includes(clip.label)?clip.label:'unreviewed';
@@ -840,11 +891,13 @@ function appendReviewRow(clip) {
  const noteCell=reviewCell(row),note=document.createElement('input');note.type='text';note.value=clip.notes||'';note.placeholder='What was actually said?';note.setAttribute('aria-label','Review notes');note.maxLength=2000;
  note.onchange=()=>{clip.notes=note.value;queueReviewSave(clip);};noteCell.append(note);
  const state=reviewCell(row);
- reviewRowElements.set(clip.id,{row,detail,state,score});$('reviewRows').prepend(row);updateReviewRow(clip);
+ reviewRowElements.set(clip.id,{row,detail,state,score,play,originalPlay});$('reviewRows').prepend(row);updateReviewRow(clip);
 }
 function updateReviewRow(clip) {
  const elements=reviewRowElements.get(clip.id);if(!elements)return;
  elements.detail.textContent=`${clip.kind} · ${clip.duration.toFixed(1)} s${clip.shortPreRoll?' · short beginning':''}${clip.shortPostRoll?' · short ending':''}`;
+ elements.play.disabled=running||clip.duration<=0;elements.originalPlay.disabled=running||clip.duration<=0||(!reviewOriginals.has(clip.id)&&clip.audio.type!=='audio/wav');
+ const level=clip.sourceStats;elements.score.textContent=`${fmt(clip.prob)} / ${fmt(clip.threshold)}`+(level?` · RMS ${Number.isFinite(level.rmsDbfs)?level.rmsDbfs.toFixed(1):'−∞'} dBFS · peak ${Number.isFinite(level.peakDbfs)?level.peakDbfs.toFixed(1):'−∞'} dBFS`:'');
  elements.state.textContent=(clip.saved?'Saved locally':'Memory / saving')+' · '+(clip.encoding?'compressing':reviewAudioExtension(clip).toUpperCase())+' · '+(clip.audio.size/1024).toFixed(1)+' KB';
  $('reviewCount').textContent=String(reviewClips.length);
 }
@@ -869,17 +922,20 @@ async function blobBase64(blob) {
  for(let offset=0;offset<bytes.length;offset+=32768)binary+=String.fromCharCode(...bytes.subarray(offset,offset+32768));return btoa(binary);
 }
 $('reviewExport').onclick=async()=>{
+ if(reviewMaintenance)return;
  if(running){reviewStatus('Stop monitoring before exporting the complete archive.');return;}
- $('reviewExport').disabled=true;
- try {reviewStatus('Finishing audio compression and preparing the archive…');await Promise.allSettled([...compressionJobs]);const clips=[];for(const clip of reviewClips){const {audio,saved,encoding,...metadata}=clip;clips.push({...metadata,audioMimeType:audio.type,audioBase64:await blobBase64(audio)});}
+ $('reviewExport').disabled=true;reviewMaintenance=true;$('reviewClear').disabled=true;
+ try {await reviewReady;reviewStatus('Finishing audio compression and preparing the archive…');await Promise.allSettled([...compressionJobs]);const clips=[];for(const clip of reviewClips){const {audio,saved,encoding,...metadata}=clip;clips.push({...metadata,audioMimeType:audio.type,audioBase64:await blobBase64(audio)});}
  download('WakeLab-review-'+new Date().toISOString().replaceAll(':','-')+'.json',JSON.stringify({format:'imuse-wake-review',version:2,exportedAt:now(),clips,runs:reviewRuns}),'application/json');
  reviewStatus('Review archive prepared with audio, labels, notes and run logs. Keep it outside browser storage.');
- }catch(error){reviewStatus('Archive export failed: '+error.message);}finally{$('reviewExport').disabled=false;}
+ }catch(error){reviewStatus('Archive export failed: '+error.message);}finally{$('reviewExport').disabled=false;reviewMaintenance=false;$('reviewClear').disabled=false;}
 };
 $('reviewImport').onchange=async()=>{
  const file=$('reviewImport').files[0];if(!file)return;
+ if(reviewMaintenance){reviewStatus('Wait for the current review operation to finish.');$('reviewImport').value='';return;}
  try {
   if(running)throw Error('Stop monitoring before importing');
+  reviewMaintenance=true;$('reviewClear').disabled=true;await reviewReady;
   const archive=JSON.parse(await file.text());
   if(archive.format!=='imuse-wake-review'||![1,2].includes(archive.version)||!Array.isArray(archive.clips))throw Error('Not a supported review archive');
   const imported=archive.clips.map(item=>{
@@ -894,7 +950,7 @@ $('reviewImport').onchange=async()=>{
   let count=0;for(const clip of imported){if(reviewClips.some(existing=>existing.id===clip.id))continue;reviewClips.push(clip);appendReviewRow(clip);queueReviewSave(clip);count++;}
   for(const run of archive.runs||[]){if(typeof run.id!=='string'||!Array.isArray(run.frames)||reviewRuns.some(existing=>existing.id===run.id))continue;reviewRuns.push(run);const copy=run;reviewWrites=reviewWrites.then(()=>new Promise((resolve,reject)=>{if(!clipDatabase){reject(Error('Browser storage unavailable'));return;}const tx=clipDatabase.transaction('runs','readwrite');tx.objectStore('runs').put(copy);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('Run import aborted'));})).catch(error=>reviewStatus('Imported run diagnostics are only in memory: '+error.message));}
   reviewStatus(`Imported ${count} clips. Existing clip IDs and their review labels were kept.`);
- }catch(error){reviewStatus('Import failed: '+error.message);}finally{$('reviewImport').value='';}
+ }catch(error){reviewStatus('Import failed: '+error.message);}finally{$('reviewImport').value='';reviewMaintenance=false;$('reviewClear').disabled=false;}
 };
 const reviewReady=initializeReview();
 window.addEventListener('pagehide',()=>{if(reviewPlayerUrl)URL.revokeObjectURL(reviewPlayerUrl);});
@@ -918,7 +974,7 @@ async function updateProcessingLive(){
 for(const id of Object.keys(processingKeys))$(id).addEventListener('change',()=>{processingChange=processingChange.then(updateProcessingLive).catch(error=>event('microphone-processing-error',{error:String(error)}));processingStatus('Applying change');});
 processingStatus();
 const now=()=>new Date().toISOString();const fmt=x=>Number.isFinite(x)?x.toFixed(3):'—';
-function event(type,extra={}){const e={at:now(),elapsedMs:started?Math.round(performance.now()-started):null,type,...extra};events.push(e);$('log').textContent=events.slice(-35).map(v=>`${v.at.slice(11,19)} ${v.type} ${JSON.stringify(Object.fromEntries(Object.entries(v).filter(([k])=>!['at','type','elapsedMs'].includes(k))))}`).join('\n');$('log').scrollTop=$('log').scrollHeight;}
+function event(type,extra={}){const e={at:now(),elapsedMs:started?Math.round(performance.now()-started):null,type,...extra};events.push(e);renderEventLog();}
 async function refresh(){try{const d=await navigator.mediaDevices.enumerateDevices();const prior=$('mic').value;$('mic').replaceChildren(new Option('System default',''));for(const item of d.filter(x=>x.kind==='audioinput'))$('mic').add(new Option(item.label||`Microphone ${$('mic').length}`,item.deviceId));$('mic').value=prior;}catch(e){$('state').textContent='Microphone enumeration: '+e.message;}}
 $('refresh').onclick=async()=>{try{const s=await navigator.mediaDevices.getUserMedia({audio:true});s.getTracks().forEach(t=>t.stop());await refresh()}catch(e){$('state').textContent=e.message;}};void refresh();
 $('condition').onchange=()=>event('condition-changed',{condition:$('condition').value});
@@ -959,7 +1015,7 @@ async function processVoicute(id){if(voicuteBusy||!running||id!==token||!voicute
  frames.push(f);collectReviewFrame(f,audioEnd);if(detected){event('voicute-trigger',{condition:f.condition,raw,word:r.word,detected});$('last').textContent=`Last trigger: ${new Date().toLocaleTimeString()} · ${names[f.condition]} · raw ${fmt(raw)}`}
  if(frames.length%5===0||detected)render();
  }catch(e){event('voicute-inference-error',{error:String(e)});}finally{voicuteBusy=false}}
-async function start(){await reviewReady;if(running)return;const id=++token;running=true;engineName=$('engine').value;started=performance.now();ended=null;currentRunInfo=null;frames=[];events=[];marks=[];pending=0;queue=Promise.resolve();$('start').disabled=true;$('stop').disabled=false;$('reviewExport').disabled=true;$('reviewImport').disabled=true;runId=globalThis.crypto?.randomUUID?.()||Date.now()+'-'+Math.random().toString(36).slice(2);clipSequence=0;$('engine').disabled=true;$('mic').disabled=$('refresh').disabled=true;$('export').disabled=$('csv').disabled=false;$('state').textContent='Loading '+engineName+' model…';$('log').textContent='';$('last').textContent='No detections yet.';render();try{
+async function start(){await reviewReady;if(running||reviewMaintenance)return;const id=++token;running=true;engineName=$('engine').value;started=performance.now();ended=null;currentRunInfo=null;frames=[];events=[];marks=[];eventLogStart=0;pending=0;queue=Promise.resolve();$('start').disabled=true;$('stop').disabled=false;$('reviewClear').disabled=true;updateReviewPlayback();$('reviewAudio').pause?.();$('reviewExport').disabled=true;$('reviewImport').disabled=true;runId=globalThis.crypto?.randomUUID?.()||Date.now()+'-'+Math.random().toString(36).slice(2);clipSequence=0;$('engine').disabled=true;$('mic').disabled=$('refresh').disabled=true;$('export').disabled=$('csv').disabled=false;$('state').textContent='Loading '+engineName+' model…';$('log').textContent='';$('last').textContent='No detections yet.';render();try{
  if(!window.ort)throw Error('ONNX Runtime Web did not load; check internet access.');
  if(engineName==='heed'){
   const meta=HEED_METADATA;const binary=atob(HEED_MODEL_BASE64),bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
@@ -982,7 +1038,7 @@ async function start(){await reviewReady;if(running)return;const id=++token;runn
  };
  await context.resume();event('monitoring-started',{phrase:engineName==='heed'?'Hey Doc':'Hey Friday',threshold:Number($('threshold').value),sampleRate:context.sampleRate,engine:engineName});$('state').textContent='Monitoring '+engineName+'. Change sound condition as needed; Stop to finish.';await refresh();
  }catch(e){event('startup-error',{error:e.stack||String(e)});$('state').textContent='Error: '+e.message;await stop();}}
-async function stop(){if(!running&&!stream&&!context)return;running=false;token++;ended=now();if(currentRunInfo&&clipBuffer){currentRunInfo.capturedSamples=clipBuffer.cursor;currentRunInfo.capturedAudioSeconds=clipBuffer.cursor/clipBuffer.rate;currentRunInfo.wallSeconds=(Date.parse(ended)-Date.parse(currentRunInfo.captureStartedAt))/1000;}finishReviewCapture();try{worklet?.disconnect();source?.disconnect();silentGain?.disconnect();}catch{}try{await context?.close()}catch{}stream?.getTracks().forEach(t=>t.stop());worklet=source=silentGain=context=stream=null;detector=null;session=null;voicute=null;ring=null;voicuteBusy=false;$('start').disabled=false;$('stop').disabled=true;$('mic').disabled=$('refresh').disabled=$('engine').disabled=false;event('monitoring-stopped',{frames:frames.length,triggers:frames.filter(f=>f.triggered).length});persistReviewRun();$('reviewExport').disabled=false;$('reviewImport').disabled=false;$('state').textContent=`Stopped. ${frames.length} score frames captured; export scores before restarting. Review clips are kept.`;processingStatus();render();}
+async function stop(){if(!running&&!stream&&!context)return;running=false;token++;ended=now();if(currentRunInfo&&clipBuffer){currentRunInfo.capturedSamples=clipBuffer.cursor;currentRunInfo.capturedAudioSeconds=clipBuffer.cursor/clipBuffer.rate;currentRunInfo.wallSeconds=(Date.parse(ended)-Date.parse(currentRunInfo.captureStartedAt))/1000;}finishReviewCapture();try{worklet?.disconnect();source?.disconnect();silentGain?.disconnect();}catch{}try{await context?.close()}catch{}stream?.getTracks().forEach(t=>t.stop());worklet=source=silentGain=context=stream=null;detector=null;session=null;voicute=null;ring=null;voicuteBusy=false;$('start').disabled=false;$('stop').disabled=true;$('mic').disabled=$('refresh').disabled=$('engine').disabled=false;event('monitoring-stopped',{frames:frames.length,triggers:frames.filter(f=>f.triggered).length});persistReviewRun();$('reviewClear').disabled=false;updateReviewPlayback();$('reviewExport').disabled=false;$('reviewImport').disabled=false;$('state').textContent=`Stopped. ${frames.length} score frames captured; export scores before restarting. Review clips are kept.`;processingStatus();render();}
 $('start').onclick=start;$('stop').onclick=stop;
 function download(filename,text,type){const blob=new Blob([text],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);}
 $('export').onclick=()=>download('WakeLab-'+engineName+'-diagnostics.json',JSON.stringify({lab:'Dual Wake-Word Reliability Lab',exportedAt:now(),startedAt:events.find(e=>e.type==='monitoring-started')?.at??null,endedAt:ended,ongoing:running,runId,reviewClipCount:reviewClips.filter(clip=>clip.runId===runId).length,model:engineName,userAgent:navigator.userAgent,device,liveThreshold:Number($('threshold').value),analysisThreshold:Number($('analysisThreshold').value),frames,events,marks},null,2),'application/json');
