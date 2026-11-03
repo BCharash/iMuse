@@ -114,3 +114,23 @@ The iOS 27 volunteer comparison may take several days. The next recommended diag
 Safari Web Inspector can also inspect installed Home Screen apps ([WebKit instructions](https://webkit.org/web-inspector/enabling-web-inspector/)), but any debugger-attached result must be checked against an unattached control because inspection can change execution conditions. Prefer device-system logging first.
 
 A remaining configuration gap is whether the installed lab reproduction used a genuinely minimal profile with no Web Audio and no cue playback, rather than just Audio commands off. Establish that before proposing a new capture-only comparison; do not repeat the already-passed Safari-tab matrix. Foreground recovery/truthful session completion can be developed on the working browser route while the OS investigation remains unresolved, without promising that it restores missing background audio.
+
+## Minimal installed capture lab — new focused test
+
+The corrected direct-tap activation was accepted and cleared successfully in both installed iPhone iMuse and Safari-tab tests, per the user, but did not prevent standalone background loss or the double beep. Safari-tab background speech survived. That accepted-activation experiment was reverted (`2ae6f9c`, revert `0502fa3`). Automatic / Play and record likewise showed no benefit and was reverted. Do not repeat these approaches without new evidence.
+
+The user has no USB-C-to-Lightning cable available, so Mac-connected device logging is deferred. An iOS 27 volunteer test may take several days. Because the preset used for the installed older lab was not established, the user authorized a new focused test at **[lab.html](../lab.html)** with **[lab.webmanifest](../lab.webmanifest)**. The earlier broad labs remain removed; this is a new, intentionally minimal page.
+
+The lab calls only getUserMedia({audio:true}) and MediaRecorder with a requested 250 ms interval, preferring supported MP4/AAC. It leaves microphone processing to browser defaults and records actual settings. It has no production imports, Web Audio, cue playback, inference, silence handling, wake lock, database access, Media Session declaration, audio-session override, background resume or reacquisition. Visibility events only log observations. Audio chunks stay in memory; playback is created after recorder stop. One run per page load prevents an earlier playback element from influencing the next capture. No recurring UI polling timer runs during capture.
+
+The distinct manifest ID and start URL name the installed app **iMuse Mic Lab** and launch lab.html. Production manifest and recordings are unchanged. There is no service worker or offline-loading promise. Host the page/manifest at the repository root over HTTPS with the existing icon assets.
+
+Procedure:
+
+1. In Safari open lab.html and run one control. Speak before, switch to the same other app for about 20 seconds and speak background, return and speak after. Stop and listen. Choose observations; download audio and JSON before leaving.
+2. Add lab.html to Home Screen, then launch **iMuse Mic Lab**. Confirm its heading says **Minimal Mic Lab · revision 1** and its mode says **Standalone**; otherwise this is not the installed-host test.
+3. Repeat the identical spoken markers and switch. Stop, inspect playback, record beep/indicator/speech outcome, then download both files. Retain JSON until reviewed. Reload between runs; the page keeps no durable recording storage.
+
+Success requires actual background speech in playback. If this capture-only installed page fails while its Safari control succeeds, the remaining evidence points more directly toward the standalone host path without the removed audio subsystems. It does not identify the exact OS implementation or prove all possible workarounds impossible.
+
+Syntax, manifest identity/start URL/assets and mocked direct capture/visibility/stop checks passed, including the final data chunk, absence of playback elements during capture, single acquisition and no visibility-driven recorder changes. Real iPhone result is pending.

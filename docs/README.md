@@ -13,7 +13,7 @@ Updated 3 November 2026. Start here; current findings take precedence over older
 
 ## Current checkpoint
 
-The interruption-warning playback, warning setting, WAV, and temporary background labs have been removed. On the user's iPhone, Safari-tab recording succeeds without the warning, whereas installed iMuse and an installed lab lose background capture with an external double beep. MacBook browser and installed-app tests succeed. No iPhone standalone workaround is established. Device tests and code inspection are recorded separately in the investigation.
+The interruption-warning playback, warning setting, WAV, and temporary background labs have been removed. On the user's iPhone, Safari-tab recording succeeds without the warning, whereas installed iMuse and an installed lab lose background capture with an external double beep. MacBook browser and installed-app tests succeed. No iPhone standalone workaround is established. The accepted direct-tap declaration did not help and was reverted. A new focused [minimal capture lab](../lab.html), separately installable as iMuse Mic Lab, is ready for browser/standalone comparison; see the investigation for instructions. The user prefers completing web development before native work. Device tests and code inspection are recorded separately.
 
 ## Document maintenance
 

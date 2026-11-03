@@ -1414,3 +1414,14 @@ Earlier flight-recorder instrumentation produced startup lockups and was reverte
 The next proposed step is a bounded iPhone standalone audio-session investigation, with actual background speech as the success criterion and a stopping point if the host continues interrupting capture. An explicit Audio Session intent is an untested candidate, not a validated workaround. Recovery/truthful completion status is separate from uninterrupted capture; native recording is a conditional feasibility decision, not a migration already approved or begun.
 
 The [documentation index](README.md) now names the authoritative current files. The [recording investigation](recording-investigation.md) consolidates the handoff, lab evidence and remaining architecture questions. The [active roadmap](iMuse%20next%20steps.md) owns priorities; Memora and Swift documents retain distinct integration/proposal roles. The old stabilization review, November 2 handoff and detailed November 1 roadmap moved into Archive. The redundant lab-design file was removed after its evidence was incorporated. Earlier entries remain intact as history, not instructions to repeat completed experiments or restore retired controls.
+
+
+---
+
+# DJ012 — Minimal Installed Recorder Control
+
+**Date:** 3 November 2026. **Status:** New lab implemented at the user's request; real-device result pending.
+
+Both explicit audio-session type selection and the corrected direct-tap microphone activation failed to improve installed-iPhone background capture. The latter was accepted and cleanup succeeded, but installed mode still beeped and lost capture; Safari-tab capture succeeded. Both experiment commits were reverted. No production test setting/button is retained.
+
+The user lacks a suitable cable for Mac device logging and may wait days for an iOS 27 volunteer test. They authorized lab.html, a new minimal microphone → MediaRecorder page with a dedicated manifest ID/start URL and **iMuse Mic Lab** Home Screen title. It excludes Web Audio, cues, models, silence actions, wake lock, storage writes and audio-session controls. A visible host-mode label distinguishes Safari from Standalone. Audio/JSON are downloadable after a short spoken-marker test; no production recording storage is accessed. Static/mocked tests passed; the actual installed-device comparison is not yet reported. See the [investigation](recording-investigation.md#minimal-installed-capture-lab--new-focused-test).

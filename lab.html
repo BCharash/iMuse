@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="iMuse Mic Lab">
+<meta name="theme-color" content="#07145C">
+<link rel="manifest" href="./lab.webmanifest">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<title>iMuse Minimal Mic Lab</title>
+<style>
+:root{font-family:system-ui;color-scheme:light dark}body{max-width:720px;margin:auto;padding:20px;line-height:1.5}button,select{font:inherit;padding:10px;margin:5px 4px 5px 0}section{border:1px solid #8888;border-radius:10px;padding:14px;margin:18px 0}#mode,#status{font-weight:700}audio{display:block;max-width:100%;margin:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:280px;overflow:auto}label{display:block;margin:10px 0}
+</style>
+</head>
+<body>
+<h1>Minimal Mic Lab · revision 1</h1>
+<p id="mode">Checking launch mode…</p>
+<p>Microphone → MediaRecorder only. No Web Audio, voice models, cues, silence detection, wake lock, storage writes, or audio-session overrides. The browser chooses microphone processing.</p>
+<ol>
+<li>Open this URL in Safari and record one control run.</li>
+<li>Add this page to the Home Screen as <strong>iMuse Mic Lab</strong>, then launch that icon. Confirm the mode below says <strong>Standalone</strong> before testing again.</li>
+<li>For each run: say “before”, switch to the same other app for about 20 seconds and say “background”, return and say “after”. Stop and listen for all three.</li>
+</ol>
+<p>One short run per page load. Audio stays in memory; download audio and diagnostics before closing or reloading. This lab does not access iMuse recordings. It needs HTTPS or localhost and an internet connection to load.</p>
+<section>
+<p id="status" role="status">Ready</p>
+<p id="metrics">No recording yet.</p>
+<button id="start" type="button">Start</button>
+<button id="stop" type="button" disabled>Stop and save</button>
+<button id="snapshot" type="button" disabled>Show current status</button>
+<button id="export" type="button" disabled>Download diagnostics</button>
+<p id="instruction">After starting, switch apps without playing any other audio.</p>
+</section>
+<section>
+<h2>Result</h2>
+<div id="playback">Playback is created only after capture stops.</div>
+<label>External double beep <select id="beep"><option value="unknown">Not recorded</option><option value="yes">Heard beep</option><option value="no">No beep</option></select></label>
+<label>Microphone indicator while away <select id="indicator"><option value="unknown">Not recorded</option><option value="on">Stayed on</option><option value="off">Went off</option></select></label>
+<label>Saved speech <select id="outcome"><option value="unreviewed">Not reviewed</option><option value="all">Before, background and after all present</option><option value="background-missing">Background missing; after present</option><option value="before-only">Only before present</option><option value="other">Other / uncertain</option></select></label>
+<p>Choose results after listening, then download diagnostics. A recording state or chunk count alone does not establish that background speech was captured.</p>
+</section>
+<details><summary>Recent events</summary><pre id="events">No events yet.</pre></details>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+$('mode').textContent = standalone ? 'Mode: Standalone — installed Home Screen app' : 'Mode: Browser tab — not the installed-app test';
+const report = {
+  labRevision: 1, id: crypto.randomUUID?.() || String(Date.now()), createdAt: new Date().toISOString(),
+  environment: {userAgent:navigator.userAgent, standalone, secureContext:isSecureContext, url:location.href},
+  constraints: {audio:true}, timesliceMs:250, received:0, bytes:0, droppedEvents:0, events:[]
+};
+let stream = null, track = null, recorder = null, chunks = [], startBusy = false;
+let hasStarted = false, finished = false, stopRequested = false, stopTimer = null, lastChunkAt = null;
+const origin = performance.now();
+function log(type, details = {}) {
+  report.events.push({at:new Date().toISOString(), elapsedMs:Math.round(performance.now()-origin), type,
+    visibility:document.visibilityState, recorder:recorder?.state ?? null,
+    track:track?.readyState ?? null, muted:track?.muted ?? null, ...details});
+  if (report.events.length > 2000) {report.events.shift();report.droppedEvents++;}
+}
+function render() {
+  $('metrics').textContent = `Recorder: ${recorder?.state || 'none'} · Track: ${track?.readyState || 'none'} · Muted: ${track?.muted ?? 'unknown'} · Chunks: ${report.received} · Bytes: ${report.bytes}`;
+  $('events').textContent = report.events.slice(-30).map(e=>JSON.stringify(e)).join('\n');
+}
+function captureSnapshot(reason) {
+  log('snapshot',{reason, received:report.received, bytes:report.bytes,
+    lastChunkAgeMs:lastChunkAt == null ? null : Math.round(performance.now()-lastChunkAt), enabled:track?.enabled ?? null});
+}
+function createRecorder(input) {
+  for (const mime of ['audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/webm;codecs=opus','audio/webm']) {
+    if (!MediaRecorder.isTypeSupported(mime)) continue;
+    try {return new MediaRecorder(input,{mimeType:mime});}
+    catch(error){log('format-fallback',{mime,error:String(error)});}
+  }
+  return new MediaRecorder(input);
+}
+function releaseTracks() {stream?.getTracks().forEach(t=>t.stop());}
+function saveResult() {
+  if (finished) return;
+  finished = true; clearTimeout(stopTimer); stopTimer = null;
+  report.endedAt = new Date().toISOString();
+  report.stopReason = stopRequested ? 'user-stop' : 'unexpected-stop';
+  releaseTracks();
+  const blob = new Blob(chunks,{type:report.mimeType || chunks.find(c=>c.type)?.type || ''});
+  chunks = [];
+  report.savedBytes = blob.size;
+  log('saved',{bytes:blob.size,stopReason:report.stopReason});
+  const player = document.createElement('audio'); player.controls = true;
+  const url = URL.createObjectURL(blob); player.src = url;
+  const download = document.createElement('a');download.href = url;
+  const ext = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('webm') ? 'webm' : 'audio';
+  download.download = `minimal-mic-${report.id}.${ext}`;download.textContent = 'Download recorded audio';
+  $('playback').replaceChildren(player,download);
+  $('status').textContent = blob.size ? `Stopped (${report.stopReason}). Listen for before/background/after.` : 'Stopped without saved audio. Download diagnostics.';
+  $('stop').disabled = true; $('snapshot').disabled = true;
+  $('instruction').textContent = 'Download the audio and diagnostics, then reload for another run.';
+  render();
+}
+$('start').addEventListener('click',async()=>{
+  if (startBusy || hasStarted) return;
+  startBusy = true; $('start').disabled = true;
+  $('status').textContent = 'Requesting microphone…';
+  try {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw Error('Use a supported browser over HTTPS or localhost.');
+    log('microphone-request');
+    stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    track = stream.getAudioTracks()[0];
+    if (!track || track.readyState !== 'live') throw Error('No live microphone acquired.');
+    report.microphone = {label:track.label, settings:track.getSettings?.(), constraints:track.getConstraints?.()};
+    for (const type of ['mute','unmute','ended']) track.addEventListener(type,()=>{log(`track-${type}`);render();});
+    recorder = createRecorder(stream);report.mimeType = recorder.mimeType;
+    recorder.addEventListener('dataavailable',e=>{
+      if (!e.data?.size) {log('empty-chunk');return;}
+      const sequence = report.received++;report.bytes += e.data.size;
+      lastChunkAt = performance.now();chunks.push(e.data);
+      log('chunk',{sequence,bytes:e.data.size});
+      // No persistent UI timer or background analysis loop.
+      if (document.visibilityState === 'visible') $('metrics').textContent = `Recorder: ${recorder.state} · Chunks: ${report.received} · Bytes: ${report.bytes}`;
+    });
+    for (const type of ['start','pause','resume','error']) recorder.addEventListener(type,e=>{
+      log(`recorder-${type}`,e.error ? {error:String(e.error)} : {});
+      if (type==='error') $('status').textContent = 'Recorder error. Keep this page open and download diagnostics.';
+    });
+    recorder.addEventListener('stop',()=>{log('recorder-stop');saveResult();});
+    recorder.start(250);
+    hasStarted = true;
+    $('stop').disabled = false; $('snapshot').disabled = false; $('export').disabled = false;
+    $('status').textContent = 'Recording. Say “before”, switch apps and say “background”, return and say “after”.';
+    log('capture-started',{mimeType:report.mimeType});render();
+  } catch(error) {
+    log('start-error',{error:String(error)});releaseTracks();
+    $('status').textContent = `Start failed: ${error.message}`;
+    $('export').disabled = false; $('instruction').textContent = 'Download diagnostics, then reload before trying again.';
+  } finally {startBusy = false;}
+});
+$('stop').addEventListener('click',()=>{
+  if (!recorder || finished) return;
+  stopRequested = true;log('stop-request');$('stop').disabled = true;
+  $('status').textContent = 'Waiting for final recorder data…';
+  stopTimer = setTimeout(()=>{
+    if (finished) return;
+    log('stop-timeout');$('status').textContent = 'Stop has not completed. Keep this page open and download diagnostics; received audio is still retained.';
+    render();
+  },8000);
+  try {
+    if (recorder.state !== 'inactive') recorder.stop();
+    else log('awaiting-recorder-stop-event');
+  } catch(error) {
+    clearTimeout(stopTimer);log('stop-error',{error:String(error)});
+    $('status').textContent = `Stop failed: ${error.message}. Keep this page open and download diagnostics.`;render();
+  }
+});
+$('snapshot').addEventListener('click',()=>{captureSnapshot('manual');render();});
+$('export').addEventListener('click',()=>{
+  captureSnapshot('export');
+  const observations={beep:$('beep').value,indicator:$('indicator').value,outcome:$('outcome').value};
+  const blob = new Blob([JSON.stringify({...report,observations},null,2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob),link = document.createElement('a');
+  link.href=url;link.download=`minimal-mic-${report.id}.json`;document.body.append(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);render();
+});
+document.addEventListener('visibilitychange',()=>{captureSnapshot('visibilitychange');render();});
+for (const type of ['pagehide','pageshow']) window.addEventListener(type,()=>log(type));
+log('lab-ready');render();
+</script>
+</body>
+</html>
