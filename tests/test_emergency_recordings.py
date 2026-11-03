@@ -103,6 +103,7 @@ const URL = {createObjectURL: () => 'blob:test', revokeObjectURL: url => revoked
 let recordingUrl = null, displayedSessionId = null, activeSession = null, db = null;
 let emergencyPanel = null, lastRecordingPeakBytes = 0, startRequest = 0;
 const emergencyRecordings = new Map(), downloads = [], disk = new Map();
+let preservationTestEnabled = false, preservationTestResult = null;
 let downloadFails = false, storageReadable = true;
 let reads = 0, writes = 0;
 async function getSession() { reads++; throw Error('must not read partial stored session'); }

@@ -82,6 +82,63 @@ let lastRecordingPeakBytes = 0;
 // These references survive playback changes, but cannot survive a page closure.
 const emergencyRecordings = new Map();
 let emergencyPanel = null;
+// Deliberately session-only: enabling a test must not affect a later page load.
+let preservationTestEnabled = false;
+let preservationTestButton = null;
+let preservationTestResult = null;
+
+function updatePreservationTestControls() {
+    if (!preservationTestButton) return;
+    const current = activeSession;
+    preservationTestButton.disabled = !preservationTestEnabled ||
+        !current || current.recorder.state !== "recording" ||
+        !current.metadata.chunkCount || current.persistenceError ||
+        current.simulateNextChunkFailure || current.simulatedStorageFailure || current.stopHandled;
+}
+
+function initializePreservationTest() {
+    const panel = document.createElement("details");
+    const heading = document.createElement("summary");
+    heading.textContent = "Recording preservation test";
+    const note = document.createElement("p");
+    note.textContent = "Use a disposable recording. This test stops it by simulating a storage-write failure, retaining unsaved audio in this open page. Existing recordings are unchanged. Keep the page open until you download the emergency audio.";
+    const label = document.createElement("label");
+    const enable = document.createElement("input");
+    enable.type = "checkbox";
+    label.append(enable, document.createTextNode(" Enable failure testing for this page"));
+    preservationTestButton = document.createElement("button");
+    preservationTestButton.type = "button";
+    preservationTestButton.textContent = "Simulate storage failure";
+    preservationTestResult = document.createElement("p");
+    preservationTestResult.setAttribute("role", "status");
+    enable.addEventListener("change", () => {
+        preservationTestEnabled = enable.checked;
+        if (!enable.checked && activeSession) activeSession.simulateNextChunkFailure = false;
+        preservationTestResult.textContent = enable.checked
+            ? "Ready. Start a test recording and speak for several seconds. The test button becomes available after audio is saved."
+            : "Failure testing disabled.";
+        updatePreservationTestControls();
+    });
+    preservationTestButton.addEventListener("click", () => {
+        updatePreservationTestControls();
+        if (preservationTestButton.disabled) return;
+        const current = activeSession;
+        current.simulateNextChunkFailure = true;
+        preservationTestResult.textContent = "Failure armed for this recording's next audio write. Keep speaking until recording stops.";
+        updatePreservationTestControls();
+        try {
+            // Flush recent audio rather than wait indefinitely for a timeslice.
+            current.recorder.requestData();
+        } catch (error) {
+            current.simulateNextChunkFailure = false;
+            preservationTestResult.textContent = `Could not request test audio: ${error.message || error}. No failure was injected.`;
+            updatePreservationTestControls();
+        }
+    });
+    panel.append(heading, note, label, preservationTestButton, preservationTestResult);
+    document.getElementById("settingsPanel").appendChild(panel);
+    updatePreservationTestControls();
+}
 
 // Count actual active recording time, excluding periods when MediaRecorder is paused.
 function recordedSeconds(current) {
@@ -114,6 +171,7 @@ function publishRecordingDiagnostics() {
         recordingState: current?.recorder?.state || "inactive"
     };
     window.dispatchEvent(new Event("imuse-recording-diagnostics"));
+    updatePreservationTestControls();
 }
 publishRecordingDiagnostics();
 
@@ -274,6 +332,14 @@ async function putSession(record) {
 }
 
 async function persistChunk(record, sequence, blob) {
+    if (preservationTestEnabled && record.simulateNextChunkFailure) {
+        record.simulateNextChunkFailure = false;
+        record.simulatedStorageFailure = true;
+        logRecordingEvent(record, "simulated-storage-failure", { sequence, bytes: blob.size });
+        // Fail before opening a transaction. The existing write-error and stop
+        // handlers retain this chunk and the final recorder tail for export.
+        throw new Error("Simulated storage failure (preservation test).");
+    }
     const updated = {
         ...record.metadata,
         chunkCount: sequence + 1,
@@ -1244,6 +1310,10 @@ function retainEmergencyRecording(current, blob) {
         metadata: { ...current.metadata }
     });
     renderEmergencyRecordings();
+    if (current.simulatedStorageFailure && preservationTestResult) {
+        const unsavedBytes = [...current.pendingChunks.values()].reduce((sum, chunk) => sum + chunk.size, 0);
+        preservationTestResult.textContent = `Simulated failure completed. Emergency audio contains ${blob.size} bytes, including ${unsavedBytes} bytes not saved to browser storage. Make a second recording, then load and download this emergency recording again. Keep this page open.`;
+    }
 }
 
 function playEmergencyRecording(id) {
@@ -2210,6 +2280,7 @@ window.addEventListener("pagehide", () => {
     }
 });
 
+initializePreservationTest();
 initialize();
 initializeWakeWord();
 // Give startup UI and microphone setup priority, then prepare the model in advance.

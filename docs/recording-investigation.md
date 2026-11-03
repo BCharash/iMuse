@@ -111,6 +111,24 @@ Validation: `python3 tests/test_emergency_recordings.py` exercises production fu
 
 No database schema, audio-capture policy, persistent-storage request, or iPhone background workaround was added. Serialized metadata updates, cross-tab ownership, completion validation and persistent-storage requests remain separate stages requiring approval.
 
+### Stage 1 device test: controlled storage failure
+
+An optional **Settings → Recording preservation test** section now provides an explicit failure-injection control. It defaults off on every page load and is not saved as a preference. Enabling it alone does not inject a failure: the user must press **Simulate storage failure** during an active recording after at least one chunk has committed. That button arms only the current recording, requests recent audio, and fails its next chunk write before opening a database transaction. Existing recordings and committed chunks are unchanged. The ordinary storage-error handler stops capture and retains the failed chunk plus the final recorder tail. This tests application error handling, not a real quota failure or browser transaction abort.
+
+Use the updated build in the same PWA or browser throughout. Keep it foregrounded and do not reload, close, reinstall or clear website data during this test.
+
+1. Open **Settings → Recording preservation test** and check **Enable failure testing for this page**. Close Settings if needed to reach Record.
+2. Start a disposable recording. Count aloud for about ten seconds. The simulation button is available once some audio has saved.
+3. Open that Settings section again while recording, continue counting, and tap **Simulate storage failure**. Continue until recording stops automatically. It may stop almost immediately; there is no guaranteed post-click speaking interval.
+4. The test result should say **Simulated failure completed**, with a positive number of **bytes not saved to browser storage**. Close Settings and find **Emergency recordings**. Load the emergency audio, play it, and note its ending. Download it while the user gesture is available and check the downloaded file.
+5. Make a second disposable recording and stop it normally. It should save normally without another injected failure; there is no need to disable the control first. Both the emergency entry and the second saved recording should remain accessible.
+6. Load the first emergency recording again and download it again. Its audio and ending should match the earlier emergency playback/download. Both downloads should include the retained unsaved tail, rather than only the stored prefix. Listen to the exported files; the browser cannot confirm successful file saving merely from a download request.
+7. Uncheck **Enable failure testing for this page** when finished. This does not remove emergency audio. Preserve any needed emergency exports before closing or reloading.
+
+Pass criteria: a reported positive unsaved-byte count, accessible/playable emergency audio, a normally saved second recording, and unchanged first emergency playback and export after the second recording. A missing emergency entry, zero unsaved bytes, a truncated later export, an unplayable export, or an unintended failure of the second recording requires investigation before Stage 2. Report the container (PWA or Safari), counts/result message and the failed step. A new test-created interrupted/storage-error saved entry contains only its committed prefix after page closure; that is not a durable copy of its emergency tail.
+
+Automated control coverage: `python3 tests/test_preservation_failure_control.py` checks the default-off and active/committed/paused guards, production chunk-write/error/stop functions, retention/export of failed and final chunks, normal writes by the next session, cancellation, and requestData failure. The existing Stage 1 test remains `python3 tests/test_emergency_recordings.py`. Both use controlled mocks; the device procedure above remains outstanding.
+
 ## Cleanup completed
 
 Removed `Lab.html`, `BackgroundCaptureLab.html`, `js/labs/background-capture-lab.js`, the interruption-warning setting/code and `audio/recording-interrupted.wav`. Written findings, visual lifecycle notices, normal cues, pre-existing command labs and production recording data remain. Old lab IndexedDB data was not deleted. No capture workaround was added as part of cleanup.
