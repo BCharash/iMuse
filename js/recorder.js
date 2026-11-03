@@ -4,7 +4,6 @@ import { loadVoicuteWakeWord } from "./voicute/voicute-adapter.js";
 import { loadHeedWakeWord } from "./heed/heed-adapter.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { loadCommands, startCommands, stopCommands } from "./tensorflow/commands-adapter.js";
-import { beginRecordingAudioSession } from "./recording-audio-session.js";
 
 const recordButton = document.getElementById("recordButton");
 const pauseButton = document.getElementById("pauseButton");
@@ -73,7 +72,6 @@ const MAX_PENDING_AUDIO_BYTES = 8 * 1024 * 1024;
 
 let db = null;
 let activeSession = null;
-const recordingAudioSessions = new WeakMap();
 let recordingUrl = null;
 let displayedSessionId = null;
 let startRequest = 0;
@@ -180,7 +178,6 @@ function logCaptureSnapshot(current, phase) {
     const details = {
         phase,
         audioContextState: current.audioContext?.state || "unavailable",
-        audioSession: current.audioSessionLease?.snapshot() || null,
         recorderMimeType: current.recorder?.mimeType || "",
         trackEnabled: track?.enabled ?? null,
         chunksReceived: current.sequence,
@@ -336,14 +333,7 @@ async function restoreRecentlyDeletedSession(id) {
 
 function stopStream(stream) {
     if (stream?.getAudioTracks?.().length) publishMicrophoneProcessing(stream, false);
-    try {
-        releaseRecordingMicrophone(stream);
-    } finally {
-        if (stream) {
-            recordingAudioSessions.get(stream)?.release();
-            recordingAudioSessions.delete(stream);
-        }
-    }
+    releaseRecordingMicrophone(stream);
 }
 
 // Prefer a format this browser can both record and play, with M4A/AAC first.
@@ -1731,14 +1721,8 @@ async function startRecording() {
     setRecordingControlState("preparing");
     status.textContent = "Preparing microphone...";
     let stream;
-    let audioSessionLease;
     try {
-        audioSessionLease = beginRecordingAudioSession(getSettings().recordingAudioSession, message => {
-            const target = document.getElementById("recordingAudioSessionStatus");
-            if (target) target.textContent = message;
-        });
         stream = await acquireRecordingMicrophone();
-        recordingAudioSessions.set(stream, audioSessionLease);
         publishMicrophoneProcessing(stream);
         if (requestId !== startRequest) {
             stopStream(stream);
@@ -1768,7 +1752,7 @@ async function startRecording() {
             return;
         }
         const current = {
-            id, recorder, stream, metadata, audioSessionLease,
+            id, recorder, stream, metadata,
             formatLabel,
             sequence: 0,
             writeQueue: Promise.resolve(),
@@ -1807,10 +1791,7 @@ async function startRecording() {
             lastChunkBytes: null
         };
         activeSession = current;
-        logRecordingEvent(current, "session-created", {
-            mimeType: actualMimeType, audioSession: audioSessionLease.snapshot(),
-            standalone: window.matchMedia?.("(display-mode: standalone)")?.matches || navigator.standalone === true
-        });
+        logRecordingEvent(current, "session-created", { mimeType: actualMimeType });
         lastRecordingPeakBytes = 0;
         publishRecordingDiagnostics();
         // Freeze voice-command preference throughout this recording session.
@@ -2065,7 +2046,6 @@ async function startRecording() {
 
         console.error(error);
         stopStream(stream);
-        audioSessionLease?.release();
         setRecordingControlState("idle");
         if (!activeSession) { setAudioCommandsToggleLocked(false); setMicrophoneSelectionLocked(false); setSilencePauseLocked(false); }
         status.textContent = `Could not start durable recording: ${error.message || "microphone unavailable"}`;

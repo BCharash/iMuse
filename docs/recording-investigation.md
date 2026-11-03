@@ -74,7 +74,7 @@ Checked against the repository on 3 November; these are static observations, not
 | Capture health | Existing snapshots record received count (`sequence`), committed count (`metadata.chunkCount`), last-chunk age, pending bytes and signal; no robust stalled-capture recovery controller |
 | Finalization | Unexpected stop is logged, but a nonempty assembly can still be marked `completed`; the status can conceal missing capture. This remains an actionable correctness issue |
 | Scaling | Finalization/playback/recovery still retrieve chunks and assemble a Blob; bounded pending capture memory does not establish bounded total memory for long recordings |
-| Packaging | Manifest uses `display: standalone`; no service-worker implementation was found in this review. An opt-in Audio Session experiment is now implemented; Automatic leaves the type unchanged, while Play and record requests the explicit type before acquisition |
+| Packaging | Manifest uses `display: standalone`; no service-worker implementation was found in this review. No current production audioSession type override was found |
 
 Do not revive the older startup-readiness claim or the proposed `js/voice/` directory from historical reviews. Headset media-button controls were retired on both platforms; microphone selection remains. The application's periodic paused reminder beeps are distinct from the equal-pitch external transition beep.
 
@@ -86,19 +86,12 @@ External references checked 3 November 2026:
 - [WebKit capture-policy source](https://github.com/WebKit/WebKit/blob/main/Source/WebCore/platform/mediastream/cocoa/RealtimeMediaSourceCenterCocoa.mm) bases an iOS visibility-interruption decision on the native host's background-audio configuration. This supports a host-level explanation; it does not reveal the installed iPhone host's actual configuration. The manifest cannot be assumed to configure that native setting.
 - [W3C Audio Session draft](https://www.w3.org/TR/audio-session/) defines explicit audio-session intent, including `play-and-record`. It is a draft API and does not promise background-execution permission. No iMuse experiment has yet established that setting it overcomes installed-app capture loss. Earlier headset-button experiments using that value tested a different outcome.
 
-The user authorized the reversible setting experiment. It is implemented in [recording-audio-session.js](../js/recording-audio-session.js), with Settings and recorder integration. Device outcome is still unknown.
+Recommended bounded investigation, not an approved production implementation:
 
-### Installed-iPhone experiment instructions
-
-1. Identify the deployed warning-free build containing **Settings → Audio session (experimental)**. Leave Audio commands off for this comparison. Do not clear IndexedDB or reinstall as a generic cache fix.
-2. Select **Automatic**, start a fresh recording, say “before”, switch to the same other app for about 20 seconds and say “background”, return and say “after”, Stop, then listen. Record microphone indicator and external beep observations.
-3. Select **Play and record**, then repeat identically. After starting, Settings reports whether the browser accepted the choice. Report that message as well as playback. An unsupported/rejected request is not a test of an applied explicit mode.
-4. Repeat any apparent success, then test longer app switching and screen lock separately. Use Safari and Mac as regression controls only once there is a candidate benefit. API acceptance is not evidence of retained background speech.
-5. If the installed host still stops capture, stop repeating graph/storage toggles or adding silent keep-alive playback. Retain the tested Safari-tab path and bring the native feasibility decision back to the user. Recreate a minimal reproducer only for a specific experiment or WebKit report.
-
-The selection persists on this device and is locked throughout acquisition/recording/pause. Automatic performs no type assignment. Explicit mode captures the previous type, requests `play-and-record` before getUserMedia, and restores the prior type after stream cleanup, including startup failure/cancellation. It does not overwrite a subsequent different type from another audio owner. Unsupported APIs and setter failures are reported without blocking capture. Session-created and existing foreground snapshots include the request/readback; startup diagnostics also record standalone mode. No new polling or automatic recorder restart was added.
-
-Syntax and mocked API/recorder checks cover unsupported/rejected requests, settings fallback, no-write Automatic behavior, restoration/idempotence, and permission/cancellation/constructor/storage startup exits. These checks do not exercise real iOS audio hardware or certify background capture.
+1. Keep the warning-free build as the control and identify the exact deployed revision. Do not clear browser storage or reinstall again as a generic troubleshooting step.
+2. Verify availability and current behavior of the Audio Session API on the actual iPhone. If supported, test **one** isolated explicit `play-and-record` session-intent variant against automatic selection, set before acquisition and restore after cleanup. Keep input, processing, cues and app-switch duration identical; log support, assignment result, host mode, and actual saved audio. This is a hypothesis, not a promised fix.
+3. Validate any candidate first in the **installed iPhone host**, then Safari and Mac regression controls. Test app switching separately from screen lock and other audio apps. Require repeated before/background/after playback success; inspect stored audio rather than relying on icon/beep/state.
+4. If the installed host still stops capture, stop repeating graph/storage toggles or adding silent keep-alive playback. Retain the tested Safari-tab path as the practical option and bring the native feasibility decision back to the user. Recreate a minimal reproducer only for a specific experiment or a WebKit report, not the old broad lab matrix.
 
 A workaround is acceptable only if capture fidelity, persistence, pause/resume, cleanup, export, and supported desktop behavior survive. A native shell merely wrapping the same page is not a demonstrated solution. Native recording remains a conditional alternative, described in the [Swift proposal](iMuse%20Swift%20migration%20plan.md).
 

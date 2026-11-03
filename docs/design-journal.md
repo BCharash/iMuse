@@ -1414,13 +1414,3 @@ Earlier flight-recorder instrumentation produced startup lockups and was reverte
 The next proposed step is a bounded iPhone standalone audio-session investigation, with actual background speech as the success criterion and a stopping point if the host continues interrupting capture. An explicit Audio Session intent is an untested candidate, not a validated workaround. Recovery/truthful completion status is separate from uninterrupted capture; native recording is a conditional feasibility decision, not a migration already approved or begun.
 
 The [documentation index](README.md) now names the authoritative current files. The [recording investigation](recording-investigation.md) consolidates the handoff, lab evidence and remaining architecture questions. The [active roadmap](iMuse%20next%20steps.md) owns priorities; Memora and Swift documents retain distinct integration/proposal roles. The old stabilization review, November 2 handoff and detailed November 1 roadmap moved into Archive. The redundant lab-design file was removed after its evidence was incorporated. Earlier entries remain intact as history, not instructions to repeat completed experiments or restore retired controls.
-
----
-
-# DJ012 — Reversible Audio Session Experiment
-
-**Date:** 3 November 2026. **Status:** Implemented at the user's request; installed-iPhone results pending.
-
-Settings now offers Automatic (default, no audio-session type assignment) and Play and record (request explicit microphone/output intent before microphone acquisition). The selection persists and is locked during capture and pause. Browser support, request/readback and restoration are reported; API acceptance does not establish background recording permission or continuity. Unsupported/rejected requests do not prevent ordinary recording.
-
-The recorder retains a cleanup handle with the acquired stream, restores the previous type on release and startup failure, and avoids overwriting a later different type. Existing diagnostic events record the request and standalone mode. No warning playback, new background polling, keep-alive audio or automatic recorder replacement was introduced. Syntax and mocked lifecycle checks passed; device capture remains unverified. Follow the current [test instructions](recording-investigation.md#installed-iphone-experiment-instructions) before proposing another change.
