@@ -1,69 +1,43 @@
-# iMuse → Memora Integration Handoff
+# iMuse → Memora integration handoff
 
-**Updated:** 31 October 2026  
-**Audience:** Agent implementing the unified iMuse application  
-**Status:** Current user decisions and proposed integration plan; **no code changes authorized by this document**
+Updated 3 November 2026. This document owns the integration contract, not the recording investigation or immediate development queue. See the [index](README.md), [current priorities](iMuse%20next%20steps.md), and [platform evidence](recording-investigation.md).
 
-## Objective
+## Objective and scope
 
-Merge iMuse's independent, durable **Record** functionality into the Memora-based application. Intended tab order: **Record → Transcribe → Edit and Combine → Search**. Memora already has desktop/mobile file opening and saving, Whisper transcription, model/runtime management, editing/combining, and search. **Reuse those implementations rather than rebuilding them.** Record must remain usable even when Whisper is unavailable.
+Incorporate iMuse's independent Record subsystem into the Memora-based application with intended tab order **Record → Transcribe → Edit and Combine → Search**. Reuse Memora's existing desktop/mobile file opening and saving, Whisper runtime/model management, transcription, editing/combining, and search. Record must work independently of transcription, voice models, and network-dependent features.
 
-## What is established by user testing
+The iPhone installed-app background failure is unresolved. Safari-tab recording succeeds in the reported warning-free tests; that does not certify installed iOS capture or lock-screen reliability. Combining repositories must not be presented as a fix for host lifecycle behavior. The removed interruption warning must not return during integration.
 
-- iMuse writes audio incrementally to IndexedDB and has recovered recordings after a page reload during active recording. A prior test recovered three spoken sections separated by pauses; a later test reloaded in the middle of speech after auto-pause and manual pause/resume, and recovered/exported an `.m4a` recording.
-- The user accepts losing a short tail of speech immediately before an abrupt reload/crash. Preserving already committed audio and producing a usable recovery is the priority, not lossless last-millisecond crash capture.
-- A prior exported `.webm` file was successfully opened by Memora. iMuse prefers M4A/AAC when the browser supports it, otherwise uses a supported format. **Do not relabel one container with another extension.**
-- **Delete Saved Session** deletes only the selected saved recording. Starting a new recording does not disturb previous saved sessions. Delete is **hidden during active recording**, so a test of pressing Delete mid-recording is not a valid normal UI scenario.
-- Auto-pause after about five seconds of detected inactivity, manual pause/resume, and the **periodic double beep while paused** remain recording functions. Heed and Voicute are now selectable wake engines; a detected wake opens a bounded TensorFlow Go/Stop command window. Neither wake nor command recognition justifies adding Whisper to Record.
-- On MacBook Chrome, GitHub Pages microphone denial was fixed by adjusting site-specific microphone permission; localhost and iPhone access worked. No Git changes were involved. This is a permissions issue, not a demonstrated recording defect.
-- Desktop opt-in headset controls have worked in Mac Chrome, with some variable responsiveness. Mobile headset controls are disabled/deferred: in tested iPhone conditions, microphone capture and headset media-button delivery did not coexist dependably. Do not reopen that investigation during integration.
+## Ownership and minimum transfer contract
 
-## Evidence boundaries
+| Owner | Responsibility |
+| --- | --- |
+| Record | Microphone, manual/silence/voice transitions, ordered chunk persistence, recovery, saved/recently deleted recordings, explicit deletion, capture metadata and playable audio |
+| Memora | File open/save/export conventions, Transcribe, Whisper model/runtime management, transcript editing/combining and Search |
+| Integration boundary | A Blob/File or retrieval function, actual MIME/container, correct filename/extension, stable source session ID, and honest completed/recovered/interrupted status |
 
-The previous assistant reported technical checks of the recovered M4A (roughly 21 seconds of AAC audio and no reported decoding/timestamp problems). This handoff does **not** independently re-run those checks. One successful recording does not prove every browser/container combination or every crash scenario. IndexedDB can lose data that has not yet committed and remains subject to browser storage policies. Do not claim guarantees; equally, do not replace a working design without a demonstrated reason.
+Include duration only when it is reliably known. Keep a future editable title separate from identity. Do not couple Memora to internal IndexedDB object-store layout if a retrieval interface suffices. Determine who owns temporary Blob/object URLs and when they may be revoked.
 
-## Architecture and ownership
+Passing a recording to Transcribe, exporting, suggesting a title, or creating a transcript must not delete or overwrite source audio. Failure leaves the original available. Newly recorded and externally imported audio should reach the same Memora transcription path. Preserve actual formats: successful WebM import and M4A/AAC preference do not imply interchangeable containers or safe extension relabeling.
 
-**Record owns:** microphone permission and capture, manual/automatic pause/resume, incremental IndexedDB chunk persistence, recovery, recording session list and explicit deletion, completed/recovered audio artifacts, and recording-specific metadata. Recording must not depend on model loading, transcription, or network availability.
+## Recording behavior to preserve
 
-**Memora owns:** desktop/iPhone file selection and save/export pathways, Transcribe workflow and Whisper model registry/resource manager, transcript creation, Edit and Combine, and Search. Avoid parallel file pickers, model selectors, or duplicate transcription workers unless existing architecture truly requires them.
+- Committed chunks have been recovered after reload in user tests, with playable/downloadable output; a short uncommitted tail may be lost. Recovery is not an absolute crash/eviction guarantee.
+- Current recovery promotes successfully rebuilt audio to normal saved-recording behavior while retaining interruption history. The follow-up reload-after-recovery label test remains unreported; see the roadmap.
+- Manual Stop finalizes directly. Spoken Stop requests Yes/No confirmation: Yes finalizes; No/timeout leaves capture paused. Wake during recording pauses before command listening; wake while paused acknowledges “Yes?”. Silence/manual pause do not themselves start a command listener.
+- Keep ordinary startup/pause/resume/stopped/confirmation WAV cues and periodic paused reminder tones. The external iPhone background-transition beep is distinct from those application cues.
+- Support exposed headset microphones through selection. Physical headset media-button controls were retired on both platforms; do not import the older desktop control pathway.
+- Ordinary deletion uses Recently Deleted; permanent deletion is explicit. A new recording does not disturb other sessions. The normal Delete control is hidden during active capture; that historical UI statement is not a guarantee against every asynchronous deletion race.
 
-**Integration boundary:** expose an audio Blob/File (or a stable retrieval function), actual MIME type, appropriate filename/extension, recording/session identifier, and status (`completed` or `recovered/interrupted`). Duration is useful if reliably known; don't invent it. The receiving Transcribe pathway should handle both newly recorded and imported audio using the same processing logic. Avoid coupling to internal IndexedDB object-store structure if a narrower interface can be used.
+## Integration sequence, when scheduled
 
-**Non-destructive transfer:** Passing audio to Transcribe, saving/exporting it, or creating a transcript **must not automatically delete the original audio** from IndexedDB. Explicit deletion remains a user action. Keep source data available if transfer or transcription fails. Determine ownership and lifetime of any temporary Blob/object URL during integration.
+1. Inspect current source in both projects. The iMuse workspace is authoritative; obtain Memora code if it is not available. Earlier ZIP names and previous assistant descriptions are not source revisions.
+2. Map iMuse session export/recovery to Memora's actual import/transcription interface. Verify formats, identity, ownership, error propagation and object URL lifetime before implementation.
+3. Implement the smallest handoff while preserving Record's own storage and lifecycle. Avoid a concurrent media/storage rewrite or duplicate model/file-picker system.
+4. Test one ordinary completed and one interrupted/recovered recording through Transcribe, on desktop and the supported iPhone browser route. Source recordings must remain available after both success and failure. Recheck existing mobile import/save behavior.
 
-## Immediate implementation plan
+Integration is not evidence that background capture or every recovered container is valid. The pending-memory bound does not certify long-file assembly. Broader finalization/metadata work remains in [Next steps](iMuse%20next%20steps.md), not duplicated here.
 
-1. **Request latest source** from both repositories (especially iMuse recorder/storage/UI and Memora file-open/import, Transcribe, and shared app/navigation code). Do not edit based on older files or memory.
-2. **Map existing flows**: how iMuse lists/recovers/exports a saved session; how Memora opens an audio file on desktop and iPhone and passes it into Transcribe. Record actual formats and interfaces, not assumptions.
-3. **Design the smallest handoff** and agree it with the user. Prefer invoking Memora's established import/transcription path with a Blob/File and metadata rather than building another file-save/load system.
-4. **Implement incrementally**, preserving the Record tab's independent capture and recovery lifecycle. Avoid refactoring storage or media assembly unless a concrete integration failure requires it.
-5. **Acceptance test** one normal completed recording and one interrupted/recovered recording through Transcribe; verify the source recording remains available afterward, and that existing desktop/mobile import/save functionality is not regressed.
+## Deferred work
 
-## Explicitly deferred / not a blocker
-
-- OPFS migration or more elaborate crash buffering to preserve a fraction of a second of speech.
-- Repeating already successful Delete Saved Session, new-session isolation, and basic reload recovery tests without a new failure hypothesis.
-- Broad container-remuxing or finalization redesign absent evidence of invalid output.
-- iPhone Bluetooth headset media-button control during capture.
-- Idle wake listening before the first Start Recording action (planned next, not implemented); custom wake-phrase training; Whisper-tiny commands (superseded by current TensorFlow Go/Stop).
-- Comprehensive cross-browser, background/locked-screen, and long-duration stress certification. These may be separate future quality tasks; do not present them as completed.
-
-## Working rules
-
-- The latest files supplied by the user are authoritative. Ask for current versions of every source file before editing.
-- Make focused changes, verify them, and return code in a ZIP **with each original filename unchanged** (no appended numbers, suffixes, or parentheses inside the ZIP).
-- Remove temporary diagnostics when finished; avoid speculative modifications.
-- Distinguish tested behavior, user acceptance, assistant inference, and untested assumptions.
-- Keep the journal chronological. Use `iMuse next steps.md` for active priorities and this handoff for integration architecture.
-
-**Bottom line:** iMuse Record has a useful, user-accepted IndexedDB recovery foundation. The next job is to connect that recording to Memora's existing Transcribe and file-management workflows **without losing the source recording or duplicating Memora's functionality**.
-
-## Voice-control implementation update — 31 October 2026
-
-- Existing code separates wake engines (`js/heed/`, `js/voicute/`), TensorFlow command recognition (`js/tensorflow/`), microphone acquisition (`js/microphone-manager.js`), and spoken playback (`js/audio-response-manager.js`). Recorder/controller code still coordinates multiple states; **do not assume the controller is fully decoupled yet**.
-- During an active session, wake while recording pauses capture and opens Go/Stop listening after the pause acknowledgment; wake while already paused says “Yes?” before listening. Silence/manual pauses never themselves launch TensorFlow. Go resumes the existing session; Stop finalizes; timeout remains paused.
-- State-driven WAV responses: New recording, Pause, Recording, Recording stopped. Keep the recurring **double beep** while paused. The command timer is now a compact light-blue, counterclockwise-emptying disk.
-- User reported MacBook System default microphone selected Shokz and both wake engines worked in recent tests; further reliability and iPhone testing remain necessary.
-- **Future idle behavior:** wake before first Start Recording → “Yes?” → Go creates a new session, which announces “New recording”. This is a design requirement, **not current implemented behavior**.
-- Preserve audio source and crash recovery regardless of wake, TensorFlow, or spoken-response errors. Before integration, request fresh source from both repositories and verify interface details.
+Idle voice-start before first Record, custom wake training, command-audio removal, OPFS/storage redesign, native recording, and headset media-button research are independent workstreams. A future native recorder exports audio/metadata to Memora rather than reproducing its entire transcription/search stack. Nothing in this contract schedules those features automatically.

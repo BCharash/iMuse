@@ -1,3 +1,5 @@
+> **Archived 3 November 2026.** Historical snapshot, not current implementation instructions. See the [documentation index](../README.md), [current investigation](../recording-investigation.md), and [active roadmap](../iMuse%20next%20steps.md). Statements below about current priorities, required uploads, warning playback, startup capture, or headset controls may be superseded.
+
 > **Status update — 31 October 2026:** This document records an earlier code review of `iMuse(7).zip`, not an audit of the current build. Microphone selection and a shared spoken-response manager have since been introduced; Heed/Voicute and TensorFlow Go/Stop are integrated for active sessions. The historical findings below must **not** be presented as verified current defects. The remaining items are audit questions until checked against latest source and tested.
 
 # iMuse architecture stabilization review

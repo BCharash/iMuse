@@ -1,12 +1,12 @@
 # iMuse — Native Swift Migration Plan
 
-**Date:** 30 October 2026  
-**Status:** Proposed future architecture; no Swift implementation begun  
-**Relationship to current work:** The browser recording prototype will be incorporated into Memora. A separate native iOS iMuse app may subsequently be built for hands-free, lock-screen-oriented recording. This document does not supersede the current Record → Memora integration plan.
+**Originally drafted:** 30 October 2026; reviewed 3 November 2026
+**Status:** Conditional architecture proposal; no Swift implementation or migration decision established.
+**Current relationship:** First complete the bounded iPhone standalone investigation in the [recording brief](recording-investigation.md) and follow the [active roadmap](iMuse%20next%20steps.md). If a web workaround is not demonstrated, decide whether to test native capture. Memora integration remains a separate goal, not a prerequisite to a small native feasibility decision.
 
-## 1. Executive decision
+## 1. Proposed direction
 
-Build **one cross-platform Memora web application** using the proven browser Record implementation, and eventually build **iMuse as a focused native iOS recording app** using Swift and Apple's native audio, persistence, and system-integration APIs. Do not attempt to mechanically convert JavaScript into Swift or create a second full Memora implementation.
+The proposed direction is **one cross-platform Memora web application** using the browser Record implementation, with **a focused native iOS recorder** as a conditional option for installed-app background recording. The current iPhone tests make that option relevant, but do not establish that a full migration is necessary. If selected, use Swift and Apple's native audio, persistence, and system-integration APIs. Do not attempt to mechanically convert JavaScript into Swift or create a second full Memora implementation.
 
 The primary reasons for native iMuse are (1) greater control over recording during screen lock and supported background-audio scenarios, (2) Siri and Shortcuts entry points, (3) better integration with iOS audio interruptions and headset/audio routes, and (4) a more natural installed-app experience. None of these automatically guarantees indefinite microphone capture, an always-on wake-word engine, or hands-free operation after every termination or reboot.
 
@@ -105,17 +105,17 @@ Set an appropriate iOS file-protection class based on the requirement to record 
 
 ## 7. Voice control: transfer the state machine, not the web libraries
 
-Accepted product behavior:
+Proposed native behavior (idle voice-start is still deferred and is not implemented in the web recorder):
 
 | Recording state | Wake phrase recognized | Go | Stop |
 |---|---|---|---|
 | Idle, listening enabled | Enter command mode | Start new recording | Stay idle |
-| Recording | Pause immediately, then enter command mode | Resume same session | Finalize session |
-| Paused | Enter command mode | Resume same session | Finalize session |
+| Recording | Pause, then enter command mode | Resume same session | Request Yes/No confirmation; finalize only on Yes |
+| Paused | Enter command mode | Resume same session | Request Yes/No confirmation; finalize only on Yes |
 
 Go/Stop are accepted only in command mode. If no valid command follows the wake phrase, remain paused rather than silently resuming. Manual controls always remain available. A recognized wake phrase must not discard any previously committed audio.
 
-The current web laboratory uses **Heed** for “Hey Doc” and **TensorFlow.js speech-commands** for Go/Stop. Its provisional overlap settings are **0.75 on MacBook and 0.90 on iPhone**. These are **web-model observations**, not Swift parameter recommendations. `overlapFactor` and the TensorFlow.js callback schedule do not map directly onto Apple's speech frameworks or a native Core ML implementation.
+The web recorder offers **Heed** (“Hey Doc”) or **Voicute** (“Hey Friday”), followed by **TensorFlow.js speech-commands** for Go/Stop and Yes/No confirmation. The temporary background labs have been removed. Its provisional overlap settings are **0.75 on MacBook and 0.90 on iPhone**. These are **web-model observations**, not Swift parameter recommendations. `overlapFactor` and the TensorFlow.js callback schedule do not map directly onto Apple's speech frameworks or a native Core ML implementation.
 
 For native implementation, investigate (a) whether the chosen wake model can be executed reliably on-device through a suitable runtime or converted to Core ML, and (b) whether a small native keyword model can recognize Go/Stop. Do not assume the browser ONNX model or TensorFlow.js pretrained command model can simply be copied into Swift. Verify model license, preprocessing, sample rate, window size, and recognition thresholds. Keep models and runtime assets inside a dedicated `VoiceControl/` area, not the app root.
 
@@ -167,13 +167,13 @@ Practical distribution paths to evaluate:
 3. **App Store distribution:** generally the most convenient long-term installation and update experience after review/approval, with ongoing developer-account and compliance obligations. A focused recorder may be more practical to maintain than a full Memora port.
 4. **Other eligible distribution mechanisms:** availability depends on region, entitlement, and current Apple rules; investigate only if the conventional options are unsuitable.
 
-Before writing substantial Swift code, choose a distribution path based on how often the user is willing to rebuild, whether the app is private or public, ongoing fees, and whether App Store review is acceptable. Do not promise a particular provisioning duration without checking the current account and Apple documentation.
+The distribution observations above are planning context, not newly verified account-specific terms; check current Apple documentation, eligibility and fees before selecting a route. Before writing substantial Swift code, choose a distribution path based on how often the user is willing to rebuild, whether the app is private or public, ongoing fees, and whether App Store review is acceptable. Do not promise a particular provisioning duration without checking the current account and Apple documentation.
 
 ## 10. Recommended phased roadmap
 
-**Phase A — Finish the web handoff (now).** Move the existing browser Record implementation into Memora without weakening IndexedDB recovery or adding a second transcription stack. Preserve the standalone lab results and documentation.
+**Phase A — Resolve the platform direction.** Finish the bounded installed-iPhone workaround investigation, then choose whether a native spike is warranted. Use the successful Safari-tab route as the practical web option under its tested conditions. Memora integration can be scheduled independently; preserve its non-destructive handoff contract.
 
-**Phase B — Native feasibility spike.** Create a minimal SwiftUI shell with one Start/Pause/Resume/Stop recording flow; test microphone permission, headset route, actual screen locking, interruption recovery, and one complete audio export. Also create one Siri/App Intent for Start Recording. Decide whether native iMuse provides the expected lock-screen and Siri benefit before investing in voice models.
+**Phase B — Native feasibility spike.** Create a minimal SwiftUI shell with one Start/Pause/Resume/Stop recording flow; test microphone permission, headset route, actual screen locking, interruption recovery, and one complete audio export. The first gate is real-device capture continuity and valid recoverable export; do not make Siri or voice models prerequisites for that test. Evaluate a Start Recording App Intent only after capture feasibility is established.
 
 **Phase C — Durable native recorder.** Implement explicit states, ordered checkpoints/segments, recovery after force-close/crash scenarios, valid finalization, saved-recording list, delete/reset, and repeatable device tests. Validate file protection and storage behavior while locked.
 
@@ -194,12 +194,12 @@ Before writing substantial Swift code, choose a distribution path based on how o
 - The app does not silently lose recordings due to a failed voice recognizer or an unavailable model.
 - A realistic installation/update pathway has been demonstrated without a weekly manual re-signing cycle.
 
-**Go/no-go after Phase B:** If reliable locked-state recording and a useful Siri invocation path cannot be demonstrated on the target iPhone, do not invest in a full native migration merely because Swift is available. Continue with the working Memora web recorder while revisiting the native hypothesis.
+**Go/no-go after Phase B:** Require real background/locked-state capture and valid export on the target iPhone before investing in a full native recorder. Siri feasibility is a separate gate. If capture fails, report that result and reconsider the native hypothesis. The demonstrated web fallback is an iPhone Safari tab; Memora integration has not yet been established here.
 
 ## 12. What to preserve from the current project
 
 Retain the iMuse design journal, next-steps document, voice-control integration plan, standalone diagnostic findings, user-facing recording semantics, and recovery acceptance tests. These form the native product specification. Keep the web implementation in Memora; do not delete it as a prerequisite for native work.
 
-**Next practical decision, when ready:** select the distribution route and perform the minimal Swift feasibility spike. No current JavaScript or Swift source edits are authorized by this document.
+**Next practical decision:** follow the current web-investigation stopping criteria, then ask whether to undertake a minimal native capture spike. Select a viable install/update route before substantial native development. This proposal does not itself schedule a rewrite.
 
 > **Capture first. Preserve continuously. Make hands-free operation useful without sacrificing recoverability.**

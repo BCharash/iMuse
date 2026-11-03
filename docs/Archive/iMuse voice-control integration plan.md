@@ -1,3 +1,5 @@
+> **Historical archive — reviewed 3 November 2026.** These experiments and installation instructions are superseded where they conflict with the [active roadmap](../iMuse%20next%20steps.md) or [current recording investigation](../recording-investigation.md). Headset media-button controls are retired on both platforms; temporary background labs and interruption-warning audio have been removed. Preserve evidence below; do not execute its older next steps as current work.
+
 # iMuse voice-control integration plan
 
 **Date:** 30 October 2026  

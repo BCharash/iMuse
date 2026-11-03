@@ -1,5 +1,7 @@
-# Heed adapter boundary (stage 1)
+# Heed wake adapter
 
-Heed-specific inference code, models, preprocessing, and worklets will live here.
-The current lab at the repository root is intentionally not moved yet: its relative asset paths must remain functional until the adapter is integrated and verified.
-The core recorder must not import Heed internals directly; use a narrow voice-controller interface.
+`heed-adapter.js` loads the Hey Doc ONNX model and exposes detection to the recorder; it does not acquire the microphone or own recording/storage transitions. Model, preprocessing and engine implementation remain in this directory. ONNX Runtime is loaded through the adapter's configured CDN URL.
+
+The recorder feeds samples during an active session when Audio commands enables detection. Idle wake before first Record is deferred. Failure to load recognition must leave manual recording usable. The microphone/controller boundary is still coordinated by `js/recorder.js`, not a completed standalone voice-controller refactor.
+
+For current platform findings and priorities, see the [documentation index](../../docs/README.md). Earlier stage-1 placeholder instructions and root-lab relocation plans are historical.

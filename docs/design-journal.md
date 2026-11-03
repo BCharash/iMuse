@@ -1,5 +1,7 @@
 # iMuse Design Journal
 
+Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated historical snapshots; DJ011 supersedes earlier background-capture assumptions and priority ordering.
+
 ---
 
 # DJ001 — iMuse: From Concept to Working Voice Notebook Foundation
@@ -1385,3 +1387,30 @@ The change was delivered and syntax-checked, but the follow-up test of recoverin
 
 **Documentation rule:** DJ001–DJ009 remain historical snapshots. This entry is the latest recording/memory/recovery checkpoint. The companion `iMuse next steps.md` has been revised to distinguish completed work from outstanding tests. Obtain the latest code from the user before further source changes.
 
+
+---
+
+# DJ011 — iPhone Standalone Capture Loss, Warning Playback, and Documentation Consolidation
+
+**Date:** 2–3 November 2026; consolidated 3 November 2026.
+**Status:** Device findings reported by the user, selected Safari-tab JSON logs reviewed, warning and temporary labs removed. Installed-iPhone workaround unresolved. This entry supersedes earlier assumptions that a successful iPhone browser lab establishes installed-PWA capability.
+
+## 84. Browser and installed-host distinction
+
+MacBook Chrome tab, Chrome installed app, and Safari Dock web app recorded in the background in reported tests. On iPhone, Safari-tab recording succeeds without the interruption warning, but installed iMuse loses background capture and produces an external equal-pitch double beep regardless of the warning setting. An installed iPhone lab reproduced that beep and capture loss. Reinstalling and rebooting did not resolve it. Therefore the successful earlier browser labs did not isolate iMuse's processing as the source of the original standalone failure. This is an iPhone standalone result, not a limitation established for every PWA/platform. The beep's exact origin remains unverified.
+
+## 85. Separate warning-induced failure and removal
+
+The spoken interruption warning was added after the original failure. Safari-tab comparisons found that playing it on visibility hidden could stall capture through either a shared or dedicated player; merely preparing a dedicated player did not. Warning off and mute-triggered warning profiles passed, without evidence that the mute-triggered warning actually played. Reviewed logs showed that AudioContext interruption can coexist with successful capture, and that context recovery alone may leave recorder output stalled. Received chunks were committed in the reviewed failures. A later silence pause was a consequence rather than the start of the shared-player stall.
+
+The user requested complete warning removal. Playback/preparation/deduplication code, settings control and WAV were removed; normal state cues and visual lifecycle notices remain. The temporary background lab pages and dedicated script were removed at the user's request, leaving findings in the documentation. Production recordings and lab IndexedDB data were not cleared. Syntax and asset/reference checks passed; that does not constitute new device certification of the cleaned build.
+
+## 86. Historical startup and cache incidents remain separate
+
+Earlier flight-recorder instrumentation produced startup lockups and was reverted; the exact runtime mechanism was not established. A separate deployment/cache incident had misleadingly mixed old assets. Neither is proven to explain the installed-host failure. Avoid another broad diagnostic patch or clearing valuable browser storage. Existing received/committed chunk counts and snapshots already provide useful evidence.
+
+## 87. Current decision and document ownership
+
+The next proposed step is a bounded iPhone standalone audio-session investigation, with actual background speech as the success criterion and a stopping point if the host continues interrupting capture. An explicit Audio Session intent is an untested candidate, not a validated workaround. Recovery/truthful completion status is separate from uninterrupted capture; native recording is a conditional feasibility decision, not a migration already approved or begun.
+
+The [documentation index](README.md) now names the authoritative current files. The [recording investigation](recording-investigation.md) consolidates the handoff, lab evidence and remaining architecture questions. The [active roadmap](iMuse%20next%20steps.md) owns priorities; Memora and Swift documents retain distinct integration/proposal roles. The old stabilization review, November 2 handoff and detailed November 1 roadmap moved into Archive. The redundant lab-design file was removed after its evidence was incorporated. Earlier entries remain intact as history, not instructions to repeat completed experiments or restore retired controls.
