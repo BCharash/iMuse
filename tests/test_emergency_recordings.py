@@ -63,7 +63,7 @@ globalThis.testResult = 'pending';
     assert(reads === beforeReads, 'emergency export does not depend on readable database');
     assert(emergencyRecordings.size === 2, 'download requests never release emergency copies');
 
-    for (const action of [playSavedSession, recoverSession]) {
+    for (const action of [recoverSession, recordingRecovery.recoverSession]) {
         const button = {disabled: false};
         await action('first', button);
         assert(window.lastRecording === first.blob, 'saved action prefers emergency instead of partial disk audio');

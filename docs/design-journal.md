@@ -1475,3 +1475,13 @@ Five suites/seven methods pass, including complete store-module schema/open-fail
 The existing failure, timeout, late-write, smaller-fallback and interrupted-status algorithms are preserved. Five suites/eight test methods pass with complete recovery-module evaluation, actual recorder wiring and a direct callback-level component test. No durability mode, schema, background-capture workaround or media format changed. The next checkpoint is focused device verification, with further extraction requiring approval.
 
 **Follow-up correction approved during testing:** The simulated-failure row was confusing despite being playable, and its disabled Delete action lacked an explanation. The user approved an explicit interruption/memory-copy notice and confirmed **Discard…** action. Playback/export already uses the original format; no conversion was added. Discard moves the committed portion to Recently Deleted before releasing emergency memory and its matching player. Cancellation, storage-operation failure and active/finalizing ownership retain the copy. Tests cover cancellation, confirmation, failure retention and preservation of a different current recording. This is a deliberate UI/behavior correction alongside the otherwise mechanical extraction.
+
+---
+
+# DJ017 — Remove Unused Recorder Helpers
+
+**Date:** 3 November 2026. **Status:** Approved lower-risk cleanup; voice extraction deferred.
+
+The user confirmed the recovery/Discard changes worked in live view and on iPhone. The simulated failure retained about one additional word plus a fraction; this verifies access to a short pending tail rather than the size of a possible real-world stall.
+
+After reviewing risks of moving voice control, the user selected unused-code cleanup. Removed the uncalled readiness probe, tone/readiness-chime helpers, unused context closer and test-only saved-playback alias. Updated test extraction boundaries and exercised the real recovery wrapper/service instead of that alias. No live recording, voice, silence, lifecycle or storage behavior changed, and no additional production module was created. Eight controlled regression tests pass. Export helpers and voice/diagnostic/test-UI extractions remain separate proposals, not authorized follow-up work.

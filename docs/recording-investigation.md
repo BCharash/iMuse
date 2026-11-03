@@ -12,7 +12,9 @@ Updated 3 November 2026. This is the current recording reference. The four prese
 
 [recorder.js](../js/recorder.js) retains capture, recording transitions, pending chunks, voice logic and the top player. It creates the three modules and delegates through their interfaces. It updates counters only after a store commit, performs microphone cleanup through a callback when finalization is delayed, and releases the writer lease only after recovery/finalization processing settles. The recovery service marks finalization finished/clears its watchdog at that boundary. Recovery/initialization keep the existing explicitly owned metadata-write path inside the coordinator, avoiding a nested queue. Settings' read-only diagnostics remain separate.
 
-These are approved extractions, not a storage redesign or an implementation of strict durability/OPFS. No schema migration or audio format change was added. The user reported the first and second extractions worked. The third has controlled test coverage; focused device verification remains outstanding. Further recording/voice-controller extractions require separate approval.
+These are approved extractions, not a storage redesign or an implementation of strict durability/OPFS. No schema migration or audio format change was added. The user reported all three extractions and the confirmed Discard correction worked, including on iPhone. The simulated failure's extra memory tail was about one word plus a fraction, consistent with rapid protective stopping; this does not measure a prolonged real storage stall. Broader acceptance limits remain below.
+
+After discussing voice-extraction risks, the user approved a lower-risk unused-code cleanup instead. Removed the uncalled startup capture probe, readiness-tone helpers, audio-context closer and saved-playback alias used only by tests. Ordinary cues, pause reminders and live capture/voice/lifecycle logic remain unchanged. No new module was added by this cleanup; eight controlled tests pass. Export/diagnostic/test-interface extractions and the voice-controller extraction remain unapproved.
 
 ## Current behavior
 

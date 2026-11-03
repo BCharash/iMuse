@@ -197,8 +197,7 @@ FUNCTIONS = (
     + between("function clearPlayback()", "function setAudioCommandsToggleLocked(")
     + between("function showPlayback(", "function audioFileExtension(")
     + between("function sessionFilename(", "function ensureCurrentDownloadButton(")
-    + between("function renderRecoverableSessions(", "async function playSavedSession(")
-    + between("async function playSavedSession(", "async function initialize(")
+    + between("function renderRecoverableSessions(", "async function initialize(")
     + between("function assertSessionIdle(", "function stopStream(")
     + between("async function startRecording()", 'recordButton.addEventListener("click"')
     + "async function stopHandler() {" + stop_body + "}\n"

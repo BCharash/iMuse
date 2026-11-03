@@ -392,78 +392,6 @@ function describeAudioFormat(mimeType) {
     return mimeType || "browser default format";
 }
 
-// Play cues through the session's existing AudioContext. Reusing it avoids
-// creating a new audio context for every cue, which is more reliable on iPhone.
-async function playToneCue(current, tones) {
-    const context = current?.audioContext;
-    if (!context || context.state === "closed") return false;
-
-    try {
-        if (context.state === "suspended") await context.resume();
-        if (context.state !== "running" || current.discard) return false;
-
-        const now = context.currentTime;
-        for (const tone of tones) {
-            const start = now + (tone.delay || 0);
-            const duration = tone.duration;
-            const oscillator = context.createOscillator();
-            const gain = context.createGain();
-
-            oscillator.type = "sine";
-            oscillator.frequency.setValueAtTime(tone.frequency, start);
-            if (tone.harmonic) {
-                // A very quiet octave adds definition without making the cue harsh.
-                const harmonic = context.createOscillator();
-                const harmonicGain = context.createGain();
-                harmonic.type = "sine";
-                harmonic.frequency.setValueAtTime(tone.frequency * 2, start);
-                harmonicGain.gain.setValueAtTime(0.0001, start);
-                harmonicGain.gain.linearRampToValueAtTime(tone.volume * 0.12, start + 0.018);
-                harmonicGain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-                harmonic.connect(harmonicGain);
-                harmonicGain.connect(context.destination);
-                harmonic.start(start);
-                harmonic.stop(start + duration);
-                harmonic.addEventListener("ended", () => {
-                    harmonic.disconnect();
-                    harmonicGain.disconnect();
-                }, { once: true });
-            }
-
-            gain.gain.setValueAtTime(0.0001, start);
-            gain.gain.linearRampToValueAtTime(tone.volume, start + 0.018);
-            gain.gain.setValueAtTime(tone.volume, start + duration * 0.62);
-            gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-            oscillator.connect(gain);
-            gain.connect(context.destination);
-            oscillator.start(start);
-            oscillator.stop(start + duration);
-            oscillator.addEventListener("ended", () => {
-                oscillator.disconnect();
-                gain.disconnect();
-            }, { once: true });
-        }
-        // Tell the caller the tones were successfully scheduled so the startup
-        // routine waits for the two-note cue before closing this AudioContext.
-        return true;
-    } catch (error) {
-        console.warn("Could not play an iMuse audio cue:", error);
-        return false;
-    }
-}
-
-// A clear, rising perfect fifth distinguishes microphone readiness from the
-// two close, high reminder beeps used while paused. Match their gain level.
-async function playMicReadyChime(current) {
-    const played = await playToneCue(current, [
-        { frequency: 523.25, delay: 0, duration: 0.22, volume: 0.10 },
-        { frequency: 783.99, delay: 0.17, duration: 0.27, volume: 0.10 }
-    ]);
-    // Allow the short, rising pair to finish before startup continues.
-    if (played) await new Promise(resolve => window.setTimeout(resolve, 460));
-    return played;
-}
-
 // UI state follows MediaRecorder events, including silence and voice-triggered transitions.
 const recordingHeading = document.getElementById("recordingHeading");
 function setRecordingControlState(state) {
@@ -1323,10 +1251,6 @@ function renderRecoverableSessions() {
     return recordingLibrary.render();
 }
 
-async function playSavedSession(id, button) {
-    return recoverSession(id, button);
-}
-
 function recoverSession(id, button, present = showPlayback) {
     return recordingRecovery.recoverSession(id, button, present);
 }
@@ -1353,70 +1277,6 @@ async function initialize() {
     } catch (error) {
         console.error("Recording recovery initialization failed:", error);
         status.textContent = "Recording storage unavailable. Recording cannot start safely.";
-    }
-}
-
-// Run a short, disposable MediaRecorder probe during app startup. This tests
-// more than constructing a recorder: start() must succeed and the browser must
-// deliver non-empty audio data. The probe is never saved or exposed as a recording.
-function verifyRecorderCanCapture(recorder) {
-    return new Promise((resolve, reject) => {
-        const chunks = [];
-        let settled = false;
-        let stopTimer = null;
-        let timeoutTimer = null;
-
-        const cleanup = () => {
-            if (stopTimer !== null) window.clearTimeout(stopTimer);
-            if (timeoutTimer !== null) window.clearTimeout(timeoutTimer);
-            recorder.removeEventListener("dataavailable", onData);
-            recorder.removeEventListener("error", onError);
-            recorder.removeEventListener("stop", onStop);
-        };
-        const finish = (error = null) => {
-            if (settled) return;
-            settled = true;
-            cleanup();
-            if (error) reject(error);
-            else {
-                const bytes = chunks.reduce((total, chunk) => total + chunk.size, 0);
-                if (bytes > 0) resolve();
-                else reject(new Error("The browser started the recorder but produced no test audio data."));
-            }
-        };
-        const onData = event => {
-            if (event.data && event.data.size > 0) chunks.push(event.data);
-        };
-        const onError = event => finish(event.error || new Error("The recorder probe failed."));
-        const onStop = () => finish();
-
-        recorder.addEventListener("dataavailable", onData);
-        recorder.addEventListener("error", onError);
-        recorder.addEventListener("stop", onStop);
-        timeoutTimer = window.setTimeout(() => {
-            try {
-                if (recorder.state !== "inactive") recorder.stop();
-            } catch (_) {}
-            finish(new Error("The recorder did not complete its readiness test in time."));
-        }, 5000);
-
-        try {
-            recorder.start(250);
-            stopTimer = window.setTimeout(() => {
-                if (recorder.state !== "inactive") {
-                    try { recorder.stop(); }
-                    catch (error) { finish(error); }
-                }
-            }, 650);
-        } catch (error) {
-            finish(new Error(`The browser could not start audio capture: ${error.message || error}`));
-        }
-    });
-}
-
-function closeAudioContext(context) {
-    if (context && context.state !== "closed") {
-        context.close().catch(() => {});
     }
 }
 

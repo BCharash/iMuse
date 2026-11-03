@@ -10,7 +10,7 @@ coordinator = (Path(__file__).resolve().parents[1] / "js/recording-storage-coord
 functions = (
     between("function openDatabase(", "// Independent IndexedDB")
     + between("function getAllSessions(", "function stopStream(")
-    + between("async function initialize()", "// Run a short, disposable")
+    + between("async function initialize()", "async function startRecording()")
 )
 
 mock = r"""
