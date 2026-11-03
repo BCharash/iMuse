@@ -1,3 +1,5 @@
+> **Update — 3 November 2026:** Later device tests reproduced background capture loss and the external double beep in an installed iPhone lab as well as installed iMuse, while iPhone Safari-tab recording succeeds with warning playback disabled. MacBook Chrome tab, Chrome app, and Safari Dock web app also record in the background. The warning introduced a separate Safari-tab playback-associated failure and has now been removed completely, along with the temporary background labs. See [current findings](background-capture-lab-design.md). Interpret the earlier hypotheses below as historical; the iPhone standalone issue remains unresolved.
+
 # iMuse Recording Investigation — Handoff
 **Date:** 2 November 2026  
 **Status:** Working baseline restored; flight-recorder instrumentation reverted; original iPhone background-capture defect unresolved.
