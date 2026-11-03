@@ -524,11 +524,13 @@ interruptionWarning.preload = "auto";
 interruptionWarning.playsInline = true;
 let interruptionWarningPrepared = false;
 function prepareInterruptionWarning() {
+    if (!getSettings().interruptionWarningEnabled) return;
     if (interruptionWarningPrepared) return;
     interruptionWarningPrepared = true;
     try { interruptionWarning.load(); } catch (_) {}
 }
 function announceInterruption(current, trigger) {
+    if (!getSettings().interruptionWarningEnabled) return;
     if (activeSession !== current || current.discard || current.stopHandled ||
         current.metadata?.state === "finalizing" || current.interruptionAnnounced) return;
     current.interruptionAnnounced = true;

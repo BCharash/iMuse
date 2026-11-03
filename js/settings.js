@@ -9,6 +9,7 @@ export function loadSettings() {
     let stored = {};
     try { stored = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (_) { /* storage unavailable */ }
     return {audioCommands:stored.audioCommands === true,
+        interruptionWarningEnabled:stored.interruptionWarningEnabled !== false,
         wakeEngine:stored.wakeEngine === "heed" ? "heed" : "voicute",
         voicuteThreshold:clamp(stored.voicuteThreshold,.3,.95,defaults.voicuteThreshold),
         wakeThreshold:clamp(stored.wakeThreshold,.3,.99,defaults.wakeThreshold),
@@ -46,7 +47,7 @@ button.addEventListener("click", () => {
     updateAutomaticOverlapLabel();
     button.setAttribute("aria-expanded", String(!panel.hidden));
 });
-const controls = {autoGainControl:"autoGainControl",noiseSuppression:"noiseSuppression",echoCancellation:"echoCancellation",silenceThresholdDb:"silenceThresholdDb",wakeMinimumDb:"wakeMinimumDb",silencePauseSeconds:"silencePauseSeconds",wakeEngine:"wakeEngine",voicuteThreshold:"voicuteThreshold",audioCommands:"audioCommandsToggle",wakeThreshold:"wakeThreshold",commandWindow:"commandWindow",
+const controls = {interruptionWarningEnabled:"interruptionWarningEnabled",autoGainControl:"autoGainControl",noiseSuppression:"noiseSuppression",echoCancellation:"echoCancellation",silenceThresholdDb:"silenceThresholdDb",wakeMinimumDb:"wakeMinimumDb",silencePauseSeconds:"silencePauseSeconds",wakeEngine:"wakeEngine",voicuteThreshold:"voicuteThreshold",audioCommands:"audioCommandsToggle",wakeThreshold:"wakeThreshold",commandWindow:"commandWindow",
     goThreshold:"goThreshold",stopThreshold:"stopThreshold",yesThreshold:"yesThreshold",noThreshold:"noThreshold",overlapFactor:"overlapFactor"};
 let silencePauseLocked = false;
 let microphoneProcessingLocked = false;
