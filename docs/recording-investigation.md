@@ -72,7 +72,7 @@ Checked against the repository on 3 November; these are static observations, not
 | Startup | Initializes database/recovery and selected wake model; TensorFlow warmup checks Audio commands; preloads normal response audio. No active idle wake listening before Record |
 | Visibility | Logs transitions and foreground snapshots, reacquires screen wake lock, resumes AudioContext only when `suspended`; does not explicitly stop or pause recorder merely because page is hidden |
 | Capture health | Existing snapshots record received count (`sequence`), committed count (`metadata.chunkCount`), last-chunk age, pending bytes and signal; no robust stalled-capture recovery controller |
-| Finalization | Unexpected stop is logged, but a nonempty assembly can still be marked `completed`; the status can conceal missing capture. This remains an actionable correctness issue |
+| Finalization | Stage 3 retains unexpected/error outcomes, checks chunk structure/counts/bytes, and offers available audio when finalization is delayed. Passing structural checks does not establish microphone continuity or media decoding |
 | Scaling | Finalization/playback/recovery still retrieve chunks and assemble a Blob; bounded pending capture memory does not establish bounded total memory for long recordings |
 | Packaging | Manifest uses `display: standalone`; no service-worker implementation was found in this review. No current production audioSession type override was found |
 
@@ -109,7 +109,7 @@ The collection is page memory, not persistent storage. Closing/reloading the pag
 
 Validation: `python3 tests/test_emergency_recordings.py` exercises production functions with controlled DOM/storage mocks, including actual failure finalization, the new-recording playback-clear path, multiple emergencies, rendered load/download controls, full-prefix-plus-tail exports, download failure/retry, recovery precedence, and unavailable-storage fallback. It checks recorder syntax. It does not exercise a real microphone, actual browser IndexedDB, file-picker completion, or iPhone behavior; those remain device acceptance work.
 
-Stage 1 added no database schema, audio-capture policy, persistent-storage request, or iPhone background workaround. Stage 2 below adds serialized updates, ownership and the consolidated interface. Completion validation and persistent-storage requests remain separate stages requiring approval.
+Stage 1 added no database schema, audio-capture policy, persistent-storage request, or iPhone background workaround. Stages 2 and 3 below add coordinated writes, consolidated recovery and completion checks. Persistent-storage requests remain a later stage requiring approval.
 
 ### Stage 1 device test: controlled storage failure
 
@@ -150,7 +150,28 @@ Stage 2 device/browser acceptance:
 3. In a separate disposable run, reload A while it records, then reload B after A has finished reinitializing. Its orphaned session should be loadable from committed chunks. Some ending loss remains possible; a timeslice is not a maximum-loss guarantee.
 4. In A, test pause/resume followed by Stop, then load/download the result. Counts should not roll backward when lifecycle state changes. Check normal Recently Deleted/Restore using a disposable completed recording; do not delete emergency audio to test this.
 
-Stage 3 (completion validation and stalled-finalization handling) remains unapproved. Stop at this checkpoint for user testing.
+The user subsequently reported that Stage 2 seemed to work as intended, without a new diagnostic trace or individual acceptance-step results. Stage 3 was then explicitly approved.
+
+### Stage 3: validated outcomes and delayed finalization
+
+Implemented 3 November 2026. [recording-integrity.js](../js/recording-integrity.js) checks sequences (including missing initial chunks and duplicates), nonempty chunk data, per-chunk byte counts, stored counts/totals and, where known, the received chunk count. It returns available parts and a structural report; it never deletes source chunks. Normal completion requires a normal user Stop, no recorded encoder error, no finalization delay and passing structural checks. Unexpected stops, recorder errors and failed checks retain an interrupted outcome. Storage failures retain their storage-error outcome. Empty audio is classified as interrupted with validation evidence. Error/history/report fields remain attached to the session.
+
+Unified Load audio applies the checks to both previously completed and interrupted sessions. Loading an interrupted session does not promote it to normal completion just because bytes are nonempty. Previously completed sessions that fail validation are reclassified as interrupted. Available partial audio remains loadable/exportable, with an incomplete-audio notice. This verifies stored structure only: it does not decode the container, establish speech continuity, or detect background audio that never reached MediaRecorder. Legacy records without enough metadata may be marked uncertain rather than declared complete.
+
+A watchdog is armed when stop is requested, on recorder error and when the stop handler runs. After 10 seconds of runnable page time, unfinished finalization offers a retained snapshot from readable committed chunks plus pending audio. Storage reads used by recovery/finalization/listing have a 2-second fallback; a hung read does not clear recordings or force an IndexedDB transaction to abort. If no committed data can be read, only pending fragments may be available, and those fragments may not decode on their own. The notice is explicit when no audio can yet be read. Browser suspension can delay JavaScript timers; these are not wall-clock or background-execution guarantees.
+
+Pending writes keep their storage ownership until they settle. A new recording is refused while the previous writer remains unfinished, preventing a second writer from competing with an unresolved transaction. Available recovery Load/Download actions remain usable. If the original operation eventually finishes, its delay/error history remains interrupted and the fullest retained copy remains available; a smaller fallback cannot replace a fuller recovery assembly. Stale watchdog work checks that finalization has not already completed before changing playback/notices. A permanently stalled browser storage operation may still require exporting available audio and later reopening; this stage does not claim to force such operations to finish or persist memory-only audio through closure.
+
+Validation: the three earlier suites still pass, plus `python3 tests/test_recording_finalization.py`. The new controlled suite covers valid/invalid sequence and byte structures, empty data, received-but-missing tails, normal/encoder-error/unexpected stops, preserved recovery classifications, partial exports, missing stop events, pending chunk and metadata writes, ownership while writes are delayed, later completion, bounded read fallback, fuller-copy retention and inert stale watchdogs. Tests use mocked storage, lock services and timers; actual codec/browser/device behavior remains outside these automated claims.
+
+Device acceptance for Stage 3, using disposable recordings:
+
+1. Record, pause/resume, then Stop normally. Expect **Received audio saved** and a structural-check message. Load/download the result and check playback. No interrupted label should appear for this normal path.
+2. Repeat the optional simulated storage-failure test, then make a normal second recording. Expect the first entry's unsaved-audio notice and full-copy Load/Download behavior to remain intact. Its error must not become normal completion just because it can be loaded.
+3. In a separate recording with no needed memory-only emergency audio in the page, reload during capture. Load the interrupted session after reopening. Available committed audio should still load, and its interrupted classification should remain. Some final audio loss is expected to remain possible; do not use reload to test memory-only emergency durability.
+4. Deliberate missing-chunk, encoder-error and stuck-storage/stop scenarios are covered by controlled tests, not new destructive device procedures. If real finalization runs long, check for the delayed notice and available-audio actions; export/check any available audio before closing. Report the exact notice, container and whether finalization later finishes. Never fill storage, clear site data or manually delete chunks to force this test.
+
+No storage-persistence request, schema migration, audio-warning playback or background microphone workaround was added. The next separately approved stage is persistent-storage requests/reporting, not file-picker enforcement. Wait for Stage 3 device results before advancing.
 
 ## Cleanup completed
 

@@ -5,6 +5,7 @@ import { loadHeedWakeWord } from "./heed/heed-adapter.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { loadCommands, startCommands, stopCommands } from "./tensorflow/commands-adapter.js";
 import { createRecordingStorageCoordinator } from "./recording-storage-coordinator.js";
+import { inspectRecordingChunks, recordingCompletion } from "./recording-integrity.js";
 
 const recordButton = document.getElementById("recordButton");
 const pauseButton = document.getElementById("pauseButton");
@@ -89,6 +90,51 @@ const emergencyRecordings = new Map();
 let preservationTestEnabled = false;
 let preservationTestButton = null;
 let preservationTestResult = null;
+const FINALIZATION_NOTICE_MS = 10000;
+const STORAGE_READ_TIMEOUT_MS = 2000;
+
+function boundedStorageRead(promise) {
+    let timer;
+    return Promise.race([promise, new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Reading saved audio is taking too long.")), STORAGE_READ_TIMEOUT_MS);
+    })]).finally(() => clearTimeout(timer));
+}
+
+function armFinalizationWatchdog(current) {
+    if (current.finalizationTimer || current.finalizationFinished) return;
+    current.finalizationTimer = setTimeout(() => {
+        void offerDelayedFinalization(current).catch(error => console.error("Delayed finalization recovery:", error));
+    }, FINALIZATION_NOTICE_MS);
+}
+
+async function offerDelayedFinalization(current) {
+    if (current.finalizationFinished) return;
+    current.finalizationDelayed = true;
+    current.metadata.interruptedAt ||= new Date().toISOString();
+    current.metadata.interruptionReasons = [...new Set([...(current.metadata.interruptionReasons || []), "Finalization was delayed"])];
+    status.textContent = "Finishing is taking longer than expected. Preparing available audio for download. Keep this page open.";
+    // A missing stop event must not leave the microphone running indefinitely.
+    // Keep ownership until the real stop handler and pending writes settle.
+    if (!current.stopHandled) {
+        setRecordingControlState("finalizing");
+        closeCommandWindow({ restorePauseReminder: false });
+        cleanupAudioMonitor(current);
+        stopStream(current.stream);
+        releaseScreenWakeLock();
+    }
+    let saved = [];
+    try { saved = await boundedStorageRead(getChunks(current.id)); } catch (_) { /* retain available memory fragments */ }
+    if (current.finalizationFinished) return;
+    const bySequence = new Map(saved.map(chunk => [chunk.sequence, chunk.blob]));
+    for (const [sequence, blob] of current.pendingChunks) bySequence.set(sequence, blob);
+    const parts = [...bySequence].sort((a, b) => a[0] - b[0]).map(([, blob]) => blob).filter(blob => blob?.size);
+    const blob = new Blob(parts, { type: current.metadata.mimeType || parts[0]?.type || "application/octet-stream" });
+    if (blob.size) retainEmergencyRecording(current, blob);
+    status.textContent = blob.size
+        ? "Finalization is delayed. Load or download available audio below; it may be incomplete. Keep this page open. New recording waits for pending storage to finish."
+        : "Finalization is delayed and no audio could be read yet. Keep this page open; pending storage still owns this session.";
+    void renderRecoverableSessions().catch(error => console.error(error));
+}
 
 function updatePreservationTestControls() {
     if (!preservationTestButton) return;
@@ -609,6 +655,7 @@ function finalizeRecording(source = "unspecified") {
     current.metadata.lastUpdatedAt = new Date().toISOString();
     putSession(current.metadata).catch(error => console.error("Could not mark session finalizing:", error));
     status.textContent = "Saving recording…";
+    armFinalizationWatchdog(current);
     try {
         current.recorder.stop();
     } catch (error) {
@@ -1353,9 +1400,14 @@ function clearPlayback() {
 
 function retainEmergencyRecording(current, blob) {
     if (!blob?.size) return;
+    // A later storage read may fail or return only a prefix. Never replace a
+    // fuller retained assembly with that smaller fallback.
+    const previous = emergencyRecordings.get(current.id);
+    if (previous && previous.blob.size > blob.size) return;
     emergencyRecordings.set(current.id, {
         blob,
-        metadata: { ...current.metadata }
+        metadata: { ...current.metadata },
+        unsavedBytes: [...current.pendingChunks.values()].reduce((sum, chunk) => sum + chunk.size, 0)
     });
     void renderRecoverableSessions().catch(error => console.error("Could not refresh recordings:", error));
     if (current.simulatedStorageFailure && preservationTestResult) {
@@ -1368,7 +1420,9 @@ function playEmergencyRecording(id) {
     const emergency = emergencyRecordings.get(id);
     if (!emergency) return false;
     showPlayback(emergency.blob, id);
-    status.textContent = "Emergency audio loaded. It includes audio not saved to browser storage. Download it before closing or reloading iMuse.";
+    status.textContent = emergency.unsavedBytes
+        ? "Available audio loaded, including unsaved audio. Download it before closing or reloading iMuse and check for missing sections."
+        : "Recovery audio loaded. Finalization was delayed; check for missing sections and download before closing or reloading iMuse.";
     return true;
 }
 
@@ -1429,6 +1483,21 @@ function sessionFilename(item) {
     return `iMuse-recording-${stamp}`;
 }
 
+function assembleSavedAudio(item, chunks, receivedCount) {
+    const { parts, report } = inspectRecordingChunks(item, chunks, receivedCount);
+    const blob = new Blob(parts, { type: item.mimeType || parts.find(part => part.type)?.type || "application/octet-stream" });
+    if (!blob.size) {
+        const error = new Error("No saved audio chunks are available.");
+        error.integrityReport = report;
+        throw error;
+    }
+    return { blob, report };
+}
+
+function integrityNotice(report) {
+    return report.ok ? "" : ` Audio may be incomplete: ${report.issues.join("; ")}.`;
+}
+
 async function exportSavedSession(id, button) {
     if (button) button.disabled = true;
     try {
@@ -1440,16 +1509,12 @@ async function exportSavedSession(id, button) {
         }
         await recordingStorage.run(async () => {
             assertSessionIdle(id);
-            const item = await getSession(id);
+            const item = await boundedStorageRead(getSession(id));
             if (!item || item.state === "deleted") throw new Error("This session is unavailable. Restore a deleted recording before loading it.");
-            const chunks = await getChunks(id);
-            const parts = chunks.map(chunk => chunk.blob).filter(blob => blob && blob.size > 0);
-            if (!parts.length) throw new Error("No saved audio chunks were found for this recording.");
-            const blob = new Blob(parts, {
-                type: item.mimeType || parts.find(part => part.type)?.type || "audio/webm"
-            });
+            const chunks = await boundedStorageRead(getChunks(id));
+            const { blob, report } = assembleSavedAudio(item, chunks);
             downloadAudioBlob(blob, sessionFilename(item));
-            status.textContent = "Download started. Check the exported audio before deleting the original.";
+            status.textContent = `Download started.${integrityNotice(report)} Check the exported audio before deleting the original.`;
         });
     } catch (error) {
         console.error("Could not export saved recording:", error);
@@ -1507,7 +1572,7 @@ function formatDate(value) {
 async function renderRecoverableSessions() {
     const panel = ensureRecoveryPanel();
     let allSessions = [], readError = null;
-    try { if (db) allSessions = await getAllSessions(); }
+    try { if (db) allSessions = await boundedStorageRead(getAllSessions()); }
     catch (error) { readError = error; }
     const available = new Map(allSessions.filter(item =>
         ["completed", "recording", "paused", "interrupted", "finalizing", "storage-error"].includes(item.state)
@@ -1551,10 +1616,12 @@ async function renderRecoverableSessions() {
         const label = document.createElement("span");
         label.style.flex = "1 1 12rem";
         const emergency = emergencyRecordings.get(item.id);
-        const busy = writingSessions.has(item.id) || ["recording", "paused", "finalizing"].includes(item.state);
+        const busy = !emergency && (writingSessions.has(item.id) || ["recording", "paused", "finalizing"].includes(item.state));
         label.textContent = emergency
-            ? `${formatDate(item.startedAt)} — ${emergency.blob.size} bytes available. Includes unsaved audio; download before closing or reloading.`
+            ? `${formatDate(item.startedAt)} — ${emergency.blob.size} bytes available. ${emergency.unsavedBytes ? "Includes unsaved audio" : "Recovery copy; finalization was delayed"}; download before closing or reloading.`
             : `${formatDate(item.startedAt)} — ${item.chunkCount || 0} saved chunks, ${item.bytesStored || 0} bytes${busy ? " — recording or finishing" : ""}`;
+        if (item.integrityReport?.ok === false) label.textContent += " — audio may be incomplete";
+        else if (item.state === "interrupted") label.textContent += " — interrupted recording";
         row.appendChild(label);
         const recoverButton = document.createElement("button");
         recoverButton.type = "button";
@@ -1742,40 +1809,11 @@ async function renderRecoverableSessions() {
 }
 
 async function loadRecording(id, button) {
-    if (playEmergencyRecording(id)) return;
-    try {
-        const item = await getSession(id);
-        if (item?.state === "completed") await playSavedSession(id, button);
-        else await recoverSession(id, button);
-    } catch (error) {
-        status.textContent = `Could not load audio: ${error.message || error}`;
-    }
+    return recoverSession(id, button);
 }
 
 async function playSavedSession(id, button) {
-    button.disabled = true;
-    status.textContent = "Loading saved recording...";
-    try {
-        if (playEmergencyRecording(id)) {
-            button.disabled = false;
-            return;
-        }
-        assertSessionIdle(id);
-        const item = await getSession(id);
-        if (!item || item.state !== "completed") throw new Error("This completed recording is no longer available.");
-        const chunks = await getChunks(id);
-        const parts = chunks.map(chunk => chunk.blob).filter(blob => blob && blob.size > 0);
-        if (!parts.length) throw new Error("No saved audio chunks were found for this recording.");
-        const blob = new Blob(parts, { type: item.mimeType || parts.find(part => part.type)?.type || "audio/webm" });
-        if (!blob.size) throw new Error("The saved recording is empty.");
-        showPlayback(blob, id);
-        status.textContent = `Recording loaded. Ready to play.`;
-    } catch (error) {
-        console.error("Could not load saved recording:", error);
-        status.textContent = `Could not load saved recording: ${error.message || "unknown error"}`;
-    } finally {
-        button.disabled = false;
-    }
+    return recoverSession(id, button);
 }
 
 async function recoverSession(id, button) {
@@ -1790,23 +1828,24 @@ async function recoverSession(id, button) {
         }
         await recordingStorage.run(async () => {
             assertSessionIdle(id);
-            const item = await getSession(id);
+            const item = await boundedStorageRead(getSession(id));
             if (!item || item.state === "deleted") throw new Error("This session is unavailable. Restore a deleted recording before loading it.");
-            const chunks = await getChunks(id);
-            const parts = chunks.map(chunk => chunk.blob).filter(blob => blob && blob.size > 0);
-            if (!parts.length) throw new Error("No audio chunks were successfully saved for this session.");
-            const blob = new Blob(parts, { type: item.mimeType || parts.find(part => part.type)?.type || "audio/webm" });
-            if (!blob.size) throw new Error("The recovered audio is empty.");
-            // Promote successfully recovered audio to normal saved-recording behavior.
-            // Preserve interruptedAt and other original metadata as recovery history.
+            const chunks = await boundedStorageRead(getChunks(id));
+            const { blob, report } = assembleSavedAudio(item, chunks);
+            // Recover availability, not a claim of uninterrupted capture.
+            const state = item.state === "completed" && report.ok ? "completed" : "interrupted";
             await putSessionNow({
                 ...item,
-                state: "completed",
+                state,
+                recoveredFromState: item.recoveredFromState || item.state,
+                integrityReport: report,
                 recoveredAt: new Date().toISOString(),
                 lastUpdatedAt: new Date().toISOString()
             });
             showPlayback(blob, id);
-            status.textContent = `Recovered audio saved. Listen through it to check for missing sections.`;
+            status.textContent = state === "completed"
+                ? "Recording loaded. Saved chunks passed structural checks; check playback."
+                : `Available audio loaded from an interrupted recording.${integrityNotice(report)} Check playback for missing sections.`;
             await renderRecoverableSessions();
         });
     } catch (error) {
@@ -1907,6 +1946,10 @@ function closeAudioContext(context) {
 }
 
 async function startRecording() {
+    if (writingSessions.size) {
+        status.textContent = "The previous recording is still finishing. Use its available audio below and keep this page open.";
+        return;
+    }
     setMicrophoneSelectionLocked(true);
     setSilencePauseLocked(true);
     setRecordingControlState("preparing");
@@ -2059,6 +2102,7 @@ async function startRecording() {
                 status.textContent = "Audio storage is too slow. Stopping to protect the recording.";
                 // Stop emits a final dataavailable event, which is also queued for storage.
                 if (recorder.state !== "inactive") {
+                    armFinalizationWatchdog(current);
                     try { recorder.stop(); } catch (error) { console.error("Automatic storage stop failed:", error); }
                 }
             }
@@ -2073,7 +2117,7 @@ async function startRecording() {
                 current.pendingChunks.delete(sequence);
                 current.pendingBytes -= chunk.size;
                 publishRecordingDiagnostics();
-                if (!current.persistenceError && !current.stopHandled) {
+                if (!current.persistenceError && !current.stopHandled && !current.finalizationDelayed) {
                     const progress = `${savedChunkProgress(current)} to this browser`;
                     if (recorder.state === "recording") {
                         status.textContent = `Recording in ${current.formatLabel} — ${progress}.`;
@@ -2093,6 +2137,7 @@ async function startRecording() {
                     current.stopIntent = "storage-write-error";
                     logRecordingEvent(current, "stop-request", { source: current.stopIntent, error: String(error) });
                     if (recorder.state !== "inactive") {
+                        armFinalizationWatchdog(current);
                         try { recorder.stop(); } catch (stopError) { console.error("Storage-failure stop failed:", stopError); }
                     }
                 }
@@ -2101,8 +2146,15 @@ async function startRecording() {
         recorder.addEventListener("error", event => {
             logRecordingEvent(current, "recorder-error", { error: String(event.error?.message || event.error || "unknown") });
             console.error("MediaRecorder error:", event.error || event);
-            status.textContent = "Recording error. Some audio may not have been saved.";
-            setRecordingControlState("idle");
+            current.recorderError = String(event.error?.message || event.error || "unknown");
+            current.metadata.recorderError = current.recorderError;
+            current.metadata.interruptedAt ||= new Date().toISOString();
+            current.metadata.interruptionReasons = [...new Set([...(current.metadata.interruptionReasons || []), "Recorder reported an error"])];
+            current.metadata.state = "interrupted";
+            putSession(current.metadata).catch(error => console.error(error));
+            status.textContent = "Recording error. Preserving available audio; the recording may be incomplete.";
+            setRecordingControlState("finalizing");
+            armFinalizationWatchdog(current);
         });
         recorder.addEventListener("pause", async () => {
             logRecordingEvent(current, "recorder-pause", { reason: current.pauseReason || "unspecified" });
@@ -2153,6 +2205,8 @@ async function startRecording() {
             logRecordingEvent(current, "recorder-stop", { classification: current.stopIntent || "UNEXPECTED-NO-STOP-REQUEST", stopIntent: current.stopIntent });
             if (current.stopHandled) return;
             current.stopHandled = true;
+            current.metadata.receivedChunkCount = current.sequence;
+            armFinalizationWatchdog(current);
             try {
                 if (current.activeSinceMs !== null) {
                     current.recordedMs += Math.max(0, performance.now() - current.activeSinceMs);
@@ -2199,19 +2253,35 @@ async function startRecording() {
                         current.persistenceError.message === "Audio storage is not keeping up with recording.")) {
                         throw current.persistenceError;
                     }
-                    const savedChunks = await getChunks(id);
-                    const parts = savedChunks.map(chunk => chunk.blob).filter(blob => blob && blob.size > 0);
-                    finalBlob = new Blob(parts, { type: current.metadata.mimeType || parts.find(part => part.type)?.type || "application/octet-stream" });
-                    if (!finalBlob.size) throw new Error("No saved audio chunks were found.");
-                    current.metadata.state = "completed";
-                    current.metadata.completedAt = new Date().toISOString();
-                    current.metadata.lastUpdatedAt = current.metadata.completedAt;
+                    const savedChunks = await boundedStorageRead(getChunks(id));
+                    const assembly = assembleSavedAudio(current.metadata, savedChunks, current.sequence);
+                    finalBlob = assembly.blob;
+                    Object.assign(current.metadata, recordingCompletion(current, assembly.report));
+                    current.metadata.integrityReport = assembly.report;
+                    current.metadata.lastUpdatedAt = new Date().toISOString();
+                    if (current.metadata.state === "completed") current.metadata.completedAt = current.metadata.lastUpdatedAt;
+                    else current.metadata.interruptedAt ||= current.metadata.lastUpdatedAt;
                     await putSession(current.metadata);
-                    logRecordingEvent(current, "finalization-completed", { bytes: finalBlob.size, stopIntent: current.stopIntent });
+                    // The watchdog may have fired while the transaction ran.
+                    if (current.finalizationDelayed && current.metadata.state === "completed") {
+                        Object.assign(current.metadata, recordingCompletion(current, assembly.report));
+                        current.metadata.interruptedAt ||= new Date().toISOString();
+                        await putSession(current.metadata);
+                    }
+                    logRecordingEvent(current, "finalization-completed", { bytes: finalBlob.size, stopIntent: current.stopIntent, state: current.metadata.state, integrity: assembly.report });
+                    if (current.pendingChunks.size) {
+                        const combined = new Map(savedChunks.map(chunk => [chunk.sequence, chunk.blob]));
+                        for (const [sequence, blob] of current.pendingChunks) combined.set(sequence, blob);
+                        finalBlob = new Blob([...combined].sort((a, b) => a[0] - b[0]).map(([, blob]) => blob).filter(blob => blob?.size), { type: current.metadata.mimeType });
+                        retainEmergencyRecording(current, finalBlob);
+                    } else if (emergencyRecordings.has(id)) retainEmergencyRecording(current, finalBlob);
+                    finalBlob = emergencyRecordings.get(id)?.blob || finalBlob;
                     showPlayback(finalBlob, id);
-                    status.textContent = current.storageStopRequested
-                        ? "Recording stopped because storage was slow. Saved audio is available; check playback."
-                        : "Recording saved.";
+                    status.textContent = emergencyRecordings.get(id)?.unsavedBytes
+                        ? `Recording was interrupted. Available audio includes unsaved data; download before closing or reloading.${integrityNotice(assembly.report)}`
+                        : current.metadata.state === "completed"
+                        ? "Received audio saved. Saved chunks passed structural checks; check playback."
+                        : `Recording was interrupted. Available audio is saved.${integrityNotice(assembly.report)} Check playback for missing sections.`;
                 } catch (error) {
                     logRecordingEvent(current, "finalization-error", { error: String(error) });
                     console.error("Could not finalize persisted recording:", error);
@@ -2219,7 +2289,7 @@ async function startRecording() {
                     // The latter is retained in RAM solely for emergency export.
                     let fallbackParts = [];
                     try {
-                        const committed = await getChunks(id);
+                        const committed = await boundedStorageRead(getChunks(id));
                         const bySequence = new Map(committed.map(chunk => [chunk.sequence, chunk.blob]));
                         for (const [sequence, blob] of current.pendingChunks) bySequence.set(sequence, blob);
                         fallbackParts = [...bySequence.entries()].sort((a, b) => a[0] - b[0])
@@ -2232,9 +2302,13 @@ async function startRecording() {
                     finalBlob = new Blob(fallbackParts, { type: current.metadata.mimeType || fallbackParts.find(part => part.type)?.type || "application/octet-stream" });
                     if (finalBlob.size) {
                         retainEmergencyRecording(current, finalBlob);
-                        showPlayback(finalBlob, id);
+                        showPlayback(emergencyRecordings.get(id).blob, id);
                     }
-                    current.metadata.state = "storage-error";
+                    current.metadata.state = error.integrityReport ? "interrupted" : "storage-error";
+                    current.metadata.finalizationError = String(error.message || error);
+                    current.metadata.interruptedAt ||= new Date().toISOString();
+                    current.metadata.interruptionReasons = [...new Set([...(current.metadata.interruptionReasons || []), "Finalization could not be verified"])];
+                    if (error.integrityReport) current.metadata.integrityReport = error.integrityReport;
                     current.metadata.lastUpdatedAt = new Date().toISOString();
                     try { await putSession(current.metadata); } catch (saveError) { console.error(saveError); }
                     status.textContent = finalBlob.size
@@ -2246,8 +2320,10 @@ async function startRecording() {
                 void sayResponse("stopped");
                 await renderRecoverableSessions();
             } finally {
-                writingSessions.delete(id);
+                current.finalizationFinished = true;
+                clearTimeout(current.finalizationTimer);
                 await recordingLease?.release();
+                writingSessions.delete(id);
                 // The preceding render may still have shown a finishing session.
                 void renderRecoverableSessions().catch(error => console.error(error));
             }
@@ -2320,6 +2396,7 @@ deleteButton.addEventListener("click", async () => {
         current.stopIntent = "delete-button";
         logRecordingEvent(current, "stop-request", { source: current.stopIntent });
         current.deleteRequested = true;
+        armFinalizationWatchdog(current);
         activeSession = null;
         setAudioCommandsToggleLocked(false);
         setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);

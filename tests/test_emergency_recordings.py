@@ -74,6 +74,11 @@ def evaluate(code):
 MOCKS = r"""
 const assert = (value, message) => { if (!value) throw Error(message); };
 const console = {error(){}};
+const FINALIZATION_NOTICE_MS = 10000, STORAGE_READ_TIMEOUT_MS = 2000;
+const timers = new Map();
+let timerSequence = 0;
+function setTimeout(callback) { const id = ++timerSequence; timers.set(id, callback); return id; }
+function clearTimeout(id) { timers.delete(id); }
 class Element {
     constructor() { this.children = []; this.style = {}; this.events = {}; }
     append(...items) { this.children.push(...items); }
@@ -165,7 +170,9 @@ stop_marker = '        recorder.addEventListener("stop", async () => {'
 stop_offset = SOURCE.index(stop_marker) + len(stop_marker)
 stop_body = SOURCE[stop_offset:SOURCE.index('        });\n        await setupSilenceMonitor(current);', stop_offset)]
 FUNCTIONS = (
-    between("function clearPlayback()", "function setAudioCommandsToggleLocked(")
+    (Path(__file__).resolve().parents[1] / "js/recording-integrity.js").read_text().replace("export ", "")
+    + between("function boundedStorageRead(", "function updatePreservationTestControls(")
+    + between("function clearPlayback()", "function setAudioCommandsToggleLocked(")
     + between("function showPlayback(", "function audioFileExtension(")
     + between("function sessionFilename(", "function ensureCurrentDownloadButton(")
     + between("function ensureRecoveryPanel(", "async function playSavedSession(")
