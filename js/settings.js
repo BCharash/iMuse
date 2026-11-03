@@ -1,3 +1,5 @@
+import { createStoragePersistence, storagePersistenceLabel } from "./storage-persistence.js";
+
 // Stage 1: configuration only. The existing wake-word implementation remains
 // unchanged until the Heed/TensorFlow integration is tested in later stages.
 const KEY = "imuse.voice-settings.v1";
@@ -148,6 +150,42 @@ function renderMicrophoneProcessing() {
 }
 window.addEventListener("imuse-microphone-processing", renderMicrophoneProcessing);
 renderMicrophoneProcessing();
+
+// Separate from read-only diagnostics: this asks the browser for eviction
+// protection, without exporting files or changing the recording database.
+const persistenceSection = document.createElement("section");
+persistenceSection.id = "storagePersistence";
+persistenceSection.setAttribute("aria-label", "Recording storage protection");
+const persistenceHeading = document.createElement("h3");
+persistenceHeading.textContent = "Recording storage protection";
+const persistenceStatus = document.createElement("p");
+persistenceStatus.setAttribute("role", "status");
+const persistenceNote = document.createElement("p");
+persistenceNote.textContent = "Protection applies to saved browser data in this app or browser. It is not a separate file backup, does not reserve free disk space, and does not protect unsaved audio, deleted website data or an uninstalled app. Safari and an installed app may have different results.";
+const persistenceError = document.createElement("p");
+const persistenceRequest = document.createElement("button");
+persistenceRequest.type = "button";
+persistenceRequest.textContent = "Request storage protection";
+const persistenceRefresh = document.createElement("button");
+persistenceRefresh.type = "button";
+persistenceRefresh.textContent = "Check protection";
+const persistence = createStoragePersistence(navigator.storage, state => {
+    persistenceStatus.textContent = storagePersistenceLabel(state);
+    persistenceRequest.disabled = state.busy || state.status === "granted" || !state.requestSupported;
+    persistenceRefresh.disabled = state.busy;
+    persistenceError.textContent = state.error || "";
+    persistenceError.hidden = !state.error;
+});
+persistenceRequest.addEventListener("click", () => { void persistence.request(); });
+persistenceRefresh.addEventListener("click", () => { void persistence.check(); });
+persistenceSection.append(persistenceHeading, persistenceStatus, persistenceNote, persistenceRequest, persistenceRefresh, persistenceError);
+panel.appendChild(persistenceSection);
+button.addEventListener("click", () => {
+    if (!panel.hidden) void persistence.check();
+});
+// One nonblocking request per page load. A denial/error never blocks recording
+// and does not trigger repeated requests while chunks are being recorded.
+void persistence.request();
 
 // Recording diagnostics are read-only and do not modify recording or storage.
 const diagnosticsSection = document.createElement("section");

@@ -109,7 +109,7 @@ The collection is page memory, not persistent storage. Closing/reloading the pag
 
 Validation: `python3 tests/test_emergency_recordings.py` exercises production functions with controlled DOM/storage mocks, including actual failure finalization, the new-recording playback-clear path, multiple emergencies, rendered load/download controls, full-prefix-plus-tail exports, download failure/retry, recovery precedence, and unavailable-storage fallback. It checks recorder syntax. It does not exercise a real microphone, actual browser IndexedDB, file-picker completion, or iPhone behavior; those remain device acceptance work.
 
-Stage 1 added no database schema, audio-capture policy, persistent-storage request, or iPhone background workaround. Stages 2 and 3 below add coordinated writes, consolidated recovery and completion checks. Persistent-storage requests remain a later stage requiring approval.
+Stage 1 added no database schema, audio-capture policy, persistent-storage request, or iPhone background workaround. Stages 2 and 3 below add coordinated writes, consolidated recovery and completion checks; Stage 4 adds browser-persistence requests after separate approval.
 
 ### Stage 1 device test: controlled storage failure
 
@@ -171,7 +171,26 @@ Device acceptance for Stage 3, using disposable recordings:
 3. In a separate recording with no needed memory-only emergency audio in the page, reload during capture. Load the interrupted session after reopening. Available committed audio should still load, and its interrupted classification should remain. Some final audio loss is expected to remain possible; do not use reload to test memory-only emergency durability.
 4. Deliberate missing-chunk, encoder-error and stuck-storage/stop scenarios are covered by controlled tests, not new destructive device procedures. If real finalization runs long, check for the delayed notice and available-audio actions; export/check any available audio before closing. Report the exact notice, container and whether finalization later finishes. Never fill storage, clear site data or manually delete chunks to force this test.
 
-No storage-persistence request, schema migration, audio-warning playback or background microphone workaround was added. The next separately approved stage is persistent-storage requests/reporting, not file-picker enforcement. Wait for Stage 3 device results before advancing.
+Stage 3 added no storage-persistence request, schema migration, audio-warning playback or background microphone workaround. The user subsequently reported that Stage 3 looked okay, without detailed traces or individual acceptance-step outcomes, and approved Stage 4.
+
+### Stage 4: persistent browser storage
+
+Implemented 3 November 2026 after approval. [storage-persistence.js](../js/storage-persistence.js) checks `navigator.storage.persisted()` and, if not already granted, requests `navigator.storage.persist()`. Settings makes one automatic, nonblocking attempt per page load. Recording, microphone acquisition and chunk writes do not await it. No file picker, audio export, database migration or recording deletion is involved. No locally cached preference substitutes for the browser's answer.
+
+**Settings → Recording storage protection** displays the live result: **Protected from automatic eviction**, **Not granted**, **unsupported**, or an explicit check/request error. Opening Settings or pressing **Check protection** only checks current policy. **Request storage protection** allows another user-initiated attempt when supported and not granted. Concurrent actions share one operation; a 5-second timeout restores usable controls if the policy API never settles. A false result is reported as not granted, not treated as an application failure or a reason to block recording. Decisions and any permission prompt belong to the browser.
+
+This changes eviction policy for saved data in the current browser storage scope. It does not create an independent file, reserve free disk space, save an emergency tail still in memory, prevent explicit data removal/uninstallation, or fix background microphone capture. A browser tab and an installed app may have different policy results. WebKit documents these APIs and heuristic grants in its [storage policy explanation](https://webkit.org/blog/14403/updates-to-storage-policy/); successful persistence is not a guarantee of unlimited space or protection from deliberate deletion.
+
+Validation: `python3 tests/test_storage_persistence.py` exercises the production controller and Settings integration with mock APIs/DOM. It covers already granted, newly granted, refused, missing/partially supported APIs, receiver binding, concurrent calls, read-only refresh, retry, exceptions, timeout and late-result handling. The four recording preservation suites remain regression checks. Tests do not invoke actual browser permission decisions or force eviction.
+
+Stage 4 acceptance in an updated PWA or browser page:
+
+1. Open Settings and read **Recording storage protection**. Report its exact result; a browser refusal is a valid handled outcome, not proof the implementation failed.
+2. Press **Check protection**. If not granted and requesting is supported, try **Request storage protection** once. Check that the page reports the browser's outcome and the controls recover from any error.
+3. Make a disposable normal recording, Stop, Load audio, and Download audio. Confirm there is no required file-picker step between recordings. Separately reload after saving and check that the policy is checked again and the recording still loads.
+4. Optionally compare Safari and the installed app, reporting the container with each result. Do not infer one context's protection from the other, reinstall the app, clear site data or fill storage as an eviction test.
+
+Stage 4 does not add automatic retries for memory-only emergency audio. That is separate work requiring approval. No further stage is authorized by these changes; wait for device results.
 
 ## Cleanup completed
 
