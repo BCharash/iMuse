@@ -1,6 +1,6 @@
 # iMuse Design Journal
 
-Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated snapshots. DJ012 records the minimal installed failure; DJ013 records the completed preservation work. Older proposals and labels are historical, not current instructions.
+Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated snapshots. DJ012 records the minimal installed failure; DJ013 records preservation work; DJ014 records the first UI extraction. Older proposals and labels are historical, not current instructions.
 
 ---
 
@@ -1441,3 +1441,13 @@ The user requested a simpler interface: status-only storage protection, automati
 The five Python suites are retained regression coverage, with a shared harness and standard unittest discovery. They are development tools, not runtime requirements or device certification. The current recording brief owns behavior, evidence boundaries and one manual checklist; detailed stage history moved to Archive. The roadmap and Memora handoff now preserve interrupted status rather than instruct recovery-to-completed promotion.
 
 Automatic retries for memory-only emergency tails, acquisition repair, long-file memory work and native development remain separate future decisions. No additional stage, deployment or storage migration is authorized by this cleanup.
+
+---
+
+# DJ014 — Extract the Recording Library Interface
+
+**Date:** 3 November 2026. **Status:** First refactoring step approved and implemented; device regression remains separate.
+
+Moved Saved/Recently Deleted rendering, selection/confirmation handlers and the saved-player dialog into `js/recording-library.js`. Its factory accepts callbacks for storage/recovery actions and current emergency/write-ownership state. It owns only its DOM and saved-playback URL; recorder.js retains capture, storage, emergency data and the top player. No database schema, capture policy or storage algorithm changed.
+
+The five suites now run six test methods, including direct whole-module library coverage for protected active/emergency rows, playback/export/diagnostics delegation, soft delete, restore and cancelled/confirmed bulk deletion. Integration checks use the actual recorder wiring and preserve full emergency selection and top-player isolation. These controlled checks pass, but native controls/layout and real-browser recording still need focused device checks. Later storage/controller extractions require separate approval.

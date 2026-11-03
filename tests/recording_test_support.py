@@ -75,15 +75,16 @@ let timerSequence = 0;
 function setTimeout(callback) { const id = ++timerSequence; timers.set(id, callback); return id; }
 function clearTimeout(id) { timers.delete(id); }
 class Element {
-    constructor() { this.children = []; this.style = {}; this.events = {}; }
+    constructor() { this.children = []; this.style = {}; this.events = {}; this.attributes = {}; }
     append(...items) { for (const item of items) {if (typeof item === 'object') item.parentElement = this; this.children.push(item);} }
     appendChild(item) { this.append(item); }
     prepend(item) { this.children.unshift(item); }
     replaceChildren(...items) { this.children = items; }
-    setAttribute() {}
+    setAttribute(name, value) { this.attributes[name] = value; }
+    getAttribute(name) { return this.attributes[name]; }
     removeAttribute() {}
     addEventListener(name, handler) { this.events[name] = handler; }
-    click() { return this.events.click(); }
+    click() { if (!this.disabled) return this.events.click(); }
     pause() {}
     load() {}
     showModal() { this.open = true; }
@@ -104,8 +105,12 @@ const audioPlayer = new Element(), recordingControls = new Element(), status = {
 const revoked = [];
 const URL = {createObjectURL: () => 'blob:test', revokeObjectURL: url => revoked.push(url)};
 let recordingUrl = null, displayedSessionId = null, activeSession = null, db = null;
-let savedPlayback = null, savedPlaybackRequest = 0;
-let recoveryPanel = null, lastRecordingPeakBytes = 0, startRequest = 0, recordingLease = null;
+let lastRecordingPeakBytes = 0, startRequest = 0, recordingLease = null;
+function getRecoveryPanel() { return location.children.find(element => element.id === 'recoveryPanel'); }
+function getSavedPlayback() {
+    const dialog = document.body.children.find(element => element.className === 'saved-audio-dialog');
+    return dialog ? {dialog, player:dialog.children[1], id:dialog.getAttribute('data-session-id')} : null;
+}
 const writingSessions = new Set();
 let leaseAcquisitions = 0, leaseReleases = 0;
 const recordingStorage = {
@@ -148,6 +153,10 @@ function setMicrophoneSelectionLocked() {} function setSilencePauseLocked() {}
 function releaseScreenWakeLock() {} function setWakeStatus() {}
 function setRecordingControlState() {} function setReadyUI() {}
 function sayResponse() {}
+async function moveSessionToRecentlyDeleted() { throw Error('not configured'); }
+async function restoreRecentlyDeletedSession() { throw Error('not configured'); }
+async function deleteSessionData() { throw Error('not configured'); }
+async function downloadRecordingEvents() {}
 let current, id, stream = {};
 function seed(name) {
     db = {};
@@ -168,16 +177,20 @@ function seed(name) {
 stop_marker = '        recorder.addEventListener("stop", async () => {'
 stop_offset = SOURCE.index(stop_marker) + len(stop_marker)
 stop_body = SOURCE[stop_offset:SOURCE.index('        });\n        await setupSilenceMonitor(current);', stop_offset)]
+LIBRARY_SOURCE = (Path(__file__).resolve().parents[1] / "js/recording-library.js").read_text().replace("export ", "")
+assert 'import { createRecordingLibrary } from "./recording-library.js";' in SOURCE
 FUNCTIONS = (
     (Path(__file__).resolve().parents[1] / "js/recording-integrity.js").read_text().replace("export ", "")
+    + LIBRARY_SOURCE
     + between("function boundedStorageRead(", "function updatePreservationTestControls(")
     + between("function clearPlayback()", "function setAudioCommandsToggleLocked(")
     + between("function showPlayback(", "function audioFileExtension(")
     + between("function sessionFilename(", "function ensureCurrentDownloadButton(")
-    + between("function ensureRecoveryPanel(", "async function playSavedSession(")
+    + between("function renderRecoverableSessions(", "async function playSavedSession(")
     + between("async function playSavedSession(", "async function initialize(")
     + between("function assertSessionIdle(", "// Soft deletion")
     + between("async function startRecording()", 'recordButton.addEventListener("click"')
     + "async function stopHandler() {" + stop_body + "}\n"
+    + between("const recordingLibrary = createRecordingLibrary(", "// Deliberately session-only")
 )
 

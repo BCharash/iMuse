@@ -18,6 +18,8 @@ The four recording-preservation stages and interface cleanup are implemented. Th
 
 The iPhone installed-app background microphone failure remains unresolved; Safari-tab capture is the reported working route. The warning and temporary background labs are removed. No further preservation stage, native migration or speculative capture patch is underway. Automatic retries for memory-only emergency audio remain a possible separately approved improvement.
 
+The first approved recorder refactoring step moves saved-list rendering and its player dialog into `js/recording-library.js`; recording/storage behavior remains in `recorder.js`. Further extractions await separate approval and the usual focused regression checks.
+
 ## Document maintenance
 
 Keep one authoritative home for each subject. Put new test results in the investigation, priorities in Next steps, and dated decisions in the journal. Link to these rather than duplicating their contents across handoffs. Keep Memora and Swift documents focused on their own contracts. Archive superseded plans with a visible status notice; historical imperative language is not a current instruction.
