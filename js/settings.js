@@ -9,6 +9,7 @@ export function loadSettings() {
     let stored = {};
     try { stored = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (_) { /* storage unavailable */ }
     return {audioCommands:stored.audioCommands === true,
+        recordingAudioSession:stored.recordingAudioSession === "play-and-record" ? "play-and-record" : "auto",
         wakeEngine:stored.wakeEngine === "heed" ? "heed" : "voicute",
         voicuteThreshold:clamp(stored.voicuteThreshold,.3,.95,defaults.voicuteThreshold),
         wakeThreshold:clamp(stored.wakeThreshold,.3,.99,defaults.wakeThreshold),
@@ -46,13 +47,13 @@ button.addEventListener("click", () => {
     updateAutomaticOverlapLabel();
     button.setAttribute("aria-expanded", String(!panel.hidden));
 });
-const controls = {autoGainControl:"autoGainControl",noiseSuppression:"noiseSuppression",echoCancellation:"echoCancellation",silenceThresholdDb:"silenceThresholdDb",wakeMinimumDb:"wakeMinimumDb",silencePauseSeconds:"silencePauseSeconds",wakeEngine:"wakeEngine",voicuteThreshold:"voicuteThreshold",audioCommands:"audioCommandsToggle",wakeThreshold:"wakeThreshold",commandWindow:"commandWindow",
+const controls = {recordingAudioSession:"recordingAudioSession",autoGainControl:"autoGainControl",noiseSuppression:"noiseSuppression",echoCancellation:"echoCancellation",silenceThresholdDb:"silenceThresholdDb",wakeMinimumDb:"wakeMinimumDb",silencePauseSeconds:"silencePauseSeconds",wakeEngine:"wakeEngine",voicuteThreshold:"voicuteThreshold",audioCommands:"audioCommandsToggle",wakeThreshold:"wakeThreshold",commandWindow:"commandWindow",
     goThreshold:"goThreshold",stopThreshold:"stopThreshold",yesThreshold:"yesThreshold",noThreshold:"noThreshold",overlapFactor:"overlapFactor"};
 let silencePauseLocked = false;
 let microphoneProcessingLocked = false;
 export function setMicrophoneProcessingLocked(locked) {
     microphoneProcessingLocked = Boolean(locked);
-    for (const id of ["autoGainControl", "noiseSuppression", "echoCancellation"]) {
+    for (const id of ["autoGainControl", "noiseSuppression", "echoCancellation", "recordingAudioSession"]) {
         const control = document.getElementById(id);
         if (control) {
             control.disabled = Boolean(locked);

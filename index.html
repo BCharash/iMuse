@@ -79,6 +79,13 @@
             <button id="refreshMicrophones" type="button">Refresh</button>
         </div>
         <p class="settings-note">Selection applies to the next recording. Device names may require microphone permission.</p>
+        <label for="recordingAudioSession">Audio session (experimental)</label>
+        <select id="recordingAudioSession" aria-describedby="recordingAudioSessionHelp recordingAudioSessionStatus">
+            <option value="auto">Automatic — browser decides (current behavior)</option>
+            <option value="play-and-record">Play and record — request microphone and speaker together</option>
+        </select>
+        <p id="recordingAudioSessionHelp" class="settings-note">Choose before recording. This tests iPhone installed-app background capture; it does not play microphone audio through the speaker or grant background permission.</p>
+        <p id="recordingAudioSessionStatus" class="settings-note" role="status">Not tested yet. Start a recording to check whether the browser accepts the choice.</p>
         <div class="imuse-mic-processing-controls" role="group" aria-label="Microphone processing requests">
             <label><input type="checkbox" id="autoGainControl"> Automatic gain control</label>
             <label><input type="checkbox" id="noiseSuppression"> Noise suppression</label>
