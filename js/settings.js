@@ -161,24 +161,11 @@ persistenceHeading.textContent = "Recording storage protection";
 const persistenceStatus = document.createElement("p");
 persistenceStatus.setAttribute("role", "status");
 const persistenceNote = document.createElement("p");
-persistenceNote.textContent = "Protection applies to saved browser data in this app or browser. It is not a separate file backup, does not reserve free disk space, and does not protect unsaved audio, deleted website data or an uninstalled app. Safari and an installed app may have different results.";
-const persistenceError = document.createElement("p");
-const persistenceRequest = document.createElement("button");
-persistenceRequest.type = "button";
-persistenceRequest.textContent = "Request storage protection";
-const persistenceRefresh = document.createElement("button");
-persistenceRefresh.type = "button";
-persistenceRefresh.textContent = "Check protection";
+persistenceNote.textContent = "When granted, protects saved browser data from automatic removal. Keep backups of important recordings.";
 const persistence = createStoragePersistence(navigator.storage, state => {
     persistenceStatus.textContent = storagePersistenceLabel(state);
-    persistenceRequest.disabled = state.busy || state.status === "granted" || !state.requestSupported;
-    persistenceRefresh.disabled = state.busy;
-    persistenceError.textContent = state.error || "";
-    persistenceError.hidden = !state.error;
 });
-persistenceRequest.addEventListener("click", () => { void persistence.request(); });
-persistenceRefresh.addEventListener("click", () => { void persistence.check(); });
-persistenceSection.append(persistenceHeading, persistenceStatus, persistenceNote, persistenceRequest, persistenceRefresh, persistenceError);
+persistenceSection.append(persistenceHeading, persistenceStatus, persistenceNote);
 panel.appendChild(persistenceSection);
 button.addEventListener("click", () => {
     if (!panel.hidden) void persistence.check();

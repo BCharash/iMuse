@@ -18,6 +18,9 @@ async function putSession(record) {
 async function putSessionNow(record) { return putSession(record); }
 async function getSession(id) { return {...metadataStore.get(id)}; }
 async function getAllSessions() { return [...metadataStore.values()]; }
+async function moveSessionToRecentlyDeleted(id) {
+    metadataStore.set(id, {...metadataStore.get(id), state:'deleted', deletedAt:'2026-11-03T10:00:00Z'});
+}
 function healthy(name) {
     seed(name);
     current.persistenceError = null;
@@ -166,6 +169,15 @@ globalThis.testResult = 'pending';
     await offerDelayedFinalization(old);
     assert(status.textContent === oldStatus && window.lastRecording === oldPlayback, 'finished watchdog is inert');
     writingSessions.delete('done');
+
+    metadataStore.set('ui-delete', {id:'ui-delete',state:'completed',bytesStored:2048,chunkCount:2,startedAt:'2026-11-03T10:00:00Z'});
+    await renderRecoverableSessions();
+    const savedRow = recoveryPanel.children.find(element => element.children?.some(child => child.textContent === 'Delete') && element.children[0].textContent.includes(formatRecordingSize(2048)));
+    const topBeforeDelete = window.lastRecording;
+    await savedRow.children.find(child => child.textContent === 'Delete').click();
+    assert(window.lastRecording === topBeforeDelete, 'deleting a saved row keeps the top in-memory recording');
+    const deletedSection = recoveryPanel.children.find(element => element.children?.some(child => child.textContent === 'Recently Deleted (1)'));
+    assert(deletedSection && deletedSection.children.some(row => row.children?.some(child => child.textContent?.includes(formatRecordingSize(2048)))), 'Recently Deleted includes file size in KB');
     globalThis.testResult = 'PASS';
 })().catch(error => {globalThis.testResult = String(error) + '\n' + (error.stack || '');});
 """

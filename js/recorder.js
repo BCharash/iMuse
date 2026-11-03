@@ -79,6 +79,8 @@ let db = null;
 let activeSession = null;
 let recordingUrl = null;
 let displayedSessionId = null;
+let savedPlayback = null;
+let savedPlaybackRequest = 0;
 let startRequest = 0;
 let recoveryPanel = null;
 let lastRecordingPeakBytes = 0;
@@ -1416,10 +1418,10 @@ function retainEmergencyRecording(current, blob) {
     }
 }
 
-function playEmergencyRecording(id) {
+function playEmergencyRecording(id, present = showPlayback) {
     const emergency = emergencyRecordings.get(id);
     if (!emergency) return false;
-    showPlayback(emergency.blob, id);
+    present(emergency.blob, id);
     status.textContent = emergency.unsavedBytes
         ? "Available audio loaded, including unsaved audio. Download it before closing or reloading iMuse and check for missing sections."
         : "Recovery audio loaded. Finalization was delayed; check for missing sections and download before closing or reloading iMuse.";
@@ -1450,6 +1452,46 @@ function showPlayback(blob, sessionId = null) {
     audioPlayer.load();
     audioPlayer.hidden = false;
     recordingControls.hidden = false;
+}
+
+function closeSavedPlayback() {
+    if (!savedPlayback) return;
+    const previous = savedPlayback;
+    savedPlayback = null;
+    previous.player.pause();
+    previous.player.removeAttribute("src");
+    previous.player.load();
+    URL.revokeObjectURL(previous.url);
+    if (previous.dialog.open && typeof previous.dialog.close === "function") previous.dialog.close();
+    previous.dialog.remove();
+}
+
+function showSavedPlayback(blob, id) {
+    closeSavedPlayback();
+    audioPlayer.pause();
+    const dialog = document.createElement("dialog");
+    dialog.className = "saved-audio-dialog";
+    dialog.setAttribute("aria-label", "Saved recording player");
+    const heading = document.createElement("h3");
+    heading.textContent = "Saved recording";
+    const player = document.createElement("audio");
+    player.controls = true;
+    player.preload = "metadata";
+    const url = URL.createObjectURL(blob);
+    player.src = url;
+    player.type = blob.type || "audio/webm";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.textContent = "Close";
+    close.addEventListener("click", closeSavedPlayback);
+    dialog.addEventListener("close", () => {
+        if (savedPlayback?.dialog === dialog) closeSavedPlayback();
+    });
+    dialog.append(heading, player, close);
+    savedPlayback = { id, player, dialog, url };
+    document.body.appendChild(dialog);
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
 }
 
 function audioFileExtension(blob) {
@@ -1569,6 +1611,10 @@ function formatDate(value) {
     return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
 }
 
+function formatRecordingSize(bytes) {
+    return `${(Math.max(0, Number(bytes) || 0) / 1024).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} KB`;
+}
+
 async function renderRecoverableSessions() {
     const panel = ensureRecoveryPanel();
     let allSessions = [], readError = null;
@@ -1603,7 +1649,7 @@ async function renderRecoverableSessions() {
     }
     if (sessions.length) {
         const explanation = document.createElement("p");
-        explanation.textContent = "Completed recordings remain available here after a page reload. Interrupted sessions can be recovered from the chunks saved before the interruption.";
+        explanation.textContent = "Saved recordings remain available after reopening. Interrupted audio may be incomplete.";
         panel.appendChild(explanation);
     }
     for (const item of sessions) {
@@ -1618,14 +1664,18 @@ async function renderRecoverableSessions() {
         const emergency = emergencyRecordings.get(item.id);
         const busy = !emergency && (writingSessions.has(item.id) || ["recording", "paused", "finalizing"].includes(item.state));
         label.textContent = emergency
-            ? `${formatDate(item.startedAt)} — ${emergency.blob.size} bytes available. ${emergency.unsavedBytes ? "Includes unsaved audio" : "Recovery copy; finalization was delayed"}; download before closing or reloading.`
-            : `${formatDate(item.startedAt)} — ${item.chunkCount || 0} saved chunks, ${item.bytesStored || 0} bytes${busy ? " — recording or finishing" : ""}`;
+            ? `${formatDate(item.startedAt)} — ${formatRecordingSize(emergency.blob.size)}. ${emergency.unsavedBytes ? "Includes unsaved audio" : "Recovery copy; finalization was delayed"}; download before closing or reloading.`
+            : `${formatDate(item.startedAt)} — ${formatRecordingSize(item.bytesStored)}${busy ? " — recording or finishing" : ""}`;
         if (item.integrityReport?.ok === false) label.textContent += " — audio may be incomplete";
         else if (item.state === "interrupted") label.textContent += " — interrupted recording";
         row.appendChild(label);
         const recoverButton = document.createElement("button");
         recoverButton.type = "button";
-        recoverButton.textContent = "Load audio";
+        recoverButton.textContent = "▶";
+        recoverButton.className = "saved-audio-open";
+        recoverButton.title = "Open audio player";
+        recoverButton.setAttribute("aria-label", `Play recording from ${formatDate(item.startedAt)}`);
+        recoverButton.setAttribute("aria-haspopup", "dialog");
         recoverButton.disabled = busy;
         recoverButton.addEventListener("click", () => {
             void loadRecording(item.id, recoverButton);
@@ -1639,16 +1689,14 @@ async function renderRecoverableSessions() {
         row.appendChild(downloadButton);
         const discardButton = document.createElement("button");
         discardButton.type = "button";
-        discardButton.textContent = "Delete saved session";
+        discardButton.textContent = "Delete";
         discardButton.disabled = busy || !!emergency;
         discardButton.addEventListener("click", async () => {
             discardButton.disabled = true;
             try {
                 await moveSessionToRecentlyDeleted(item.id);
-                // The saved-list deletion may target the recording currently shown
-                // in the main player. Clear that stale in-memory playback and its
-                // Delete/Download controls, but leave other playback untouched.
-                if (displayedSessionId === item.id) clearPlayback();
+                if (savedPlayback?.id === item.id) closeSavedPlayback();
+                // Saved-list actions leave the current in-memory player intact.
                 status.textContent = "Recording moved to Recently Deleted. It can be restored.";
                 await renderRecoverableSessions();
             } catch (error) {
@@ -1664,14 +1712,22 @@ async function renderRecoverableSessions() {
         {
             const diagnosticButton = document.createElement("button");
             diagnosticButton.type = "button";
-            diagnosticButton.textContent = "Download stop diagnostics";
+            diagnosticButton.textContent = "↓";
+            diagnosticButton.className = "recording-diagnostic-download";
+            diagnosticButton.title = "Download stop diagnostics";
+            diagnosticButton.setAttribute("aria-label", "Download stop diagnostics");
             diagnosticButton.addEventListener("click", () => {
                 downloadRecordingEvents(item.id).catch(error => {
                     console.error("Could not export diagnostics:", error);
                     status.textContent = "Could not export recording diagnostics.";
                 });
             });
-            row.appendChild(diagnosticButton);
+            const diagnostics = document.createElement("span");
+            diagnostics.className = "recording-diagnostic-action";
+            const description = document.createElement("span");
+            description.textContent = "Stop diagnostics";
+            diagnostics.append(diagnosticButton, description);
+            row.appendChild(diagnostics);
 
         }
         panel.appendChild(row);
@@ -1727,7 +1783,7 @@ async function renderRecoverableSessions() {
                     const current = await getSession(id);
                     if (!current || current.state !== "deleted") throw new Error("Recording is no longer in Recently Deleted.");
                     await deleteSessionData(id);
-                    if (displayedSessionId === id) clearPlayback();
+                    if (savedPlayback?.id === id) closeSavedPlayback();
                     deleted++;
                 } catch (error) {
                     console.error("Could not permanently delete selected recording:", error);
@@ -1766,7 +1822,7 @@ async function renderRecoverableSessions() {
             row.appendChild(selectionBox);
             const label = document.createElement("span");
             label.style.flex = "1 1 12rem";
-            label.textContent = `${formatDate(item.startedAt)} — deleted ${formatDate(item.deletedAt)}`;
+            label.textContent = `${formatDate(item.startedAt)} — ${formatRecordingSize(item.bytesStored)} — deleted ${formatDate(item.deletedAt)}`;
             row.appendChild(label);
             const restoreButton = document.createElement("button");
             restoreButton.type = "button";
@@ -1793,7 +1849,7 @@ async function renderRecoverableSessions() {
                     const current = await getSession(item.id);
                     if (!current || current.state !== "deleted") throw new Error("Recording is no longer in Recently Deleted.");
                     await deleteSessionData(item.id);
-                    if (displayedSessionId === item.id) clearPlayback();
+                    if (savedPlayback?.id === item.id) closeSavedPlayback();
                     status.textContent = "Recording permanently deleted.";
                     await renderRecoverableSessions();
                 } catch (error) {
@@ -1809,20 +1865,23 @@ async function renderRecoverableSessions() {
 }
 
 async function loadRecording(id, button) {
-    return recoverSession(id, button);
+    const request = ++savedPlaybackRequest;
+    return recoverSession(id, button, (blob, sessionId) => {
+        if (request === savedPlaybackRequest) showSavedPlayback(blob, sessionId);
+    });
 }
 
 async function playSavedSession(id, button) {
     return recoverSession(id, button);
 }
 
-async function recoverSession(id, button) {
+async function recoverSession(id, button, present = showPlayback) {
     button.disabled = true;
     status.textContent = "Recovering saved audio...";
     try {
         // Do not replace an emergency assembly with only its committed prefix,
         // or promote the partial browser copy to a completed recording.
-        if (playEmergencyRecording(id)) {
+        if (playEmergencyRecording(id, present)) {
             button.disabled = false;
             return;
         }
@@ -1842,7 +1901,7 @@ async function recoverSession(id, button) {
                 recoveredAt: new Date().toISOString(),
                 lastUpdatedAt: new Date().toISOString()
             });
-            showPlayback(blob, id);
+            present(blob, id);
             status.textContent = state === "completed"
                 ? "Recording loaded. Saved chunks passed structural checks; check playback."
                 : `Available audio loaded from an interrupted recording.${integrityNotice(report)} Check playback for missing sections.`;

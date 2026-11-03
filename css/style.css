@@ -165,6 +165,13 @@ button:active {
 #recordingStatusGroup #wakeStatus, #recordingStatusGroup #lifecycleStatus { margin: 8px auto; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 #savedRecordingsLocation { margin-top: 26px; }
 #savedRecordingsLocation:empty { display: none; }
+.saved-audio-open { padding:6px 10px; min-width:36px; min-height:36px; }
+.recording-diagnostic-action { display:inline-flex; align-items:center; gap:5px; font-size:12px; }
+.recording-diagnostic-download { padding:4px 8px; min-width:32px; min-height:32px; font-size:12px; }
+.saved-audio-dialog { width:min(360px, calc(100% - 48px)); border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--text); padding:18px; }
+.saved-audio-dialog::backdrop { background:rgb(0 0 0 / 35%); }
+.saved-audio-dialog h3 { margin:0 0 12px; }
+.saved-audio-dialog audio { display:block; width:100%; margin-bottom:14px; }
 
 /* Microphone selection is independent of voice-command settings. */
 .microphone-choice-label { display:block; font-size:14px; font-weight:600; margin-top:8px; }

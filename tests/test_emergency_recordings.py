@@ -81,7 +81,7 @@ function setTimeout(callback) { const id = ++timerSequence; timers.set(id, callb
 function clearTimeout(id) { timers.delete(id); }
 class Element {
     constructor() { this.children = []; this.style = {}; this.events = {}; }
-    append(...items) { this.children.push(...items); }
+    append(...items) { for (const item of items) {if (typeof item === 'object') item.parentElement = this; this.children.push(item);} }
     appendChild(item) { this.append(item); }
     prepend(item) { this.children.unshift(item); }
     replaceChildren(...items) { this.children = items; }
@@ -91,6 +91,9 @@ class Element {
     click() { return this.events.click(); }
     pause() {}
     load() {}
+    showModal() { this.open = true; }
+    close() { this.open = false; this.events.close?.(); }
+    remove() { if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(item => item !== this); }
 }
 class Blob {
     constructor(parts, options = {}) {
@@ -100,12 +103,13 @@ class Blob {
     }
 }
 const location = new Element();
-const document = {createElement: () => new Element(), getElementById: () => location};
+const document = {body: new Element(), createElement: () => new Element(), createTextNode: text => text, getElementById: () => location};
 const window = {lastRecording: null};
 const audioPlayer = new Element(), recordingControls = new Element(), status = {};
 const revoked = [];
 const URL = {createObjectURL: () => 'blob:test', revokeObjectURL: url => revoked.push(url)};
 let recordingUrl = null, displayedSessionId = null, activeSession = null, db = null;
+let savedPlayback = null, savedPlaybackRequest = 0;
 let recoveryPanel = null, lastRecordingPeakBytes = 0, startRequest = 0, recordingLease = null;
 const writingSessions = new Set();
 let leaseAcquisitions = 0, leaseReleases = 0;
@@ -190,7 +194,7 @@ globalThis.testResult = 'pending';
     const first = emergencyRecordings.get('first');
     assert(first.blob.content === 'header-firsttail-first', 'finalization preserves committed prefix and unsaved tail');
     assert(window.lastRecording === first.blob, 'emergency initially loaded');
-    const rows = () => recoveryPanel.children.filter(element => element.children.some(child => child.textContent === 'Load audio'));
+    const rows = () => recoveryPanel.children.filter(element => element.children.some(child => child.className === 'saved-audio-open'));
     await renderRecoverableSessions();
     assert(location.children.includes(recoveryPanel), 'unified recordings panel visible');
     assert(rows().length === 1, 'one row for saved prefix plus emergency');
@@ -214,8 +218,20 @@ globalThis.testResult = 'pending';
 
     // Interact with the actual rendered controls, then switch to other playback.
     const row = rows()[0];
+    const currentRecording = window.lastRecording, currentSession = displayedSessionId;
     row.children[1].click();
-    assert(window.lastRecording === first.blob, 'row reloads first emergency');
+    assert(savedPlayback?.id === 'first' && savedPlayback.dialog.open, 'compact control opens saved player');
+    assert(window.lastRecording === currentRecording && displayedSessionId === currentSession, 'saved player leaves current recording intact');
+    assert(row.children[0].textContent.includes('KB') && !row.children[0].textContent.includes('saved chunks'), 'row uses readable size without chunks');
+    assert(row.children[3].textContent === 'Delete', 'short delete label');
+    assert(row.children[4].children[0].textContent === '↓' && row.children[4].children[1].textContent === 'Stop diagnostics', 'compact diagnostics action has visible explanation');
+    const previousPlayer = savedPlayback;
+    showSavedPlayback(emergencyRecordings.get('second').blob, 'second');
+    assert(savedPlayback.id === 'second' && !document.body.children.includes(previousPlayer.dialog), 'opening another saved player releases previous dialog');
+    previousPlayer.dialog.events.close();
+    assert(savedPlayback.id === 'second', 'late close event does not close newer saved player');
+    savedPlayback.dialog.close();
+    assert(savedPlayback === null && window.lastRecording === currentRecording, 'closing saved player preserves current recording');
     showPlayback(new Blob(['ordinary-recording']), 'ordinary');
     clearPlayback();
     assert(emergencyRecordings.size === 2, 'playback switching retains both emergencies');
