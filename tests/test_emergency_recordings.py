@@ -42,7 +42,7 @@ globalThis.testResult = 'pending';
     assert(getSavedPlayback()?.id === 'first' && getSavedPlayback().dialog.open, 'compact control opens saved player');
     assert(window.lastRecording === currentRecording && displayedSessionId === currentSession, 'saved player leaves current recording intact');
     assert(row.children[0].textContent.includes('KB') && !row.children[0].textContent.includes('saved chunks'), 'row uses readable size without chunks');
-    assert(row.children[3].textContent === 'Delete', 'short delete label');
+    assert(row.children[3].textContent === 'Discard…' && !row.children[3].disabled, 'finished emergency has explicit discard action');
     assert(row.children[4].children[0].textContent === '↓' && row.children[4].children[1].textContent === 'Stop diagnostics', 'compact diagnostics action has visible explanation');
     const previousPlayer = getSavedPlayback();
     recordingLibrary.showPlayback(emergencyRecordings.get('second').blob, 'second');
@@ -87,7 +87,7 @@ globalThis.testResult = 'pending';
     await renderRecoverableSessions();
     assert(rows().length === 3 && !getRecoveryPanel().hidden, 'all emergency copies remain listed when storage cannot be read');
     const empty = {id: 'empty', metadata: {}};
-    retainEmergencyRecording(empty, new Blob([]));
+    recordingRecovery.retainEmergencyRecording(empty, new Blob([]));
     assert(emergencyRecordings.size === 3, 'empty artifact not listed');
     for (const failure of ['permission', 'cancel', 'constructor']) {
         startupFailure = failure;
@@ -125,6 +125,7 @@ globalThis.testResult = 'pending';
         deleteSessionData:async id=>{permanentlyDeleted.push(id);records.delete(id);},
         restoreRecentlyDeletedSession:async id=>{records.set(id,{...records.get(id),state:'completed'});},
         downloadRecordingEvents:async id=>{calls.push(['diagnostics',id]);},
+        discardEmergencyRecording:async id=>{calls.push(['discard',id]);records.set(id,{...records.get(id),state:'deleted'});emergencies.delete(id);},
         pauseCurrentPlayback:()=>{calls.push(['pause-current']);}
     });
     assert(location.children.length===0 && calls.length===0,'constructor is inert');
@@ -133,7 +134,9 @@ globalThis.testResult = 'pending';
     assert(rows().length===3,'one row per session including emergency override');
     const saved=rows()[0],live=rows()[1],emergency=rows()[2];
     assert(live.children[1].disabled && live.children[2].disabled && live.children[3].disabled,'active row protected');
-    assert(emergency.children[3].disabled && !emergency.children[1].disabled,'emergency playable but not deletable');
+    assert(emergency.children[3].textContent==='Discard…' && !emergency.children[3].disabled && !emergency.children[1].disabled,'emergency offers explicit discard and playback');
+    await emergency.children[3].click();
+    assert(emergencies.size===1 && !calls.some(c=>c[0]==='discard'),'cancelled discard changes nothing');
     saved.children[1].click();
     assert(getSavedPlayback()?.id==='saved','callback opens player for selected saved session');
     await saved.children[2].click();
@@ -155,6 +158,9 @@ globalThis.testResult = 'pending';
     assert(permanentlyDeleted.sort().join(',')==='deleted-a,deleted-b','bulk deletion affects selected deleted sessions only');
     assert(records.has('saved') && records.has('live') && records.has('emergency') && emergencies.size===1,'other sessions and emergency source remain');
     assert(!deleted(),'empty Recently Deleted section disappears');
+    const emergencyRow=rows().find(row=>row.children[3].textContent==='Discard…');
+    await emergencyRow.children[3].click();
+    assert(emergencies.size===0 && records.get('emergency').state==='deleted','confirmed discard delegates explicit action');
     globalThis.testResult='PASS';
 })().catch(error=>{globalThis.testResult=String(error)+'\n'+(error.stack||'');});
 """

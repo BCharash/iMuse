@@ -1,6 +1,6 @@
 # iMuse Design Journal
 
-Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated snapshots. DJ012 records the minimal installed failure; DJ013 records preservation work; DJ014/DJ015 record the library/store extractions. Older proposals and labels are historical, not current instructions.
+Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated snapshots. DJ012 records the installed failure; DJ013 records preservation; DJ014–DJ016 record library/store/recovery extractions. Older proposals and labels are historical, not current instructions.
 
 ---
 
@@ -1463,3 +1463,15 @@ Moved recording IndexedDB initialization, reads/writes, deletion/restore and eve
 Blocked initialization has an explicit late-success guard: an eventual unused connection is closed, and a failed open does not silently become ready. Settings' read-only storage diagnostics retain their existing path. No new durability mode, OPFS backend, file picker or schema migration was introduced.
 
 Five suites/seven methods pass, including complete store-module schema/open-failure tests, real recorder wiring with simulated transactions/locks, diagnostic cleanup, existing fault-injection and emergency/finalization checks. Database/microphone device acceptance remains separate. Further extractions await approval after the focused checks in the recording brief.
+
+---
+
+# DJ016 — Extract Recovery and Finalization
+
+**Date:** 3 November 2026. **Status:** Store extraction reported satisfactory; third extraction approved and implemented, pending device regression.
+
+`js/recording-recovery.js` owns emergency assemblies, bounded reads, watchdog/recovery actions, assembly/validation, saved recovery/export and finalization classification. Existing integrity rules are reused. Capture and pending-write ownership, microphone cleanup, writer-lease release and the top player remain in the recorder; the recovery service calls explicit callbacks rather than taking ownership of those resources. Emergency copies remain independent of playback and survive subsequent recordings within the open page.
+
+The existing failure, timeout, late-write, smaller-fallback and interrupted-status algorithms are preserved. Five suites/eight test methods pass with complete recovery-module evaluation, actual recorder wiring and a direct callback-level component test. No durability mode, schema, background-capture workaround or media format changed. The next checkpoint is focused device verification, with further extraction requiring approval.
+
+**Follow-up correction approved during testing:** The simulated-failure row was confusing despite being playable, and its disabled Delete action lacked an explanation. The user approved an explicit interruption/memory-copy notice and confirmed **Discard…** action. Playback/export already uses the original format; no conversion was added. Discard moves the committed portion to Recently Deleted before releasing emergency memory and its matching player. Cancellation, storage-operation failure and active/finalizing ownership retain the copy. Tests cover cancellation, confirmation, failure retention and preservation of a different current recording. This is a deliberate UI/behavior correction alongside the otherwise mechanical extraction.

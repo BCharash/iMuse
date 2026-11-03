@@ -4,7 +4,7 @@ export function createRecordingLibrary({
     container, status, getAllSessions, getEmergencyRecordings, isSessionWriting,
     recoverSession, exportSavedSession, moveSessionToRecentlyDeleted, getSession,
     deleteSessionData, restoreRecentlyDeletedSession, downloadRecordingEvents,
-    pauseCurrentPlayback
+    pauseCurrentPlayback, discardEmergencyRecording
 }) {
     let recoveryPanel = null;
     let savedPlayback = null;
@@ -125,7 +125,7 @@ export function createRecordingLibrary({
             const emergency = emergencyRecordings.get(item.id);
             const busy = !emergency && (isSessionWriting(item.id) || ["recording", "paused", "finalizing"].includes(item.state));
             label.textContent = emergency
-                ? `${formatDate(item.startedAt)} — ${formatRecordingSize(emergency.blob.size)}. ${emergency.unsavedBytes ? "Includes unsaved audio" : "Recovery copy; finalization was delayed"}; download before closing or reloading.`
+                ? `${formatDate(item.startedAt)} — ${formatRecordingSize(emergency.blob.size)}. Recording interrupted. ${emergency.unsavedBytes ? "Part of this recovery copy is held only in memory. Download to keep it before leaving this page." : "Finalization was delayed. Download this recovery copy before leaving this page."}`
                 : `${formatDate(item.startedAt)} — ${formatRecordingSize(item.bytesStored)}${busy ? " — recording or finishing" : ""}`;
             if (item.integrityReport?.ok === false) label.textContent += " — audio may be incomplete";
             else if (item.state === "interrupted") label.textContent += " — interrupted recording";
@@ -150,19 +150,26 @@ export function createRecordingLibrary({
             row.appendChild(downloadButton);
             const discardButton = document.createElement("button");
             discardButton.type = "button";
-            discardButton.textContent = "Delete";
-            discardButton.disabled = busy || !!emergency;
+            discardButton.textContent = emergency ? "Discard…" : "Delete";
+            discardButton.disabled = busy || (!!emergency && isSessionWriting(item.id));
+            if (emergency && discardButton.disabled) discardButton.title = "Wait for recording and pending storage to finish before discarding.";
             discardButton.addEventListener("click", async () => {
+                if (emergency && !window.confirm("Discard this interrupted recording's recovery copy? Audio held only in memory will be lost. The portion already saved will move to Recently Deleted. Download first if you want to keep the full recording.")) return;
                 discardButton.disabled = true;
                 try {
-                    await moveSessionToRecentlyDeleted(item.id);
+                    if (emergency) await discardEmergencyRecording(item.id);
+                    else await moveSessionToRecentlyDeleted(item.id);
                     if (savedPlayback?.id === item.id) closeSavedPlayback();
                     // Saved-list actions leave the current in-memory player intact.
-                    status.textContent = "Recording moved to Recently Deleted. It can be restored.";
+                    status.textContent = emergency
+                        ? "Recovery copy discarded. Only the previously saved portion can be restored from Recently Deleted."
+                        : "Recording moved to Recently Deleted. It can be restored.";
                     await renderRecoverableSessions();
                 } catch (error) {
                     console.error(error);
-                    status.textContent = "Could not move the recording to Recently Deleted.";
+                    status.textContent = emergency
+                        ? "Could not discard the recovery copy. It remains available; wait for pending storage to finish and try again."
+                        : "Could not move the recording to Recently Deleted.";
                     discardButton.disabled = false;
                 }
             });

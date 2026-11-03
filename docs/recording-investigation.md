@@ -2,15 +2,17 @@
 
 Updated 3 November 2026. This is the current recording reference. The four preservation stages and interface cleanup are implemented; no further stage is underway. The [roadmap](iMuse%20next%20steps.md) owns future priorities. Detailed experiment/stage history is [archived](Archive/recording-investigation-stages-2026-11-03.md).
 
-## Code ownership after two refactoring steps
+## Code ownership after three refactoring steps
 
 [recording-library.js](../js/recording-library.js) now owns the Saved/Recently Deleted lists, selection and confirmation controls, saved-player dialog and its object URL. It receives callbacks for reading sessions, recovery/export, deletion/restore, diagnostics and pausing current playback. Constructing it does not acquire a microphone, open a database, or render the page.
 
 [recording-store.js](../js/recording-store.js) owns recording database initialization, session/chunk reads and writes, delete/restore transactions and diagnostic-event I/O. It receives the existing write coordinator and an idle-session guard. It keeps the database name, version 2, keys, indexes and transaction behavior. Construction is lazy; opening/readiness remain explicit. A blocked open that later succeeds closes the unused connection instead of silently marking failed initialization ready.
 
-[recorder.js](../js/recorder.js) retains capture, recording transitions, emergency memory, validation/recovery, finalization, voice logic and the top player. It creates the library/store and delegates through their interfaces. The recorder updates in-memory counters only after the store confirms a chunk commit; the store does not own or release pending audio. Recovery/initialization use an explicitly owned metadata-write entry point inside the existing coordinator callback, avoiding a nested queue. Settings' existing read-only diagnostics remain a separate read path.
+[recording-recovery.js](../js/recording-recovery.js) now owns retained emergency assemblies, bounded reads, the finalization watchdog, chunk assembly/checks, saved recovery/export and finalization outcome decisions. It receives storage and presentation callbacks, and imports the existing integrity rules. Its constructor has no storage, timer or DOM effects. It does not own the microphone, audio elements, pending-write queue or writer lease.
 
-These are approved extractions, not a storage redesign or an implementation of strict durability/OPFS. No schema migration or audio format change was added. The user confirmed the first extraction's device checks worked. The second extraction has controlled test coverage; its focused device checks remain outstanding. Further controller/recovery/voice extractions require a separate approval.
+[recorder.js](../js/recorder.js) retains capture, recording transitions, pending chunks, voice logic and the top player. It creates the three modules and delegates through their interfaces. It updates counters only after a store commit, performs microphone cleanup through a callback when finalization is delayed, and releases the writer lease only after recovery/finalization processing settles. The recovery service marks finalization finished/clears its watchdog at that boundary. Recovery/initialization keep the existing explicitly owned metadata-write path inside the coordinator, avoiding a nested queue. Settings' read-only diagnostics remain separate.
+
+These are approved extractions, not a storage redesign or an implementation of strict durability/OPFS. No schema migration or audio format change was added. The user reported the first and second extractions worked. The third has controlled test coverage; focused device verification remains outstanding. Further recording/voice-controller extractions require separate approval.
 
 ## Current behavior
 
@@ -24,9 +26,11 @@ These are approved extractions, not a storage redesign or an implementation of s
 | Delayed finalization | A 10-second watchdog offers available audio; relevant reads have a 2-second fallback. Timers need JavaScript execution. Pending writes retain ownership until they settle; a new recording waits rather than competing with them. |
 | Browser protection | One nonblocking persistence request at initialization. Opening Settings checks the current grant and displays status; there are no manual protection buttons. |
 | Saved recordings | **▶** opens a separate player dialog. The top player retains the current in-memory recording. Rows show KB, Download audio, Delete and a small download button beside Stop diagnostics. Recently Deleted also shows KB. |
-| Deletion | Ordinary Delete moves saved audio to Recently Deleted. Permanent deletion is explicit. Unsaved emergency copies and sessions still being written cannot be deleted through saved-list actions. |
+| Deletion | Delete moves saved audio to Recently Deleted. Interrupted recovery copies offer **Discard…**, with confirmation that unsaved audio will be lost; the committed prefix moves to Recently Deleted before memory is released. Pending writers remain protected. Permanent deletion is explicit. |
 
 The IndexedDB schema remains version 2. These changes do not migrate/clear recordings or add a file picker to capture. Normal audio cues remain; interruption-warning code, setting and WAV have been removed completely.
+
+Recovery copies already use the recorder's original format, typically M4A/AAC on supported devices. Their difference is storage state, not a conversion requirement. The list explicitly marks interruption and memory-only audio. Confirming Discard clears that recovery copy and its own player, preserving a different current recording. Cancellation or a failed soft-delete leaves it retained; a still-writing session cannot be discarded. Only the previously committed prefix can be restored from Recently Deleted after a successful discard.
 
 ## What is and is not protected
 
@@ -73,7 +77,7 @@ From the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-Five suites (seven test methods) cover emergency preservation/player isolation, the library component directly, the failure control, store schema/open failures, coordinated writes/ownership, finalization/integrity, and persistence policy/Settings. They share one harness. Store checks execute the complete module, including actual recorder wiring, transaction aborts, per-session diagnostic cleanup and preservation of unrelated records. See [tests/README.md](../tests/README.md) for limits. Python is a development test runner, not an application dependency; no real user recording or microphone is accessed.
+Five suites (eight test methods) cover emergency preservation/player isolation, direct library/recovery components, the failure control, store schema/open failures, coordinated writes/ownership, finalization/integrity, and persistence policy/Settings. They share one harness. Recovery checks execute the complete module and actual recorder wiring, including late writes, missing stop events, fullest-copy retention, interrupted recovery and export. Store checks include actual wiring, transaction aborts, target-only diagnostic cleanup and preservation of unrelated records. See [tests/README.md](../tests/README.md) for limits. Python is a development test runner; no real recording or microphone is accessed.
 
 The suites execute production functions with controlled DOM/storage/lock/timer mocks. They do not prove native player rendering, actual IndexedDB behavior, browser permission decisions, container decoding, background capture or multi-hour memory reliability.
 

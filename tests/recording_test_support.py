@@ -126,7 +126,8 @@ async function acquireRecordingMicrophone() {
 }
 function publishMicrophoneProcessing() {}
 function createCompatibleRecorder() { throw Error('recorder initialization test'); }
-const emergencyRecordings = new Map(), downloads = [], disk = new Map();
+let emergencyRecordings;
+const downloads = [], disk = new Map();
 let preservationTestEnabled = false, preservationTestResult = null;
 let downloadFails = false, storageReadable = true;
 let reads = 0, writes = 0;
@@ -137,6 +138,7 @@ async function getChunks(id) {
     return disk.get(id) || [];
 }
 async function putSession() { writes++; }
+async function putSessionNow(record) { return putSession(record); }
 async function getAllSessions() {
     if (!storageReadable) throw Error('storage unavailable');
     return [...disk].map(([id, parts]) => ({id, state: 'interrupted',
@@ -179,12 +181,17 @@ stop_marker = '        recorder.addEventListener("stop", async () => {'
 stop_offset = SOURCE.index(stop_marker) + len(stop_marker)
 stop_body = SOURCE[stop_offset:SOURCE.index('        });\n        await setupSilenceMonitor(current);', stop_offset)]
 LIBRARY_SOURCE = (Path(__file__).resolve().parents[1] / "js/recording-library.js").read_text().replace("export ", "")
+INTEGRITY_SOURCE = (Path(__file__).resolve().parents[1] / "js/recording-integrity.js").read_text().replace("export ", "")
 STORE_SOURCE = (Path(__file__).resolve().parents[1] / "js/recording-store.js").read_text().replace("export ", "")
 STORE_WIRING = between("const recordingStore = createRecordingStore(", "// Maximum audio waiting")
+RECOVERY_SOURCE = re.sub(r'^import .*?;\n', '', (Path(__file__).resolve().parents[1] / "js/recording-recovery.js").read_text(), flags=re.M).replace("export ", "")
+RECOVERY_WIRING = between("const recordingRecovery = createRecordingRecovery(", "const recordingLibrary =")
 assert 'import { createRecordingLibrary } from "./recording-library.js";' in SOURCE
 assert 'import { createRecordingStore, RECORDING_DB_NAME } from "./recording-store.js";' in SOURCE
+assert 'import { createRecordingRecovery } from "./recording-recovery.js";' in SOURCE
 FUNCTIONS = (
-    (Path(__file__).resolve().parents[1] / "js/recording-integrity.js").read_text().replace("export ", "")
+    INTEGRITY_SOURCE
+    + RECOVERY_SOURCE
     + LIBRARY_SOURCE
     + between("function boundedStorageRead(", "function updatePreservationTestControls(")
     + between("function clearPlayback()", "function setAudioCommandsToggleLocked(")
@@ -195,6 +202,7 @@ FUNCTIONS = (
     + between("function assertSessionIdle(", "function stopStream(")
     + between("async function startRecording()", 'recordButton.addEventListener("click"')
     + "async function stopHandler() {" + stop_body + "}\n"
+    + RECOVERY_WIRING.replace("const emergencyRecordings =", "emergencyRecordings =")
     + between("const recordingLibrary = createRecordingLibrary(", "// Deliberately session-only")
 )
 

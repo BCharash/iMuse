@@ -186,9 +186,9 @@ export function createRecordingStore({
 
     // Soft deletion retains the session and its IndexedDB audio chunks until
     // the user explicitly chooses permanent deletion.
-    async function moveSessionToRecentlyDeleted(id) {
+    async function moveSessionToRecentlyDeleted(id, { discardEmergency = false } = {}) {
         return recordingStorage.run(async () => {
-            assertSessionIdle(id);
+            assertSessionIdle(id, { allowEmergencyDiscard: discardEmergency });
             const item = await getSession(id);
             if (!item) throw new Error("This recording no longer exists.");
             if (item.state === "deleted") return;

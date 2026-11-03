@@ -2,7 +2,7 @@
 Run: python3 tests/test_recording_finalization.py
 """
 import unittest
-from recording_test_support import SOURCE, MOCKS, FUNCTIONS, between, evaluate
+from recording_test_support import SOURCE, MOCKS, FUNCTIONS, INTEGRITY_SOURCE, RECOVERY_SOURCE, between, evaluate
 
 marker = '        recorder.addEventListener("error", event => {'
 offset = SOURCE.index(marker) + len(marker)
@@ -118,7 +118,7 @@ globalThis.testResult = 'pending';
     await flush();
     assert(unblockMetadata, 'metadata write is pending');
     const previousReleased = released;
-    await offerDelayedFinalization(current);
+    await recordingRecovery.offerDelayedFinalization(current);
     assert(writingSessions.has('blocked') && released === previousReleased, 'pending transaction retains ownership');
     blockMetadata = false;
     unblockMetadata();
@@ -134,7 +134,7 @@ globalThis.testResult = 'pending';
     current.writeQueue = new Promise(resolve => {settleChunk = resolve;});
     const pendingFinalization = stopHandler();
     await flush();
-    await offerDelayedFinalization(current);
+    await recordingRecovery.offerDelayedFinalization(current);
     assert(emergencyRecordings.get('pending-chunk').blob.content.includes('delayed-tail'), 'pending chunk remains accessible while its write is blocked');
     disk.get('pending-chunk').push({sequence:1,blob:tail,bytes:tail.size});
     current.metadata.chunkCount = 2;
@@ -167,7 +167,7 @@ globalThis.testResult = 'pending';
     const old = current;
     old.finalizationFinished = true;
     const oldStatus = status.textContent, oldPlayback = window.lastRecording;
-    await offerDelayedFinalization(old);
+    await recordingRecovery.offerDelayedFinalization(old);
     assert(status.textContent === oldStatus && window.lastRecording === oldPlayback, 'finished watchdog is inert');
     writingSessions.delete('done');
 
@@ -179,13 +179,96 @@ globalThis.testResult = 'pending';
     assert(window.lastRecording === topBeforeDelete, 'deleting a saved row keeps the top in-memory recording');
     const deletedSection = getRecoveryPanel().children.find(element => element.children?.some(child => child.textContent === 'Recently Deleted (1)'));
     assert(deletedSection && deletedSection.children.some(row => row.children?.some(child => child.textContent?.includes(formatRecordingSize(2048)))), 'Recently Deleted includes file size in KB');
+    healthy('discard-current');
+    current.persistenceError=Error('quota');
+    current.pendingChunks.set(1,new Blob(['unsaved']));
+    current.sequence=2;
+    await stopHandler();
+    const fullCurrent=window.lastRecording;
+    await recordingRecovery.discardEmergencyRecording('no-stop');
+    assert(window.lastRecording===fullCurrent,'discarding another emergency preserves the current player');
+    await recordingRecovery.discardEmergencyRecording('discard-current');
+    assert(window.lastRecording===null && !emergencyRecordings.has('discard-current'),'explicit discard clears its own current-player copy');
+    assert(metadataStore.get('discard-current').state==='deleted','discard preserves committed prefix in Recently Deleted');
     globalThis.testResult = 'PASS';
 })().catch(error => {globalThis.testResult = String(error) + '\n' + (error.stack || '');});
 """
 
+COMPONENT_TESTS = r"""
+globalThis.testResult='pending';
+(async()=>{
+    const calls=[],played=[],exported=[];
+    const metadata={id:'component',state:'recording',mimeType:'audio/mp4',chunkCount:2,bytesStored:5};
+    const parts=[{sequence:0,bytes:3,blob:new Blob(['abc'])},{sequence:1,bytes:2,blob:new Blob(['de'])}];
+    const session={id:'component',metadata:{...metadata},sequence:2,stopIntent:'stop-button',writeQueue:Promise.resolve(),pendingChunks:new Map()};
+    let saved={...metadata},delayedCleanup=0,discardFails=true,discarded=null;
+    const recovery=createRecordingRecovery({
+        recordingStorage:{run:operation=>operation()},status:{},
+        getSession:async()=>{calls.push('session-read');return {...saved};},
+        getChunks:async()=>{calls.push('chunks-read');return parts;},
+        putSession:async item=>{saved={...item};calls.push('write');},
+        putSessionNow:async item=>{saved={...item};calls.push('owned-write');},
+        assertSessionIdle:()=>calls.push('guard'),
+        showPlayback:(blob,id)=>played.push({blob,id}),
+        downloadAudioBlob:(blob,name)=>exported.push({blob,name}),
+        sessionFilename:()=> 'component-file',
+        renderRecoverableSessions:async()=>{calls.push('render');},
+        logRecordingEvent:()=>calls.push('event'),
+        onStopDelayed:()=>{delayedCleanup++;},
+        onEmergencyRetained:()=>calls.push('retained'),
+        moveSessionToRecentlyDeleted:async(id,options)=>{
+            assert(options.discardEmergency===true,'discard is an explicit guarded operation');
+            if(discardFails)throw Error('storage unavailable');
+            saved={...saved,state:'deleted'};
+        },
+        onEmergencyDiscarded:id=>{discarded=id;}
+    });
+    assert(calls.length===0&&timers.size===0&&recovery.emergencies.size===0,'constructor has no storage, timer or UI effects');
+    recovery.armWatchdog(session);
+    const watchdog=session.finalizationTimer;
+    await recovery.finalize(session);
+    assert(saved.state==='completed'&&saved.integrityReport.ok,'module classifies normal finalization and persists report');
+    assert(played[0].blob.content==='abcde'&&played[0].id==='component','module presents assembled audio');
+    assert(timers.has(watchdog)&&!session.finalizationFinished,'controller retains finish/lease ordering responsibility');
+    recovery.finish(session);
+    assert(session.finalizationFinished&&!timers.has(watchdog),'controller finish clears watchdog');
+
+    session.pendingChunks.set(2,new Blob(['tail']));
+    recovery.retainEmergencyRecording(session,new Blob(['abcdetail']));
+    const retained=recovery.emergencies.get('component');
+    assert(retained.unsavedBytes===4,'module owns retained emergency tail');
+    recovery.retainEmergencyRecording(session,new Blob(['abc']));
+    assert(recovery.emergencies.get('component')===retained,'smaller fallback cannot replace fuller copy');
+    const before=calls.length;
+    await recovery.exportSavedSession('component',{disabled:false});
+    assert(exported[0].blob===retained.blob&&calls.length===before,'emergency export is independent of storage');
+    let selected;
+    await recovery.recoverSession('component',{disabled:false},blob=>{selected=blob;});
+    assert(selected===retained.blob&&calls.length===before,'recovery selects emergency without promoting saved metadata');
+    await recovery.offerDelayedFinalization(session);
+    assert(delayedCleanup===0,'finished watchdog cannot clean up or replace a completed session');
+
+    saved={...metadata,id:'other',state:'interrupted'};
+    await recovery.recoverSession('other',{disabled:false},()=>{});
+    assert(saved.state==='interrupted'&&saved.integrityReport.ok,'loading structurally valid interrupted audio retains interruption');
+    assert(delayedCleanup===0,'normal recovery does not control microphone cleanup');
+    assert(document.body.children.length===0,'module does not create DOM or own an audio element');
+    await recovery.discardEmergencyRecording('component').then(()=>{throw Error('expected failure');},()=>{});
+    assert(recovery.emergencies.get('component')===retained && discarded===null,'failed soft deletion retains full recovery copy');
+    discardFails=false;
+    await recovery.discardEmergencyRecording('component');
+    assert(!recovery.emergencies.has('component') && discarded==='component' && saved.state==='deleted','successful discard releases memory after soft deletion');
+    globalThis.testResult='PASS';
+})().catch(error=>{globalThis.testResult=String(error)+'\n'+(error.stack||'');});
+"""
+
+
 class RecordingFinalizationTests(unittest.TestCase):
     def test_finalization_and_integrity(self):
         evaluate(MOCKS + FUNCTIONS + EXTRA + 'function errorHandler(event) {' + error_body + '}\n' + TESTS)
+
+    def test_recovery_component(self):
+        evaluate(MOCKS + INTEGRITY_SOURCE + RECOVERY_SOURCE + COMPONENT_TESTS)
 
 
 if __name__ == "__main__":

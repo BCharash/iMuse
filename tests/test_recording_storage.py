@@ -145,6 +145,7 @@ globalThis.testResult = 'pending';
     recordingStorage = first; recordingStore = firstStore;
     writingSessions.add('live');
     await rejects(moveSessionToRecentlyDeleted('live'), 'Stop and finish');
+    await rejects(moveSessionToRecentlyDeleted('live',{discardEmergency:true}), 'Stop and finish');
     await rejects(deleteSessionData('live'), 'Stop and finish');
     writingSessions.delete('live');
     emergencyRecordings.set('live', {});
