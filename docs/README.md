@@ -22,6 +22,8 @@ Three approved refactoring steps move library/player UI, database I/O and recove
 
 ## Document maintenance
 
+Refactoring is stopped. One passive RMS dBFS needle meter above the Settings thresholds provides optional measured Quiet/Noisy room references. It observes existing input only; wake gating/model behavior is unchanged. See the recording brief for the evaluation procedure.
+
 Keep one authoritative home for each subject. Put new test results in the investigation, priorities in Next steps, and dated decisions in the journal. Link to these rather than duplicating their contents across handoffs. Keep Memora and Swift documents focused on their own contracts. Archive superseded plans with a visible status notice; historical imperative language is not a current instruction.
 
 Use the current repository source when working in this workspace. Ask for uploads or external source only when the required files are unavailable or the deployed build cannot be identified. No documentation update itself authorizes deployment, a storage migration, or a native rewrite.

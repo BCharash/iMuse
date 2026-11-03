@@ -46,6 +46,16 @@ Web Locks protection covers cooperating updated pages in the same storage scope.
 
 ## Evidence and user-reported results
 
+### Passive microphone-level evaluation
+
+Refactoring is stopped. **Settings → Microphone levels → View** shows one needle-style RMS dBFS meter above both thresholds; the initial duplicate readouts were consolidated at the user's request. The dial spans −70 to 0 dBFS, with an exact numeric reading even below that range. Start recording first; readings continue while paused. It measures normalized input after browser microphone processing, before Heed's filtering/preprocessing—not model confidence, peak level or calibrated room sound pressure. Less-negative values mean louder input.
+
+**Mark quiet room** and **Mark noisy room** place Q/N reference markers at the current measured level. No universal room-to-dBFS bands are assumed. Markers last until reload, do not affect thresholds and should be remeasured after microphone/gain changes. They are available only for finite live readings. The dial includes text/shape identifiers rather than relying on color, and respects reduced-motion preferences.
+
+Polling runs every 200 ms only while Settings, the disclosure and the page are visible. It uses a reusable separate buffer and never requests a microphone, resumes AudioContext or modifies the graph. Invalid, muted, suspended/interrupted or inactive input clears stale readings; digital silence displays −∞ dBFS. Closing/hiding the panel or page stops polling. Silence threshold remains active; **wake-word minimum remains evaluation-only** and does not filter activations.
+
+Measure/mark the quiet room, then household conversation/noise, then compare your intended wake phrase at the usual microphone distance. Verify readings while paused and after Stop. Check Active AGC rather than assuming the request was honored. An eventual gate can reject quieter distant conversation, but cannot identify the speaker or reject equally loud voices. No gate, streaming fix, model change or voice refactor is included. The reviewed Heed buffering and upstream Voicute concerns remain hypotheses, not established causes of the separate standalone app's false activations. Native dial layout still requires device inspection.
+
 | Environment | Background capture | Storage protection |
 | --- | --- | --- |
 | MacBook Chrome tab | Successful | Granted |
@@ -79,7 +89,7 @@ From the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-Five suites (eight test methods) cover emergency preservation/player isolation, direct library/recovery components, the failure control, store schema/open failures, coordinated writes/ownership, finalization/integrity, and persistence policy/Settings. They share one harness. Recovery checks execute the complete module and actual recorder wiring, including late writes, missing stop events, fullest-copy retention, interrupted recovery and export. Store checks include actual wiring, transaction aborts, target-only diagnostic cleanup and preservation of unrelated records. See [tests/README.md](../tests/README.md) for limits. Python is a development test runner; no real recording or microphone is accessed.
+Six suites (nine test methods) cover emergency preservation/player isolation, direct library/recovery components, fault controls, store schema/open failures, coordinated writes, finalization/integrity, persistence policy and the passive meter. Meter checks cover RMS arithmetic, paused/unavailable input and visibility/timer lifecycle. Recovery/store coverage retains late-write, fullest-copy, abort and ownership checks. See [tests/README.md](../tests/README.md) for limits. Python is a development test runner; no real recording or microphone is accessed.
 
 The suites execute production functions with controlled DOM/storage/lock/timer mocks. They do not prove native player rendering, actual IndexedDB behavior, browser permission decisions, container decoding, background capture or multi-hour memory reliability.
 

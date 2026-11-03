@@ -218,6 +218,31 @@ function publishRecordingDiagnostics() {
 }
 publishRecordingDiagnostics();
 
+function publishLiveMicrophoneLevel() {
+    const current = activeSession;
+    let detail = { state: "inactive", dbfs: null };
+    if (current && ["recording", "paused"].includes(current.recorder.state)) {
+        detail = { state: "unavailable", dbfs: null };
+        const track = current.stream?.getAudioTracks?.()[0];
+        if (document.visibilityState === "visible" && current.audioContext?.state === "running" &&
+            current.analyser && track?.readyState === "live" && !track.muted) {
+            try {
+                const size = current.analyser.fftSize;
+                if (!current.levelMeterSamples || current.levelMeterSamples.length !== size) {
+                    current.levelMeterSamples = new Float32Array(size);
+                }
+                current.analyser.getFloatTimeDomainData(current.levelMeterSamples);
+                let sum = 0;
+                for (const sample of current.levelMeterSamples) sum += sample * sample;
+                const rms = Math.sqrt(sum / size);
+                if (Number.isFinite(rms)) detail = { state: "live", dbfs: rms > 0 ? 20 * Math.log10(rms) : -Infinity };
+            } catch (_) { /* report unavailable without disturbing capture */ }
+        }
+    }
+    window.dispatchEvent(new CustomEvent("imuse-microphone-level", { detail }));
+}
+window.addEventListener("imuse-request-microphone-level", publishLiveMicrophoneLevel);
+
 
 function openDatabase() {
     return recordingStore.open();
@@ -1146,6 +1171,7 @@ function cleanupAudioMonitor(current) {
     current.audioContext = null;
     current.analyser = null;
     current.audioSamples = null;
+    current.levelMeterSamples = null;
     current.wakeRing = null;
     current.wakeRingPos = 0;
     current.wakeCollectedSamples = 0;

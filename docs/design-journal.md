@@ -1485,3 +1485,15 @@ The existing failure, timeout, late-write, smaller-fallback and interrupted-stat
 The user confirmed the recovery/Discard changes worked in live view and on iPhone. The simulated failure retained about one additional word plus a fraction; this verifies access to a short pending tail rather than the size of a possible real-world stall.
 
 After reviewing risks of moving voice control, the user selected unused-code cleanup. Removed the uncalled readiness probe, tone/readiness-chime helpers, unused context closer and test-only saved-playback alias. Updated test extraction boundaries and exercised the real recovery wrapper/service instead of that alias. No live recording, voice, silence, lifecycle or storage behavior changed, and no additional production module was created. Eight controlled regression tests pass. Export helpers and voice/diagnostic/test-UI extractions remain separate proposals, not authorized follow-up work.
+
+---
+
+# DJ018 — Observe Microphone Levels Before Changing Wake Detection
+
+**Date:** 3 November 2026. **Status:** Refactoring stopped; passive meter implemented for evaluation.
+
+The user reports frequent false activations with free Heed/Voicute phrases in a separate standalone experiment. Review confirmed iMuse's silence slider is active but wakeMinimumDb is saved only and does not gate detection. The user chose a live dBFS readout as the first lower-risk experiment. Both sliders now show the same RMS input level while recording/paused and the expanded Settings panel is visible. It reads the existing analyser into a separate buffer, does not open or resume audio, and stops polling when hidden.
+
+Nine controlled checks pass. Actual input/device layout remains a manual check. No wake gate, recognition threshold change, streaming correction, engine replacement or voice refactor was performed. Candidate alternatives and model/integration issues require separate evaluation; level and confidence are different measures.
+
+**Requested display refinement:** Consolidated the identical readings into one semicircular −70…0 dBFS needle dial with a numeric readout and reduced-motion support. Quiet-room and noisy-room Q/N markers are captured explicitly from the user's current measurements rather than assigned universal room bands. References are page-local and do not change detection thresholds. Existing passive sampling/visibility behavior remains; tests cover dial mapping, off-scale numbers and independent markers.

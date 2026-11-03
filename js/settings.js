@@ -106,6 +106,73 @@ function wireDisclosure(buttonElement, detailElement) {
 }
 wireDisclosure(document.getElementById("microphoneLevelsToggle"), document.getElementById("microphoneLevelsDetail"));
 
+// Read the existing recording analyser only while its settings are visible.
+// This never requests a microphone, resumes audio, or changes a threshold.
+const liveLevelOutput = document.getElementById("microphoneLevelLive");
+const liveLevelDial = document.getElementById("microphoneLevelDial");
+const liveLevelNeedle = document.getElementById("microphoneLevelNeedle");
+const quietRoomButton = document.getElementById("markQuietRoom");
+const noisyRoomButton = document.getElementById("markNoisyRoom");
+let lastLiveDbfs = null;
+let liveLevelTimer = null;
+function microphoneLevelAngle(dbfs) {
+    return -90 + Math.min(1, Math.max(0, (dbfs + 70) / 70)) * 180;
+}
+function setMicrophoneDial(dbfs, text) {
+    lastLiveDbfs = Number.isFinite(dbfs) ? dbfs : null;
+    if (liveLevelOutput) liveLevelOutput.textContent = text;
+    liveLevelNeedle?.setAttribute("transform", `rotate(${microphoneLevelAngle(dbfs ?? -Infinity)} 160 145)`);
+    liveLevelDial?.setAttribute("role", Number.isFinite(dbfs) || dbfs === -Infinity ? "meter" : "img");
+    liveLevelDial?.setAttribute("aria-valuetext", text);
+    if (Number.isFinite(dbfs) || dbfs === -Infinity) liveLevelDial?.setAttribute("aria-valuenow", String(Math.max(-70, Math.min(0, dbfs))));
+    else liveLevelDial?.removeAttribute("aria-valuenow");
+    if (quietRoomButton) quietRoomButton.disabled = lastLiveDbfs === null;
+    if (noisyRoomButton) noisyRoomButton.disabled = lastLiveDbfs === null;
+}
+function markMicrophoneRoom(markerId, valueId, label) {
+    if (lastLiveDbfs === null) return;
+    const marker = document.getElementById(markerId);
+    marker?.setAttribute("transform", `rotate(${microphoneLevelAngle(lastLiveDbfs)} 160 145)`);
+    if (marker) marker.removeAttribute("hidden");
+    const value = document.getElementById(valueId);
+    if (value) value.textContent = `${label}: ${lastLiveDbfs.toFixed(1)} dBFS`;
+}
+quietRoomButton?.addEventListener("click", () => markMicrophoneRoom("quietRoomMarker", "quietRoomValue", "Q Quiet room"));
+noisyRoomButton?.addEventListener("click", () => markMicrophoneRoom("noisyRoomMarker", "noisyRoomValue", "N Noisy room"));
+function renderLiveMicrophoneLevel(detail = {}) {
+    const live = detail.state === "live" && (Number.isFinite(detail.dbfs) || detail.dbfs === -Infinity);
+    const value = live
+        ? detail.dbfs === -Infinity ? "−∞ dBFS" : `${detail.dbfs.toFixed(1)} dBFS`
+        : detail.state === "inactive" ? "Microphone inactive" : "Input unavailable";
+    setMicrophoneDial(live ? detail.dbfs : null, value);
+}
+function requestLiveMicrophoneLevel() {
+    window.dispatchEvent(new Event("imuse-request-microphone-level"));
+}
+function stopLiveMicrophoneLevel() {
+    if (liveLevelTimer !== null) window.clearInterval(liveLevelTimer);
+    liveLevelTimer = null;
+    setMicrophoneDial(null, "—");
+}
+function syncLiveMicrophoneLevel() {
+    const detail = document.getElementById("microphoneLevelsDetail");
+    if (!liveLevelOutput || panel.hidden || !detail || detail.hidden || document.visibilityState !== "visible") {
+        stopLiveMicrophoneLevel();
+        return;
+    }
+    if (liveLevelTimer === null) {
+        requestLiveMicrophoneLevel();
+        liveLevelTimer = window.setInterval(requestLiveMicrophoneLevel, 200);
+    }
+}
+window.addEventListener("imuse-microphone-level", event => renderLiveMicrophoneLevel(event.detail));
+button.addEventListener("click", syncLiveMicrophoneLevel);
+document.getElementById("microphoneLevelsToggle")?.addEventListener("click", syncLiveMicrophoneLevel);
+document.addEventListener("visibilitychange", syncLiveMicrophoneLevel);
+window.addEventListener("pagehide", stopLiveMicrophoneLevel);
+window.addEventListener("pageshow", syncLiveMicrophoneLevel);
+syncLiveMicrophoneLevel();
+
 function renderMicrophoneProcessing() {
     const target = document.getElementById("microphoneProcessingDetails");
     if (!target) return;

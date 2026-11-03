@@ -194,6 +194,22 @@ button:active {
 .settings-group legend { padding:0 7px; color:var(--accent-dark); font-size:15px; font-weight:600; }
 .settings-group:has(input:disabled) { /* Retain readable headings even when commands are disabled. */ }
 .settings-slider input:disabled { opacity:.5; }
+.microphone-meter { max-width:360px; margin:8px auto 16px; text-align:center; }
+.microphone-level-dial { display:block; width:100%; overflow:visible; }
+.microphone-level-dial line { stroke:var(--text); stroke-width:1.5; }
+.microphone-level-dial text { fill:var(--text); font-size:12px; text-anchor:middle; }
+.microphone-meter-arc { fill:none; stroke:var(--border); stroke-width:8; }
+.microphone-level-dial .microphone-meter-unit { font-size:11px; fill:var(--muted); }
+.microphone-meter-needle { transition:transform 160ms ease-out; }
+.microphone-meter-needle line { stroke:var(--accent-dark); stroke-width:2.5; }
+.microphone-meter-needle circle { fill:var(--accent-dark); }
+.microphone-room-marker[hidden] { display:none; }
+.microphone-room-marker text { font-weight:700; }
+.microphone-meter-reading { display:block; min-height:1.5em; font-variant-numeric:tabular-nums; font-weight:600; }
+.microphone-room-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.microphone-room-actions button { padding:6px 9px; font-size:12px; }
+.microphone-room-reference { display:flex; justify-content:center; flex-wrap:wrap; gap:4px 12px; }
+@media (prefers-reduced-motion:reduce) { .microphone-meter-needle { transition:none; } }
 
 /* Compact Memora-style settings disclosures, retaining the iMuse palette. */
 .imuse-disclosure { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:15px; padding:9px 0; border-top:1px solid var(--border); }
