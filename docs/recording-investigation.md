@@ -101,6 +101,16 @@ Handling `interrupted` as well as `suspended` is a recovery gap worth addressing
 
 Preserve the old recorder's final data before replacing it where possible. If replacement requires fresh recorders, retain each independently encoded segment with explicit interruption history; do not byte-concatenate independent MP4 recordings. Mark unexpected termination/interruption honestly. Recovery can restore future capture, never reconstruct the missing background interval.
 
+## Recording preservation — approved Stage 1
+
+Implemented 3 November 2026 after separate user approval. A storage-failure emergency assembly is now retained in a collection independent of the current player. Starting another recording, loading another recording, clearing playback, and requesting a download do not release it. Each emergency has its own visible load/download controls. Saved-session playback, recovery and export prefer the retained emergency assembly over the committed-only browser copy; recovery does not promote that partial copy to completed while emergency audio remains in memory.
+
+The collection is page memory, not persistent storage. Closing/reloading the page or OS process termination can still lose its unsaved audio. Multiple emergency recordings consume additional memory; the existing pending-write threshold does not bound their total size. Download initiation does not establish that a file was saved, so emergency copies remain retained after download requests. If committed chunks cannot be read, only the available pending fragments may be retained, and their playability is not guaranteed.
+
+Validation: `python3 tests/test_emergency_recordings.py` exercises production functions with controlled DOM/storage mocks, including actual failure finalization, the new-recording playback-clear path, multiple emergencies, rendered load/download controls, full-prefix-plus-tail exports, download failure/retry, recovery precedence, and unavailable-storage fallback. It checks recorder syntax. It does not exercise a real microphone, actual browser IndexedDB, file-picker completion, or iPhone behavior; those remain device acceptance work.
+
+No database schema, audio-capture policy, persistent-storage request, or iPhone background workaround was added. Serialized metadata updates, cross-tab ownership, completion validation and persistent-storage requests remain separate stages requiring approval.
+
 ## Cleanup completed
 
 Removed `Lab.html`, `BackgroundCaptureLab.html`, `js/labs/background-capture-lab.js`, the interruption-warning setting/code and `audio/recording-interrupted.wav`. Written findings, visual lifecycle notices, normal cues, pre-existing command labs and production recording data remain. Old lab IndexedDB data was not deleted. No capture workaround was added as part of cleanup.

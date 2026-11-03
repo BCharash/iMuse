@@ -77,6 +77,11 @@ let displayedSessionId = null;
 let startRequest = 0;
 let recoveryPanel = null;
 let lastRecordingPeakBytes = 0;
+// Emergency assemblies include audio that could not be committed to IndexedDB.
+// Keep them independently of the player, including after another recording starts.
+// These references survive playback changes, but cannot survive a page closure.
+const emergencyRecordings = new Map();
+let emergencyPanel = null;
 
 // Count actual active recording time, excluding periods when MediaRecorder is paused.
 function recordedSeconds(current) {
@@ -1232,6 +1237,57 @@ function clearPlayback() {
     }
 }
 
+function retainEmergencyRecording(current, blob) {
+    if (!blob?.size) return;
+    emergencyRecordings.set(current.id, {
+        blob,
+        metadata: { ...current.metadata }
+    });
+    renderEmergencyRecordings();
+}
+
+function playEmergencyRecording(id) {
+    const emergency = emergencyRecordings.get(id);
+    if (!emergency) return false;
+    showPlayback(emergency.blob, id);
+    status.textContent = "Emergency audio loaded. It includes audio not saved to browser storage. Download it before closing or reloading iMuse.";
+    return true;
+}
+
+function renderEmergencyRecordings() {
+    if (!emergencyPanel) {
+        emergencyPanel = document.createElement("section");
+        emergencyPanel.id = "emergencyRecordingsPanel";
+        emergencyPanel.setAttribute("aria-label", "Emergency recordings");
+        document.getElementById("savedRecordingsLocation").prepend(emergencyPanel);
+    }
+    emergencyPanel.replaceChildren();
+    const heading = document.createElement("h2");
+    heading.textContent = "Emergency recordings";
+    emergencyPanel.appendChild(heading);
+    const note = document.createElement("p");
+    note.textContent = "These recordings include audio that could not be saved to browser storage. You can start another recording, but download these before closing or reloading iMuse. Check each downloaded file before leaving.";
+    emergencyPanel.appendChild(note);
+    for (const [id, emergency] of emergencyRecordings) {
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem";
+        const label = document.createElement("span");
+        label.textContent = `${formatDate(emergency.metadata.startedAt)} — ${emergency.blob.size} bytes`;
+        const play = document.createElement("button");
+        play.type = "button";
+        play.textContent = "Load emergency audio";
+        play.addEventListener("click", () => playEmergencyRecording(id));
+        const download = document.createElement("button");
+        download.type = "button";
+        download.textContent = "Download emergency audio";
+        download.addEventListener("click", () => exportSavedSession(id, download));
+        row.append(label, play, download);
+        emergencyPanel.appendChild(row);
+    }
+    // Neither loading nor downloading releases an emergency copy. A download
+    // request does not confirm that the user has successfully saved the file.
+}
+
 function setAudioCommandsToggleLocked(locked) {
     const toggle = document.getElementById("audioCommandsToggle");
     if (toggle) {
@@ -1292,6 +1348,12 @@ function sessionFilename(item) {
 async function exportSavedSession(id, button) {
     if (button) button.disabled = true;
     try {
+        const emergency = emergencyRecordings.get(id);
+        if (emergency) {
+            downloadAudioBlob(emergency.blob, sessionFilename(emergency.metadata));
+            status.textContent = "Emergency download started. Check the exported audio before closing or reloading iMuse; the emergency copy remains available here.";
+            return;
+        }
         const item = await getSession(id);
         if (!item) throw new Error("The saved session no longer exists.");
         const chunks = await getChunks(id);
@@ -1574,6 +1636,10 @@ async function playSavedSession(id, button) {
     button.disabled = true;
     status.textContent = "Loading saved recording...";
     try {
+        if (playEmergencyRecording(id)) {
+            button.disabled = false;
+            return;
+        }
         const item = await getSession(id);
         if (!item || item.state !== "completed") throw new Error("This completed recording is no longer available.");
         const chunks = await getChunks(id);
@@ -1595,6 +1661,12 @@ async function recoverSession(id, button) {
     button.disabled = true;
     status.textContent = "Recovering saved audio...";
     try {
+        // Do not replace an emergency assembly with only its committed prefix,
+        // or promote the partial browser copy to a completed recording.
+        if (playEmergencyRecording(id)) {
+            button.disabled = false;
+            return;
+        }
         const item = await getSession(id);
         if (!item) throw new Error("The saved session no longer exists.");
         const chunks = await getChunks(id);
@@ -1708,8 +1780,8 @@ async function startRecording() {
     setSilencePauseLocked(true);
     setRecordingControlState("preparing");
 
-    // A new session should not leave the previous session's player visible.
-    // The previous recording remains saved in IndexedDB.
+    // Hide the previous player. Committed audio remains in IndexedDB;
+    // emergency audio remains independently accessible in emergencyRecordings.
     clearPlayback();
 
     if (!db) {
@@ -2018,7 +2090,10 @@ async function startRecording() {
                         .map(([, blob]) => blob);
                 }
                 finalBlob = new Blob(fallbackParts, { type: current.metadata.mimeType || fallbackParts.find(part => part.type)?.type || "application/octet-stream" });
-                if (finalBlob.size) showPlayback(finalBlob, id);
+                if (finalBlob.size) {
+                    retainEmergencyRecording(current, finalBlob);
+                    showPlayback(finalBlob, id);
+                }
                 current.metadata.state = "storage-error";
                 current.metadata.lastUpdatedAt = new Date().toISOString();
                 try { await putSession(current.metadata); } catch (saveError) { console.error(saveError); }
