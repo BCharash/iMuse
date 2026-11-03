@@ -1,6 +1,6 @@
 // Standalone diagnostic replica. Never import production application modules.
 const $ = id => document.getElementById(id);
-const checks = ['agc', 'noise', 'echo', 'context', 'graph', 'ring', 'poll', 'storage', 'speech', 'preload', 'request', 'probes'];
+const checks = ['agc', 'noise', 'echo', 'context', 'graph', 'ring', 'poll', 'storage', 'speech', 'preload', 'request', 'probes', 'wakeLock', 'bookkeeping', 'ordering', 'separateWarning'];
 const values = ['preset', 'timeslice', 'micMode', 'device', 'silence', 'threshold', 'warning', 'recovery', 'environment', 'scenario'];
 const DB_NAME = 'imuse-background-lab-v1';
 const EVENT_LIMIT = 12000;
@@ -9,6 +9,8 @@ const sounds = {newRecording: 'audio/new-recording.wav', pause: 'audio/pause.wav
 const headsetPattern = /shokz|openrun|openmove|aeropex|headset|headphones|headphone|hands.free|airpods|earpods|earbuds|earphones|beats|jabra|plantronics|poly voyager|bose|sony wh-|sony wf-|sennheiser|bluetooth|wireless headset|usb headset|usb audio headset/i;
 let run = null, busy = false, database;
 const urls = [];
+// Match production's sparse diagnostic writes, not every chunk or render.
+const storedEvents = new Set(['session-created', 'recorder-start', 'recorder-pause', 'recorder-resume', 'recorder-error', 'recorder-stop', 'track-mute', 'track-unmute', 'track-ended', 'visibility-change', 'snapshot', 'first-chunk-after-foreground', 'warning-play-request', 'warning-play-accepted', 'warning-play-rejected']);
 const safe = fn => { try { return fn(); } catch { return null; } };
 function status(message) { $('status').textContent = message; }
 function event(r, type, details = {}) {
@@ -18,6 +20,13 @@ function event(r, type, details = {}) {
     track: r.track?.readyState ?? null, muted: r.track?.muted ?? null,
     context: r.ctx?.state ?? null, ...details});
   if (r.events.length > EVENT_LIMIT) { r.events.shift(); r.droppedEvents++; }
+  if (r.settings.bookkeeping && r.db && storedEvents.has(type)) {
+    try {
+      const tx = r.db.transaction('events', 'readwrite');
+      tx.objectStore('events').add({runId: r.id, ...r.events[r.events.length - 1], committed: r.committed, pendingBytes: r.pendingBytes});
+      tx.onerror = tx.onabort = () => { r.diagnosticWriteError = String(tx.error); };
+    } catch (error) { r.diagnosticWriteError = String(error); }
+  }
 }
 function settings() {
   return Object.freeze({...Object.fromEntries(checks.map(id => [id, $(id).checked])),
@@ -35,17 +44,23 @@ function applyPreset() {
   $('timeslice').value = '250'; $('micMode').value = 'direct'; $('silence').value = 'none';
   $('warning').value = 'none'; $('recovery').value = 'observe';
   const name = $('preset').value;
+  const combined = ['combined', 'wake', 'bookkeeping', 'ordering', 'lifecycle', 'warningReplica'].includes(name);
   if (name !== 'minimal') {
     for (const id of ['agc', 'noise', 'echo', 'context', 'graph', 'poll', 'request', 'probes']) $(id).checked = true;
     $('silence').value = 'lab'; $('recovery').value = 'all';
   }
-  if (name === 'storage' || name === 'combined') $('storage').checked = true;
-  if (name === 'speech' || name === 'combined') $('speech').checked = true;
-  if (name === 'combined') {
+  if (name === 'storage' || combined) $('storage').checked = true;
+  if (name === 'speech' || combined) $('speech').checked = true;
+  if (combined) {
     $('agc').checked = false; $('ring').checked = true; $('preload').checked = true;
     $('request').checked = false; $('micMode').value = 'imuse';
     $('silence').value = 'imuse'; $('recovery').value = 'suspended';
   }
+  const all = name === 'lifecycle' || name === 'warningReplica';
+  $('wakeLock').checked = name === 'wake' || all;
+  $('bookkeeping').checked = name === 'bookkeeping' || all;
+  $('ordering').checked = name === 'ordering' || all;
+  if (name === 'warningReplica') { $('separateWarning').checked = true; $('warning').value = 'hidden'; }
 }
 function done(tx) {
   return new Promise((resolve, reject) => {
@@ -55,11 +70,14 @@ function done(tx) {
 }
 function openDB() {
   if (!database) database = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
+    const req = indexedDB.open(DB_NAME, 2);
     req.onupgradeneeded = () => {
-      req.result.createObjectStore('runs', {keyPath: 'id'});
-      const chunks = req.result.createObjectStore('chunks', {keyPath: ['id', 'sequence']});
-      chunks.createIndex('runId', 'id');
+      if (!req.result.objectStoreNames.contains('runs')) req.result.createObjectStore('runs', {keyPath: 'id'});
+      if (!req.result.objectStoreNames.contains('chunks')) {
+        const chunks = req.result.createObjectStore('chunks', {keyPath: ['id', 'sequence']});
+        chunks.createIndex('runId', 'id');
+      }
+      if (!req.result.objectStoreNames.contains('events')) req.result.createObjectStore('events', {autoIncrement: true});
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -68,10 +86,11 @@ function openDB() {
   return database;
 }
 function metadata(r) {
-  return {id: r.id, createdAt: r.createdAt, settings: r.settings, environment: r.environment,
+  return {labRevision: 2, id: r.id, createdAt: r.createdAt, settings: r.settings, environment: r.environment,
     received: r.received, committed: r.committed, bytes: r.bytes, state: r.finished ? r.stopReason : 'recording',
     storageError: r.storageError, mime: r.mime, trackSettings: r.trackSettings,
-    outcome: r.outcome || 'unreviewed', notes: r.notes};
+    outcome: r.outcome || 'unreviewed', indicator: r.indicator || 'unknown', beep: r.beep || 'unknown',
+    diagnosticWriteError: r.diagnosticWriteError, notes: r.notes};
 }
 async function saveMetadata(r) {
   const db = await openDB(), tx = db.transaction('runs', 'readwrite'), completion = done(tx);
@@ -145,6 +164,11 @@ function prepareOutput(r) {
   r.player = new Audio(); r.player.preload = 'auto'; r.player.setAttribute('playsinline', '');
   for (const type of ['playing', 'pause', 'waiting', 'ended', 'error']) r.player.addEventListener(type, () => event(r, `output-${type}`, {cue: r.cue}));
   r.soundCache = {};
+  if (r.settings.separateWarning) {
+    r.warningPlayer = new Audio(sounds.warning);
+    r.warningPlayer.preload = 'auto'; r.warningPlayer.playsInline = true;
+    for (const type of ['playing', 'pause', 'waiting', 'ended', 'error']) r.warningPlayer.addEventListener(type, () => event(r, `warning-${type}`));
+  }
   if (r.settings.preload) for (const [name, path] of Object.entries(sounds)) {
     r.soundCache[name] = fetch(path).then(response => {
       if (!response.ok) throw Error(`HTTP ${response.status}`);
@@ -152,6 +176,43 @@ function prepareOutput(r) {
     }).then(blob => { const url = URL.createObjectURL(blob); urls.push(url); return url; })
       .catch(error => { event(r, 'preload-error', {name, error: String(error)}); return path; });
   }
+}
+function warn(r, trigger) {
+  if (r.finished || r.finishing || r.warned) return;
+  r.warned = true;
+  if (!r.settings.separateWarning) { void play(r, 'warning'); return; }
+  try {
+    r.warningPlayer.currentTime = 0;
+    const attempt = r.warningPlayer.play();
+    event(r, 'warning-play-request', {trigger});
+    Promise.resolve(attempt).then(() => event(r, 'warning-play-accepted', {trigger}))
+      .catch(error => event(r, 'warning-play-rejected', {trigger, error:String(error)}));
+  } catch (error) { event(r, 'warning-play-rejected', {trigger, error:String(error)}); }
+}
+async function requestWakeLock(r) {
+  if (!r.settings.wakeLock || r.finished || r.finishing || document.visibilityState !== 'visible') return;
+  if (!navigator.wakeLock) { event(r, 'wake-lock-unavailable'); return; }
+  if (r.wakeRequest || (r.wakeSentinel && !r.wakeSentinel.released)) return;
+  r.wakeRequest = true;
+  event(r, 'wake-lock-request');
+  try {
+    const sentinel = await navigator.wakeLock.request('screen');
+    if (r.finished || r.finishing) { await sentinel.release(); return; }
+    r.wakeSentinel = sentinel;
+    event(r, 'wake-lock-acquired');
+    sentinel.addEventListener('release', () => {
+      if (r.wakeSentinel === sentinel) r.wakeSentinel = null;
+      event(r, 'wake-lock-released');
+      // Production only updates UI here; it does not stop audio or release the mic.
+    }, {once:true});
+  } catch (error) { event(r, 'wake-lock-error', {error:String(error)}); }
+  finally { r.wakeRequest = false; }
+}
+function createRecorder(r) {
+  const mime = ['audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg'].find(m => MediaRecorder.isTypeSupported(m));
+  r.recorder = mime ? new MediaRecorder(r.stream, {mimeType:mime}) : new MediaRecorder(r.stream);
+  r.mime = r.recorder.mimeType || mime || '';
+  event(r, 'recorder-constructed');
 }
 async function play(r, name) {
   try {
@@ -168,13 +229,17 @@ function receive(r, e) {
   r.bytes += e.data.size; r.lastChunk = performance.now();
   r.pending.set(sequence, e.data); r.pendingBytes += e.data.size;
   event(r, 'chunk-received', {sequence, bytes: e.data.size, pendingBytes: r.pendingBytes});
+  if (r.awaitingForegroundChunk) { r.awaitingForegroundChunk = false; event(r, 'first-chunk-after-foreground', {sequence, bytes:e.data.size}); }
   if (!r.settings.storage) { r.parts.push(e.data); r.pending.delete(sequence); r.pendingBytes -= e.data.size; return; }
   r.queue = r.queue.then(async () => {
     if (r.storageError) return; // Keep uncommitted audio for emergency export.
     const db = await openDB(), tx = db.transaction(['runs', 'chunks'], 'readwrite'), completion = done(tx);
     tx.objectStore('chunks').put({id: r.id, sequence, blob: e.data});
-    tx.objectStore('runs').put({...metadata(r), committed: r.committed + 1});
+    const updated = r.settings.bookkeeping ? {...(r.persistedMetadata || metadata(r)), committed: sequence + 1,
+      bytesStored: (r.persistedMetadata?.bytesStored || 0) + e.data.size, lastPersistedAt:new Date().toISOString()} : {...metadata(r), committed: r.committed + 1};
+    tx.objectStore('runs').put(updated);
     await completion;
+    r.persistedMetadata = updated;
     r.committed++; r.pending.delete(sequence); r.pendingBytes -= e.data.size;
     event(r, 'chunk-committed', {sequence, committed: r.committed});
   }).catch(error => {
@@ -191,6 +256,8 @@ function stopRecorder(r, reason) {
 function cleanup(r) {
   clearInterval(r.pollTimer);
   r.player?.pause();
+  r.warningPlayer?.pause();
+  if (r.wakeSentinel && !r.wakeSentinel.released) void r.wakeSentinel.release().catch(error => event(r, 'wake-lock-release-error', {error:String(error)}));
   for (const node of [r.processor, r.gain, r.source]) safe(() => node.disconnect());
   if (r.processor) r.processor.onaudioprocess = null;
   r.stream?.getTracks().forEach(t => t.stop());
@@ -240,12 +307,14 @@ async function start() {
   const r = {id: crypto.randomUUID?.() || String(Date.now()), settings:s, started:performance.now(), createdAt:new Date().toISOString(),
     environment:{userAgent:navigator.userAgent, standalone:matchMedia('(display-mode: standalone)').matches || navigator.standalone === true, secureContext:isSecureContext},
     events:[], notes:[], droppedEvents:0, received:0, committed:0, bytes:0, pendingBytes:0, pending:new Map(), parts:[], queue:Promise.resolve(), processCalls:0, ringPos:0};
-  run = r; $('outcome').value = 'unreviewed'; event(r, 'run-created');
+  run = r; $('outcome').value = 'unreviewed'; $('indicator').value = 'unknown'; $('beep').value = 'unknown'; event(r, 'run-created');
   try {
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw Error('Recording requires a supported browser and HTTPS or localhost');
     if ((s.graph || s.poll || s.silence !== 'none') && !s.context) throw Error('Enable AudioContext for graph or silence experiments');
     if (s.ring && !s.graph) throw Error('Enable ScriptProcessor for rolling buffer');
-    if (s.storage) await saveMetadata(r);
+    if (s.bookkeeping && !s.storage) throw Error('Enable storage for production-style bookkeeping');
+    if (s.bookkeeping) r.db = await openDB();
+    if (s.storage && !s.ordering) await saveMetadata(r);
     prepareOutput(r);
     r.stream = await acquire(r); r.track = r.stream.getAudioTracks()[0];
     if (!r.track) throw Error('No audio track acquired');
@@ -253,17 +322,30 @@ async function start() {
     event(r, 'acquired', {label:r.track.label, settings:r.trackSettings, constraints:safe(()=>r.track.getConstraints())});
     for (const type of ['mute','unmute','ended']) r.track.addEventListener(type, () => {
       event(r, `track-${type}`);
-      if (type === 'mute' && s.warning === 'mute' && !r.warned) { r.warned = true; void play(r, 'warning'); }
+      if (type === 'mute' && (s.warning === 'mute' || (s.separateWarning && s.warning === 'hidden'))) warn(r, 'microphone-muted');
+      if (type === 'unmute') r.warned = false;
     });
-    await graph(r);
-    const mime = ['audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg'].find(m => MediaRecorder.isTypeSupported(m));
-    r.recorder = mime ? new MediaRecorder(r.stream, {mimeType:mime}) : new MediaRecorder(r.stream); r.mime = r.recorder.mimeType || mime || '';
-    for (const type of ['start','pause','resume','error']) r.recorder.addEventListener(type, e => {
+    if (!s.ordering) await graph(r);
+    createRecorder(r);
+    if (s.storage && s.ordering) await saveMetadata(r);
+    r.persistedMetadata = metadata(r);
+    if (s.separateWarning) r.warningPlayer.load();
+    event(r, 'session-created');
+    for (const type of ['start','pause','resume','error']) r.recorder.addEventListener(type, async e => {
       event(r, `recorder-${type}`, {error:e.error ? String(e.error) : null});
+      if (s.bookkeeping && (type === 'pause' || type === 'resume')) {
+        r.persistedMetadata = {...r.persistedMetadata, state:type === 'pause' ? 'paused' : 'recording', lastUpdatedAt:new Date().toISOString()};
+        try {
+          const tx = r.db.transaction('runs','readwrite'), completion = done(tx);
+          tx.objectStore('runs').put(r.persistedMetadata); await completion;
+        } catch (error) { event(r, 'session-update-error', {error:String(error)}); }
+      }
+      if (r.finished || r.finishing) return;
       if (s.silence === 'imuse' && (type === 'pause' || type === 'resume')) void play(r, type === 'pause' ? 'pause' : 'recording');
     });
     r.recorder.addEventListener('dataavailable', e => receive(r, e));
     r.recorder.addEventListener('stop', () => { event(r,'recorder-stop'); void finish(r); });
+    if (s.ordering) await graph(r);
     r.recorder.start(Number(s.timeslice));
     if (s.poll || s.silence !== 'none') r.pollTimer = setInterval(() => {
       const rms = sample(r).rms;
@@ -277,6 +359,7 @@ async function start() {
       }
     }, 100);
     status('Recording. Say “before”, then perform your test action.');
+    void requestWakeLock(r);
     if (s.speech) void play(r, 'newRecording');
   } catch (error) {
     event(r, 'start-error', {error:String(error)}); cleanup(r); r.finished = true; r.stopReason = 'start-error';
@@ -294,14 +377,16 @@ function visibility() {
   const r = run; if (!r || r.finished) return;
   event(r, 'visibility-change');
   if (document.visibilityState === 'hidden') {
-    if (r.settings.warning === 'hidden' && !r.warned) { r.warned = true; void play(r,'warning'); }
+    if (r.settings.warning === 'hidden') warn(r, 'visibility-hidden');
     return;
   }
+  r.awaitingForegroundChunk = true;
   if (r.settings.request && r.recorder?.state === 'recording') {
     event(r,'request-data'); try { r.recorder.requestData(); } catch(error) { event(r,'request-data-error',{error:String(error)}); }
   }
   const state = r.ctx?.state, mode = r.settings.recovery;
   if ((mode === 'all' && ['suspended','interrupted'].includes(state)) || (mode === 'suspended' && state === 'suspended')) void resumeContext(r,'foreground');
+  void requestWakeLock(r);
   if (r.settings.probes) for (const ms of [0,1000,3000,6000]) setTimeout(() => {
     if (run === r && !r.finished && document.visibilityState === 'visible') snapshot(r,`foreground-${ms}`);
   }, ms);
@@ -333,6 +418,11 @@ $('contextResume').onclick=()=>void resumeContext(run,'manual');
 $('probe').onclick=()=>{if(run){snapshot(run,'manual');render();}};
 $('addNote').onclick=()=>{if(run && $('note').value.trim()){const note={at:new Date().toISOString(),text:$('note').value.trim()};run.notes.push(note);event(run,'user-observation',note);$('note').value='';render();}};
 $('outcome').onchange=()=>{if(run){run.outcome=$('outcome').value;event(run,'outcome',{value:run.outcome});if(run.settings.storage && run.finished)void saveMetadata(run).catch(error=>status(error.message));}};
+for (const id of ['indicator', 'beep']) $(id).onchange = () => {
+  if (!run) return;
+  run[id] = $(id).value; event(run, 'user-observation', {field:id, value:run[id]});
+  if (run.settings.storage && run.finished) void saveMetadata(run).catch(error => status(error.message));
+};
 $('export').onclick=()=>{
   if(!run){status('Start a run before exporting.');return;}
   const blob=new Blob([JSON.stringify({...metadata(run),events:run.events,droppedEvents:run.droppedEvents},null,2)],{type:'application/json'});

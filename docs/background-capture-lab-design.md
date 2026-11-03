@@ -4,20 +4,30 @@ Purpose: reproduce the iMuse background capture failure in a separate page, with
 
 ## Running the implemented lab
 
-Open `BackgroundCaptureLab.html` through your existing HTTPS hosting or local development server. Its dedicated script is `js/labs/background-capture-lab.js`; it uses the existing WAV assets. Serve from the repository root so those assets resolve. Do not use a local file URL on iPhone.
+Open the existing `Lab.html` URL through your HTTPS hosting or local development server. The heading must say **revision 2**. The script has a revision query to refresh its cache. `BackgroundCaptureLab.html` redirects here. Serve from the repository root so the existing WAV assets resolve.
 
-1. Select Reference, confirm the same microphone mode as the earlier successful test, and leave the interval at 250 ms. Speak before, during, and after the same app-switch action. Stop, listen, choose a result, and export JSON.
-2. Repeat with Reference + storage. This changes only persistence relative to Reference.
-3. Repeat with Reference + startup speech. This changes only startup playback relative to Reference.
-4. Repeat each result before selecting Combined or changing an individual option. Use fresh page loads between comparisons when investigating effects from earlier audio playback.
+All previous presets passed at 250 ms, including Combined, with no external double beep and with the microphone activity indicator staying illuminated. The current numbered tests build on that successful Combined profile:
 
-Reference intentionally retains the earlier lab's automatic silence resume and foreground resume/requestData actions. To observe an interruption without recovery, switch foreground context action to Observe only and uncheck Request recorder data, then compare that same configuration across runs. The Minimal profile has no Web Audio branch at all.
+| Test | Configuration | Comparison |
+| --- | --- | --- |
+| 1 | Previously successful Combined | Verify the control still passes after replacing the page |
+| 2 | Control + screen wake lock | Request after recorder start, reacquire on return, observe system release; never stop capture on release |
+| 3 | Control + production-style storage bookkeeping | Update session metadata from committed writes; write sparse diagnostic events in separate transactions; persist pause/resume session updates |
+| 4 | Control + production startup order | Acquire microphone, construct recorder, await session write, construct/resume Web Audio, then start recorder |
+| 5 | All three additions, warning OFF | Check interactions without the later warning |
+| 6 | Test 5 + separate interruption warning | Dedicated original-URL Audio element, load before capture starts, play on hidden or mute, rearm on unmute |
 
-Combined is an approximation with Audio commands off, not an import of production code. It copies samples but performs no inference, uses manual silence resume and spoken pause/resume cues, and resumes only suspended contexts. It does not reproduce the paused reminder tones, screen wake lock, or every production UI/storage detail. Its interruption warning is off by default; warning experiments share the lab response element rather than reproducing iMuse's dedicated warning element. These remaining differences must be considered if Combined succeeds.
+For each test: select the preset; start; say “before”; switch to the same app; say “background”; return and say “after”; stop and listen. Record microphone indicator, external beep, and playback result using the controls, then export JSON. Download audio before reloading. Reload between tests and stop at the first failure; repeat the failing test and Test 1 before interpreting the result. No configuration checkboxes need changing for the numbered sequence.
+
+If wake lock is unsupported or denied, Test 2 has not exercised the acquired-lock path; its event log records that explicitly. Presets 2–4 each change one factor from Test 1. Keep the same browser/container and microphone throughout. The warning cannot explain the original pre-warning failure.
+
+These are explicit replicas, not imports of production code. They still omit paused reminder tones, wake-model initialization, full production UI work, and exact production object lifetime. No preset changes the browser's audioSession type. An unreproduced failure remains unresolved, rather than proof that iMuse or iOS is behaving correctly.
+
+Earlier Reference profiles remain available for comparison; they include automatic silence resume and foreground resume/requestData. Minimal has no Web Audio branch. Numbered Combined profiles retain manual silence resume and only resume suspended contexts, matching iMuse's current behavior.
 
 The page lists persisted lab runs for audio recovery after reload. Diagnostic events are bounded in memory (12,000 newest events, with a dropped-event count); export JSON before reloading. RAM-only recordings remain in memory until the page is closed. Storage runs release committed chunks from memory and stop at 8 MiB pending writes or on a write failure, retaining uncommitted chunks for emergency assembly. No lab recordings are automatically deleted.
 
-Validation: JavaScriptCore syntax check, DOM/asset checks, and mocked capture/storage exercises verify final-chunk handling, committed chunk reload, and preservation after a failed write. Real iPhone background behavior and audible continuity still require device testing.
+Validation: JavaScriptCore syntax check, DOM/asset checks, and mocked capture/storage exercises verify final-chunk handling, committed chunk reload, and preservation after a failed write. The revision 2 mocked checks also exercise single-factor presets, ordered startup, separate warning playback, diagnostic transactions, and wake-lock release/reacquisition. Real iPhone background behavior and audible continuity still require device testing.
 
 ## Established observations
 
@@ -25,11 +35,11 @@ Validation: JavaScriptCore syntax check, DOM/asset checks, and mocked capture/st
 - The user identifies the equal-pitch double beep as external to iMuse. Its precise source (iOS, browser, or accessory) is unverified.
 - The external beep can occur between words in the interruption warning. Playback acceptance or visibility alone does not establish the ordering of the underlying audio interruption.
 - The warning was added after the original failure and cannot be its original cause.
-- The existing Lab.html works at 250 ms with all checkboxes except visibility pause/resume enabled. Microphone mode, capture settings, and browser/PWA context must also be recorded. The 250 ms interval itself is therefore not a sufficient explanation for the failure.
+- The original Lab.html worked at 250 ms with all checkboxes except visibility pause/resume enabled. Microphone mode, capture settings, and browser/PWA context must also be recorded. The 250 ms interval itself is therefore not a sufficient explanation for the failure.
 
 ## Implementation boundary
 
-Create a separate BackgroundCaptureLab.html and dedicated lab modules. Leave Lab.html and production files unchanged. Do not import recorder.js, settings.js, microphone-manager.js, or audio-response-manager.js: they have application initialization or DOM dependencies. Reproduce the relevant operations explicitly and label them as replicas.
+Use Lab.html and dedicated lab modules; overwrite lab pages as requested to keep the URL stable. Leave production files unchanged. Do not import recorder.js, settings.js, microphone-manager.js, or audio-response-manager.js: they have application initialization or DOM dependencies. Reproduce the relevant operations explicitly and label them as replicas.
 
 Use an independently named IndexedDB database, imuse-background-lab-v1. No automatic deletion, no writes to production databases, no automatic microphone reacquisition or recorder restart during a diagnostic run.
 
