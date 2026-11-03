@@ -16,15 +16,28 @@ const MAX_PENDING_AUDIO_BYTES = 8 * 1024 * 1024;
 const SESSION_STORE = 'sessions', CHUNK_STORE = 'chunks';
 function savedChunkProgress() { return 'test'; }
 let transactionCount = 0;
-db = {transaction() {
+const testDatabase = {transaction() {
     transactionCount++;
-    const tx = {objectStore: () => ({put(){}})};
-    Promise.resolve().then(() => tx.oncomplete?.());
+    let pending = 0;
+    const tx = {objectStore: name => ({
+        put(){},
+        get() {
+            pending++;
+            const request = {};
+            Promise.resolve().then(() => {
+                request.result = name === SESSION_STORE ? {...current.metadata} : undefined;
+                request.onsuccess?.();
+                if (--pending === 0) tx.oncomplete?.();
+            });
+            return request;
+        }
+    })};
     return tx;
 }};
 let recorder, stopRequests = 0, requestedData = 0;
 function begin(name) {
     seed(name);
+    db = testDatabase;
     current.persistenceError = null;
     current.storageStopRequested = false;
     current.sequence = 1;
@@ -100,7 +113,7 @@ globalThis.testResult = 'pending';
     assert(!current.simulateNextChunkFailure && preservationTestButton.disabled, 'disabling test cancels pending injection');
     assert(emergencyRecordings.get('simulated') === emergency, 'disabling never clears emergency');
     globalThis.testResult = 'PASS';
-})().catch(error => { globalThis.testResult = String(error.stack || error); });
+})().catch(error => { globalThis.testResult = String(error) + '\n' + (error.stack || ''); });
 """
 
 if __name__ == "__main__":

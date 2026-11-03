@@ -101,7 +101,21 @@ const audioPlayer = new Element(), recordingControls = new Element(), status = {
 const revoked = [];
 const URL = {createObjectURL: () => 'blob:test', revokeObjectURL: url => revoked.push(url)};
 let recordingUrl = null, displayedSessionId = null, activeSession = null, db = null;
-let emergencyPanel = null, lastRecordingPeakBytes = 0, startRequest = 0;
+let recoveryPanel = null, lastRecordingPeakBytes = 0, startRequest = 0, recordingLease = null;
+const writingSessions = new Set();
+let leaseAcquisitions = 0, leaseReleases = 0;
+const recordingStorage = {
+    run: operation => Promise.resolve().then(operation),
+    async hold() { leaseAcquisitions++; return {async release() {leaseReleases++;}}; }
+};
+let startupFailure = 'permission';
+async function acquireRecordingMicrophone() {
+    if (startupFailure === 'permission') throw Error('permission rejected');
+    if (startupFailure === 'cancel') startRequest++;
+    return {};
+}
+function publishMicrophoneProcessing() {}
+function createCompatibleRecorder() { throw Error('recorder initialization test'); }
 const emergencyRecordings = new Map(), downloads = [], disk = new Map();
 let preservationTestEnabled = false, preservationTestResult = null;
 let downloadFails = false, storageReadable = true;
@@ -113,6 +127,12 @@ async function getChunks(id) {
     return disk.get(id) || [];
 }
 async function putSession() { writes++; }
+async function getAllSessions() {
+    if (!storageReadable) throw Error('storage unavailable');
+    return [...disk].map(([id, parts]) => ({id, state: 'interrupted',
+        startedAt: '2026-11-03T10:00:00Z', chunkCount: parts.length,
+        bytesStored: parts.reduce((n, part) => n + part.blob.size, 0)}));
+}
 function downloadAudioBlob(blob, name) {
     if (downloadFails) throw Error('download failed');
     downloads.push({blob, name});
@@ -123,9 +143,10 @@ function publishRecordingDiagnostics() {} function setAudioCommandsToggleLocked(
 function setMicrophoneSelectionLocked() {} function setSilencePauseLocked() {}
 function releaseScreenWakeLock() {} function setWakeStatus() {}
 function setRecordingControlState() {} function setReadyUI() {}
-function sayResponse() {} async function renderRecoverableSessions() {}
+function sayResponse() {}
 let current, id, stream = {};
 function seed(name) {
+    db = {};
     id = name;
     current = {
         id, metadata: {id, startedAt: '2026-11-03T10:00:00Z', mimeType: 'audio/mp4'},
@@ -136,6 +157,7 @@ function seed(name) {
     };
     disk.set(id, [{sequence: 0, blob: new Blob(['header-' + name])}]);
     activeSession = current;
+    writingSessions.add(id);
 }
 """
 
@@ -146,8 +168,9 @@ FUNCTIONS = (
     between("function clearPlayback()", "function setAudioCommandsToggleLocked(")
     + between("function showPlayback(", "function audioFileExtension(")
     + between("function sessionFilename(", "function ensureCurrentDownloadButton(")
-    + between("function formatDate(", "async function renderRecoverableSessions(")
+    + between("function ensureRecoveryPanel(", "async function playSavedSession(")
     + between("async function playSavedSession(", "async function initialize(")
+    + between("function assertSessionIdle(", "// Soft deletion")
     + between("async function startRecording()", 'recordButton.addEventListener("click"')
     + "async function stopHandler() {" + stop_body + "}\n"
 )
@@ -160,11 +183,14 @@ globalThis.testResult = 'pending';
     const first = emergencyRecordings.get('first');
     assert(first.blob.content === 'header-firsttail-first', 'finalization preserves committed prefix and unsaved tail');
     assert(window.lastRecording === first.blob, 'emergency initially loaded');
-    assert(location.children.includes(emergencyPanel), 'emergency panel visible independently of saved list');
-    assert(emergencyPanel.children.length === 3, 'one emergency row');
+    const rows = () => recoveryPanel.children.filter(element => element.children.some(child => child.textContent === 'Load audio'));
+    await renderRecoverableSessions();
+    assert(location.children.includes(recoveryPanel), 'unified recordings panel visible');
+    assert(rows().length === 1, 'one row for saved prefix plus emergency');
 
     // Execute the actual new-recording path through its unavailable-storage exit.
     // It clears the player before attempting database/microphone access.
+    db = null;
     await startRecording();
     assert(window.lastRecording === null && audioPlayer.hidden, 'new recording clears old player');
     assert(emergencyRecordings.get('first') === first, 'new recording retains emergency data');
@@ -174,12 +200,13 @@ globalThis.testResult = 'pending';
     seed('second');
     await stopHandler();
     assert(emergencyRecordings.size === 2, 'two emergencies retained');
-    assert(emergencyPanel.children.length === 4, 'both rows available');
+    await renderRecoverableSessions();
+    assert(rows().length === 2, 'both recordings available without duplicate emergency rows');
     current.metadata.startedAt = 'changed';
     assert(emergencyRecordings.get('second').metadata.startedAt !== 'changed', 'metadata snapshot retained');
 
     // Interact with the actual rendered controls, then switch to other playback.
-    const row = emergencyPanel.children[2];
+    const row = rows()[0];
     row.children[1].click();
     assert(window.lastRecording === first.blob, 'row reloads first emergency');
     showPlayback(new Blob(['ordinary-recording']), 'ordinary');
@@ -215,9 +242,17 @@ globalThis.testResult = 'pending';
     seed('unreadable');
     await stopHandler();
     assert(emergencyRecordings.get('unreadable').blob.content === 'tail-unreadable', 'read failure retains available tail');
+    await renderRecoverableSessions();
+    assert(rows().length === 3 && !recoveryPanel.hidden, 'all emergency copies remain listed when storage cannot be read');
     const empty = {id: 'empty', metadata: {}};
     retainEmergencyRecording(empty, new Blob([]));
     assert(emergencyRecordings.size === 3, 'empty artifact not listed');
+    for (const failure of ['permission', 'cancel', 'constructor']) {
+        startupFailure = failure;
+        await startRecording();
+        assert(leaseAcquisitions === leaseReleases, 'startup failure/cancellation releases ownership: ' + failure);
+        assert(emergencyRecordings.get('first') === first, 'startup failure retains earlier emergency');
+    }
     globalThis.testResult = 'PASS';
 })().catch(error => { globalThis.testResult = String(error.stack || error); });
 """

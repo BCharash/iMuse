@@ -4,6 +4,7 @@ import { loadVoicuteWakeWord } from "./voicute/voicute-adapter.js";
 import { loadHeedWakeWord } from "./heed/heed-adapter.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { loadCommands, startCommands, stopCommands } from "./tensorflow/commands-adapter.js";
+import { createRecordingStorageCoordinator } from "./recording-storage-coordinator.js";
 
 const recordButton = document.getElementById("recordButton");
 const pauseButton = document.getElementById("pauseButton");
@@ -67,6 +68,9 @@ const DB_VERSION = 2;
 const SESSION_STORE = "sessions";
 const CHUNK_STORE = "chunks";
 const EVENT_STORE = "recordingEvents";
+const recordingStorage = createRecordingStorageCoordinator(navigator.locks, `${DB_NAME}/writer`);
+// Includes finalization after activeSession is cleared.
+const writingSessions = new Set();
 // Maximum audio waiting for a committed IndexedDB write.
 const MAX_PENDING_AUDIO_BYTES = 8 * 1024 * 1024;
 
@@ -81,7 +85,6 @@ let lastRecordingPeakBytes = 0;
 // Keep them independently of the player, including after another recording starts.
 // These references survive playback changes, but cannot survive a page closure.
 const emergencyRecordings = new Map();
-let emergencyPanel = null;
 // Deliberately session-only: enabling a test must not affect a later page load.
 let preservationTestEnabled = false;
 let preservationTestButton = null;
@@ -325,10 +328,29 @@ async function getSession(id) {
     return result;
 }
 
-async function putSession(record) {
+async function putSessionNow(record) {
     const transaction = db.transaction(SESSION_STORE, "readwrite");
-    transaction.objectStore(SESSION_STORE).put(record);
-    await transactionDone(transaction);
+    const done = transactionDone(transaction);
+    const store = transaction.objectStore(SESSION_STORE);
+    const request = store.get(record.id);
+    request.onsuccess = () => {
+        const stored = request.result;
+        // Lifecycle snapshots must never roll back committed audio counters.
+        const updated = stored ? { ...stored, ...record,
+            chunkCount: stored.chunkCount, bytesStored: stored.bytesStored,
+            lastPersistedAt: stored.lastPersistedAt } : { ...record };
+        if (stored?.state === "deleted" && record.state !== "deleted") {
+            delete updated.previousState;
+            delete updated.deletedAt;
+        }
+        store.put(updated);
+    };
+    await done;
+}
+
+function putSession(record) {
+    const snapshot = { ...record };
+    return recordingStorage.run(() => putSessionNow(snapshot));
 }
 
 async function persistChunk(record, sequence, blob) {
@@ -340,23 +362,35 @@ async function persistChunk(record, sequence, blob) {
         // handlers retain this chunk and the final recorder tail for export.
         throw new Error("Simulated storage failure (preservation test).");
     }
-    const updated = {
-        ...record.metadata,
-        chunkCount: sequence + 1,
-        bytesStored: (record.metadata.bytesStored || 0) + blob.size,
-        lastPersistedAt: new Date().toISOString()
-    };
-    const transaction = db.transaction([SESSION_STORE, CHUNK_STORE], "readwrite");
-    transaction.objectStore(CHUNK_STORE).put({
-        sessionId: record.metadata.id,
-        sequence,
-        type: blob.type || record.metadata.mimeType,
-        blob,
-        bytes: blob.size
+    return recordingStorage.run(async () => {
+        const transaction = db.transaction([SESSION_STORE, CHUNK_STORE], "readwrite");
+        const done = transactionDone(transaction);
+        const sessions = transaction.objectStore(SESSION_STORE);
+        const chunks = transaction.objectStore(CHUNK_STORE);
+        let updated;
+        const request = sessions.get(record.id);
+        request.onsuccess = () => {
+            if (!request.result || request.result.state === "deleted") {
+                transaction.abort();
+                return;
+            }
+            const stored = request.result;
+            const previous = chunks.get([record.id, sequence]);
+            previous.onsuccess = () => {
+                updated = { ...stored,
+                    chunkCount: Math.max(stored.chunkCount || 0, sequence + 1),
+                    bytesStored: (stored.bytesStored || 0) - (previous.result?.bytes || 0) + blob.size,
+                    lastPersistedAt: new Date().toISOString() };
+                chunks.put({ sessionId: record.id, sequence,
+                    type: blob.type || stored.mimeType, blob, bytes: blob.size });
+                sessions.put(updated);
+            };
+        };
+        await done;
+        // A pause/stop may have changed the in-memory state while this write ran.
+        Object.assign(record.metadata, { chunkCount: updated.chunkCount,
+            bytesStored: updated.bytesStored, lastPersistedAt: updated.lastPersistedAt });
     });
-    transaction.objectStore(SESSION_STORE).put(updated);
-    await transactionDone(transaction);
-    record.metadata = updated;
 }
 
 async function getChunks(id) {
@@ -371,35 +405,49 @@ async function getChunks(id) {
 }
 
 async function deleteSessionData(id) {
-    const chunks = await getChunks(id);
-    const transaction = db.transaction([SESSION_STORE, CHUNK_STORE], "readwrite");
-    transaction.objectStore(SESSION_STORE).delete(id);
-    const chunkStore = transaction.objectStore(CHUNK_STORE);
-    for (const chunk of chunks) chunkStore.delete([id, chunk.sequence]);
-    await transactionDone(transaction);
-    // Remove diagnostics only when the recording itself is permanently deleted.
-    const events = await getRecordingEvents(id);
-    const eventTransaction = db.transaction(EVENT_STORE, "readwrite");
-    for (const event of events) eventTransaction.objectStore(EVENT_STORE).delete(event.key);
-    await transactionDone(eventTransaction);
+    return recordingStorage.run(async () => {
+        assertSessionIdle(id);
+        const chunks = await getChunks(id);
+        const transaction = db.transaction([SESSION_STORE, CHUNK_STORE], "readwrite");
+        transaction.objectStore(SESSION_STORE).delete(id);
+        const chunkStore = transaction.objectStore(CHUNK_STORE);
+        for (const chunk of chunks) chunkStore.delete([id, chunk.sequence]);
+        await transactionDone(transaction);
+        // Remove diagnostics only when the recording itself is permanently deleted.
+        const events = await getRecordingEvents(id);
+        const eventTransaction = db.transaction(EVENT_STORE, "readwrite");
+        for (const event of events) eventTransaction.objectStore(EVENT_STORE).delete(event.key);
+        await transactionDone(eventTransaction);
+    });
+}
+
+function assertSessionIdle(id) {
+    if (writingSessions.has(id)) throw new Error("Stop and finish this recording before loading or deleting it.");
+    if (emergencyRecordings.has(id)) throw new Error("This recording contains unsaved audio. Download it before closing the page; it remains available in the recordings list.");
 }
 
 // Soft deletion retains the session and its IndexedDB audio chunks until
 // the user explicitly chooses permanent deletion.
 async function moveSessionToRecentlyDeleted(id) {
-    const item = await getSession(id);
-    if (!item) throw new Error("This recording no longer exists.");
-    if (item.state === "deleted") return;
-    await putSession({ ...item, previousState: item.state, state: "deleted",
-        deletedAt: new Date().toISOString() });
+    return recordingStorage.run(async () => {
+        assertSessionIdle(id);
+        const item = await getSession(id);
+        if (!item) throw new Error("This recording no longer exists.");
+        if (item.state === "deleted") return;
+        await putSessionNow({ ...item, previousState: item.state, state: "deleted",
+            deletedAt: new Date().toISOString() });
+    });
 }
 
 async function restoreRecentlyDeletedSession(id) {
-    const item = await getSession(id);
-    if (!item || item.state !== "deleted") throw new Error("This deleted recording is no longer available.");
-    const { previousState, deletedAt, ...rest } = item;
-    const state = previousState === "completed" ? "completed" : "interrupted";
-    await putSession({ ...rest, state, lastUpdatedAt: new Date().toISOString() });
+    return recordingStorage.run(async () => {
+        assertSessionIdle(id);
+        const item = await getSession(id);
+        if (!item || item.state !== "deleted") throw new Error("This deleted recording is no longer available.");
+        const { previousState, deletedAt, ...rest } = item;
+        const state = previousState === "completed" ? "completed" : "interrupted";
+        await putSessionNow({ ...rest, state, lastUpdatedAt: new Date().toISOString() });
+    });
 }
 
 function stopStream(stream) {
@@ -1309,7 +1357,7 @@ function retainEmergencyRecording(current, blob) {
         blob,
         metadata: { ...current.metadata }
     });
-    renderEmergencyRecordings();
+    void renderRecoverableSessions().catch(error => console.error("Could not refresh recordings:", error));
     if (current.simulatedStorageFailure && preservationTestResult) {
         const unsavedBytes = [...current.pendingChunks.values()].reduce((sum, chunk) => sum + chunk.size, 0);
         preservationTestResult.textContent = `Simulated failure completed. Emergency audio contains ${blob.size} bytes, including ${unsavedBytes} bytes not saved to browser storage. Make a second recording, then load and download this emergency recording again. Keep this page open.`;
@@ -1322,40 +1370,6 @@ function playEmergencyRecording(id) {
     showPlayback(emergency.blob, id);
     status.textContent = "Emergency audio loaded. It includes audio not saved to browser storage. Download it before closing or reloading iMuse.";
     return true;
-}
-
-function renderEmergencyRecordings() {
-    if (!emergencyPanel) {
-        emergencyPanel = document.createElement("section");
-        emergencyPanel.id = "emergencyRecordingsPanel";
-        emergencyPanel.setAttribute("aria-label", "Emergency recordings");
-        document.getElementById("savedRecordingsLocation").prepend(emergencyPanel);
-    }
-    emergencyPanel.replaceChildren();
-    const heading = document.createElement("h2");
-    heading.textContent = "Emergency recordings";
-    emergencyPanel.appendChild(heading);
-    const note = document.createElement("p");
-    note.textContent = "These recordings include audio that could not be saved to browser storage. You can start another recording, but download these before closing or reloading iMuse. Check each downloaded file before leaving.";
-    emergencyPanel.appendChild(note);
-    for (const [id, emergency] of emergencyRecordings) {
-        const row = document.createElement("div");
-        row.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem";
-        const label = document.createElement("span");
-        label.textContent = `${formatDate(emergency.metadata.startedAt)} — ${emergency.blob.size} bytes`;
-        const play = document.createElement("button");
-        play.type = "button";
-        play.textContent = "Load emergency audio";
-        play.addEventListener("click", () => playEmergencyRecording(id));
-        const download = document.createElement("button");
-        download.type = "button";
-        download.textContent = "Download emergency audio";
-        download.addEventListener("click", () => exportSavedSession(id, download));
-        row.append(label, play, download);
-        emergencyPanel.appendChild(row);
-    }
-    // Neither loading nor downloading releases an emergency copy. A download
-    // request does not confirm that the user has successfully saved the file.
 }
 
 function setAudioCommandsToggleLocked(locked) {
@@ -1424,16 +1438,19 @@ async function exportSavedSession(id, button) {
             status.textContent = "Emergency download started. Check the exported audio before closing or reloading iMuse; the emergency copy remains available here.";
             return;
         }
-        const item = await getSession(id);
-        if (!item) throw new Error("The saved session no longer exists.");
-        const chunks = await getChunks(id);
-        const parts = chunks.map(chunk => chunk.blob).filter(blob => blob && blob.size > 0);
-        if (!parts.length) throw new Error("No saved audio chunks were found for this recording.");
-        const blob = new Blob(parts, {
-            type: item.mimeType || parts.find(part => part.type)?.type || "audio/webm"
+        await recordingStorage.run(async () => {
+            assertSessionIdle(id);
+            const item = await getSession(id);
+            if (!item || item.state === "deleted") throw new Error("This session is unavailable. Restore a deleted recording before loading it.");
+            const chunks = await getChunks(id);
+            const parts = chunks.map(chunk => chunk.blob).filter(blob => blob && blob.size > 0);
+            if (!parts.length) throw new Error("No saved audio chunks were found for this recording.");
+            const blob = new Blob(parts, {
+                type: item.mimeType || parts.find(part => part.type)?.type || "audio/webm"
+            });
+            downloadAudioBlob(blob, sessionFilename(item));
+            status.textContent = "Download started. Check the exported audio before deleting the original.";
         });
-        downloadAudioBlob(blob, sessionFilename(item));
-        status.textContent = "Download started. Check the exported audio before deleting the original.";
     } catch (error) {
         console.error("Could not export saved recording:", error);
         status.textContent = `Could not export audio: ${error.message || "unknown error"}`;
@@ -1488,20 +1505,37 @@ function formatDate(value) {
 }
 
 async function renderRecoverableSessions() {
-    if (!db) return;
     const panel = ensureRecoveryPanel();
-    const allSessions = await getAllSessions();
-    const sessions = allSessions.filter(item =>
+    let allSessions = [], readError = null;
+    try { if (db) allSessions = await getAllSessions(); }
+    catch (error) { readError = error; }
+    const available = new Map(allSessions.filter(item =>
         ["completed", "recording", "paused", "interrupted", "finalizing", "storage-error"].includes(item.state)
-    ).sort((a, b) => (b.startedAt || "").localeCompare(a.startedAt || ""));
-    const deletedSessions = allSessions.filter(item => item.state === "deleted")
+    ).map(item => [item.id, item]));
+    for (const [id, emergency] of emergencyRecordings) {
+        available.set(id, { ...emergency.metadata, id, state: "storage-error" });
+    }
+    const sessions = [...available.values()].sort((a, b) => (b.startedAt || "").localeCompare(a.startedAt || ""));
+    const deletedSessions = allSessions.filter(item => item.state === "deleted" && !emergencyRecordings.has(item.id))
         .sort((a, b) => (b.deletedAt || "").localeCompare(a.deletedAt || ""));
     panel.replaceChildren();
     const heading = document.createElement("h2");
     heading.textContent = "Saved recordings";
     heading.style.fontSize = "1.1rem";
     panel.appendChild(heading);
-    panel.hidden = !sessions.length && !deletedSessions.length;
+    const refresh = document.createElement("button");
+    refresh.type = "button";
+    refresh.textContent = "Refresh recordings";
+    refresh.addEventListener("click", () => {
+        void renderRecoverableSessions().catch(error => console.error(error));
+    });
+    panel.appendChild(refresh);
+    panel.hidden = !sessions.length && !deletedSessions.length && !readError;
+    if (readError) {
+        const notice = document.createElement("p");
+        notice.textContent = "Saved recordings could not be read. Any available emergency audio is listed below. Browser data has not been cleared.";
+        panel.appendChild(notice);
+    }
     if (sessions.length) {
         const explanation = document.createElement("p");
         explanation.textContent = "Completed recordings remain available here after a page reload. Interrupted sessions can be recovered from the chunks saved before the interruption.";
@@ -1516,24 +1550,30 @@ async function renderRecoverableSessions() {
         row.style.marginTop = "0.5rem";
         const label = document.createElement("span");
         label.style.flex = "1 1 12rem";
-        label.textContent = `${formatDate(item.startedAt)} — ${item.chunkCount || 0} saved chunks, ${item.bytesStored || 0} bytes`;
+        const emergency = emergencyRecordings.get(item.id);
+        const busy = writingSessions.has(item.id) || ["recording", "paused", "finalizing"].includes(item.state);
+        label.textContent = emergency
+            ? `${formatDate(item.startedAt)} — ${emergency.blob.size} bytes available. Includes unsaved audio; download before closing or reloading.`
+            : `${formatDate(item.startedAt)} — ${item.chunkCount || 0} saved chunks, ${item.bytesStored || 0} bytes${busy ? " — recording or finishing" : ""}`;
         row.appendChild(label);
         const recoverButton = document.createElement("button");
         recoverButton.type = "button";
-        recoverButton.textContent = item.state === "completed" ? "Play saved recording" : "Recover audio";
+        recoverButton.textContent = "Load audio";
+        recoverButton.disabled = busy;
         recoverButton.addEventListener("click", () => {
-            if (item.state === "completed") playSavedSession(item.id, recoverButton);
-            else recoverSession(item.id, recoverButton);
+            void loadRecording(item.id, recoverButton);
         });
         row.appendChild(recoverButton);
         const downloadButton = document.createElement("button");
         downloadButton.type = "button";
-        downloadButton.textContent = "Download audio file";
+        downloadButton.textContent = "Download audio";
+        downloadButton.disabled = busy;
         downloadButton.addEventListener("click", () => exportSavedSession(item.id, downloadButton));
         row.appendChild(downloadButton);
         const discardButton = document.createElement("button");
         discardButton.type = "button";
         discardButton.textContent = "Delete saved session";
+        discardButton.disabled = busy || !!emergency;
         discardButton.addEventListener("click", async () => {
             discardButton.disabled = true;
             try {
@@ -1701,6 +1741,16 @@ async function renderRecoverableSessions() {
     }
 }
 
+async function loadRecording(id, button) {
+    if (playEmergencyRecording(id)) return;
+    try {
+        const item = await getSession(id);
+        if (item?.state === "completed") await playSavedSession(id, button);
+        else await recoverSession(id, button);
+    } catch (error) {
+        status.textContent = `Could not load audio: ${error.message || error}`;
+    }
+}
 
 async function playSavedSession(id, button) {
     button.disabled = true;
@@ -1710,6 +1760,7 @@ async function playSavedSession(id, button) {
             button.disabled = false;
             return;
         }
+        assertSessionIdle(id);
         const item = await getSession(id);
         if (!item || item.state !== "completed") throw new Error("This completed recording is no longer available.");
         const chunks = await getChunks(id);
@@ -1737,27 +1788,31 @@ async function recoverSession(id, button) {
             button.disabled = false;
             return;
         }
-        const item = await getSession(id);
-        if (!item) throw new Error("The saved session no longer exists.");
-        const chunks = await getChunks(id);
-        const parts = chunks.map(chunk => chunk.blob).filter(blob => blob && blob.size > 0);
-        if (!parts.length) throw new Error("No audio chunks were successfully saved for this session.");
-        const blob = new Blob(parts, { type: item.mimeType || parts.find(part => part.type)?.type || "audio/webm" });
-        if (!blob.size) throw new Error("The recovered audio is empty.");
-        // Promote successfully recovered audio to normal saved-recording behavior.
-        // Preserve interruptedAt and other original metadata as recovery history.
-        await putSession({
-            ...item,
-            state: "completed",
-            recoveredAt: new Date().toISOString(),
-            lastUpdatedAt: new Date().toISOString()
+        await recordingStorage.run(async () => {
+            assertSessionIdle(id);
+            const item = await getSession(id);
+            if (!item || item.state === "deleted") throw new Error("This session is unavailable. Restore a deleted recording before loading it.");
+            const chunks = await getChunks(id);
+            const parts = chunks.map(chunk => chunk.blob).filter(blob => blob && blob.size > 0);
+            if (!parts.length) throw new Error("No audio chunks were successfully saved for this session.");
+            const blob = new Blob(parts, { type: item.mimeType || parts.find(part => part.type)?.type || "audio/webm" });
+            if (!blob.size) throw new Error("The recovered audio is empty.");
+            // Promote successfully recovered audio to normal saved-recording behavior.
+            // Preserve interruptedAt and other original metadata as recovery history.
+            await putSessionNow({
+                ...item,
+                state: "completed",
+                recoveredAt: new Date().toISOString(),
+                lastUpdatedAt: new Date().toISOString()
+            });
+            showPlayback(blob, id);
+            status.textContent = `Recovered audio saved. Listen through it to check for missing sections.`;
+            await renderRecoverableSessions();
         });
-        showPlayback(blob, id);
-        status.textContent = `Recovered audio saved. Listen through it to check for missing sections.`;
-        await renderRecoverableSessions();
     } catch (error) {
         console.error("Recovery failed:", error);
         status.textContent = `Could not recover audio: ${error.message || "unknown error"}`;
+    } finally {
         button.disabled = false;
     }
 }
@@ -1766,13 +1821,19 @@ async function initialize() {
     try {
         if (!("indexedDB" in window)) throw new Error("IndexedDB is not available in this browser.");
         db = await openDatabase();
-        const sessions = await getAllSessions();
-        for (const item of sessions) {
-            if (["recording", "paused", "finalizing"].includes(item.state)) {
-                item.state = "interrupted";
-                item.interruptedAt = new Date().toISOString();
-                await putSession(item);
-            }
+        try {
+            await recordingStorage.run(async () => {
+                const sessions = await getAllSessions();
+                for (const item of sessions) {
+                    if (["recording", "paused", "finalizing"].includes(item.state)) {
+                        item.state = "interrupted";
+                        item.interruptedAt = new Date().toISOString();
+                        await putSessionNow(item);
+                    }
+                }
+            });
+        } catch (error) {
+            status.textContent = `Saved audio remains available. ${error.message || error}`;
         }
         await renderRecoverableSessions();
     } catch (error) {
@@ -1863,7 +1924,9 @@ async function startRecording() {
     setRecordingControlState("preparing");
     status.textContent = "Preparing microphone...";
     let stream;
+    let recordingLease = null, recorderStarted = false, newSessionId = null;
     try {
+        recordingLease = await recordingStorage.hold();
         stream = await acquireRecordingMicrophone();
         publishMicrophoneProcessing(stream);
         if (requestId !== startRequest) {
@@ -1874,6 +1937,7 @@ async function startRecording() {
         const recorderChoice = createCompatibleRecorder(stream);
         const recorder = recorderChoice.recorder;
         const id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+        newSessionId = id;
         const actualMimeType = recorder.mimeType || recorderChoice.requestedMimeType || "";
         const formatLabel = describeAudioFormat(actualMimeType) || recorderChoice.formatLabel;
         const metadata = {
@@ -1894,7 +1958,7 @@ async function startRecording() {
             return;
         }
         const current = {
-            id, recorder, stream, metadata,
+            id, recorder, stream, metadata, recordingLease,
             formatLabel,
             sequence: 0,
             writeQueue: Promise.resolve(),
@@ -1933,6 +1997,7 @@ async function startRecording() {
             lastChunkBytes: null
         };
         activeSession = current;
+        writingSessions.add(id);
         logRecordingEvent(current, "session-created", { mimeType: actualMimeType });
         lastRecordingPeakBytes = 0;
         publishRecordingDiagnostics();
@@ -2049,6 +2114,7 @@ async function startRecording() {
             current.metadata.state = "paused";
             current.metadata.lastUpdatedAt = new Date().toISOString();
             try { await putSession(current.metadata); } catch (error) { console.error(error); }
+            if (activeSession !== current || current.stopHandled) return;
             setRecordingControlState("paused");
             current.autoPausing = false;
             current.silenceSince = null;
@@ -2072,6 +2138,7 @@ async function startRecording() {
             current.metadata.state = "recording";
             current.metadata.lastUpdatedAt = new Date().toISOString();
             try { await putSession(current.metadata); } catch (error) { console.error(error); }
+            if (activeSession !== current || current.stopHandled) return;
             setRecordingControlState("recording");
             stopPausedBeep(current);
             if (!commandActive) scheduleWakeDetectorArm(current, 0);
@@ -2086,98 +2153,108 @@ async function startRecording() {
             logRecordingEvent(current, "recorder-stop", { classification: current.stopIntent || "UNEXPECTED-NO-STOP-REQUEST", stopIntent: current.stopIntent });
             if (current.stopHandled) return;
             current.stopHandled = true;
-            if (current.activeSinceMs !== null) {
-                current.recordedMs += Math.max(0, performance.now() - current.activeSinceMs);
-                current.activeSinceMs = null;
-            }
-            lastRecordingPeakBytes = current.peakPendingBytes;
-            current.resolvePauseAnnouncement?.();
-            current.resolvePauseAnnouncement = null;
-            closeCommandWindow({ restorePauseReminder: false });
-            cleanupAudioMonitor(current);
-            stopStream(stream);
-            if (activeSession === current) activeSession = null;
-            publishRecordingDiagnostics();
-            setAudioCommandsToggleLocked(false);
-            setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
-            releaseScreenWakeLock();
-            setWakeStatus("Wake-word detector idle");
-            if (current.discard) {
-                try { await current.writeQueue; } catch (_) { /* best effort; session is being deleted */ }
-                try { await deleteSessionData(id); } catch (error) { console.error("Could not delete discarded session:", error); }
-                return;
-            }
-            if (current.deleteRequested) {
+            try {
+                if (current.activeSinceMs !== null) {
+                    current.recordedMs += Math.max(0, performance.now() - current.activeSinceMs);
+                    current.activeSinceMs = null;
+                }
+                lastRecordingPeakBytes = current.peakPendingBytes;
+                current.resolvePauseAnnouncement?.();
+                current.resolvePauseAnnouncement = null;
+                closeCommandWindow({ restorePauseReminder: false });
+                cleanupAudioMonitor(current);
+                stopStream(stream);
+                if (activeSession === current) activeSession = null;
+                publishRecordingDiagnostics();
+                setAudioCommandsToggleLocked(false);
+                setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
+                releaseScreenWakeLock();
+                setWakeStatus("Wake-word detector idle");
+                if (current.discard) {
+                    try { await current.writeQueue; } catch (_) { /* best effort; session is being deleted */ }
+                    writingSessions.delete(id);
+                    try { await deleteSessionData(id); } catch (error) { console.error("Could not delete discarded session:", error); }
+                    return;
+                }
+                if (current.deleteRequested) {
+                    try {
+                        await current.writeQueue;
+                        writingSessions.delete(id);
+                        await moveSessionToRecentlyDeleted(id);
+                        status.textContent = "Recording moved to Recently Deleted. It can be restored.";
+                        await renderRecoverableSessions();
+                    } catch (error) {
+                        console.error("Could not preserve deleted recording:", error);
+                        status.textContent = "Could not move recording to Recently Deleted. Check saved recordings before leaving this page.";
+                    }
+                    setReadyUI();
+                    return;
+                }
+                setRecordingControlState("finalizing");
+                status.textContent = "Finishing audio storage…";
+                await current.writeQueue;
+                let finalBlob;
                 try {
-                    await current.writeQueue;
-                    await moveSessionToRecentlyDeleted(id);
-                    status.textContent = "Recording moved to Recently Deleted. It can be restored.";
-                    await renderRecoverableSessions();
+                    if (current.persistenceError && !(current.storageStopRequested &&
+                        current.persistenceError.message === "Audio storage is not keeping up with recording.")) {
+                        throw current.persistenceError;
+                    }
+                    const savedChunks = await getChunks(id);
+                    const parts = savedChunks.map(chunk => chunk.blob).filter(blob => blob && blob.size > 0);
+                    finalBlob = new Blob(parts, { type: current.metadata.mimeType || parts.find(part => part.type)?.type || "application/octet-stream" });
+                    if (!finalBlob.size) throw new Error("No saved audio chunks were found.");
+                    current.metadata.state = "completed";
+                    current.metadata.completedAt = new Date().toISOString();
+                    current.metadata.lastUpdatedAt = current.metadata.completedAt;
+                    await putSession(current.metadata);
+                    logRecordingEvent(current, "finalization-completed", { bytes: finalBlob.size, stopIntent: current.stopIntent });
+                    showPlayback(finalBlob, id);
+                    status.textContent = current.storageStopRequested
+                        ? "Recording stopped because storage was slow. Saved audio is available; check playback."
+                        : "Recording saved.";
                 } catch (error) {
-                    console.error("Could not preserve deleted recording:", error);
-                    status.textContent = "Could not move recording to Recently Deleted. Check saved recordings before leaving this page.";
+                    logRecordingEvent(current, "finalization-error", { error: String(error) });
+                    console.error("Could not finalize persisted recording:", error);
+                    // Rebuild from committed chunks plus only the uncommitted tail.
+                    // The latter is retained in RAM solely for emergency export.
+                    let fallbackParts = [];
+                    try {
+                        const committed = await getChunks(id);
+                        const bySequence = new Map(committed.map(chunk => [chunk.sequence, chunk.blob]));
+                        for (const [sequence, blob] of current.pendingChunks) bySequence.set(sequence, blob);
+                        fallbackParts = [...bySequence.entries()].sort((a, b) => a[0] - b[0])
+                            .map(([, blob]) => blob).filter(blob => blob && blob.size);
+                    } catch (readError) {
+                        console.error("Could not read committed audio for emergency playback:", readError);
+                        fallbackParts = [...current.pendingChunks.entries()].sort((a, b) => a[0] - b[0])
+                            .map(([, blob]) => blob);
+                    }
+                    finalBlob = new Blob(fallbackParts, { type: current.metadata.mimeType || fallbackParts.find(part => part.type)?.type || "application/octet-stream" });
+                    if (finalBlob.size) {
+                        retainEmergencyRecording(current, finalBlob);
+                        showPlayback(finalBlob, id);
+                    }
+                    current.metadata.state = "storage-error";
+                    current.metadata.lastUpdatedAt = new Date().toISOString();
+                    try { await putSession(current.metadata); } catch (saveError) { console.error(saveError); }
+                    status.textContent = finalBlob.size
+                        ? "Storage failed. Emergency audio is available; download it before closing iMuse and check for missing sections."
+                        : "Recording could not be finalized. No playable audio was available.";
                 }
                 setReadyUI();
-                return;
+                // Announce stop only after the session has left the active recording state.
+                void sayResponse("stopped");
+                await renderRecoverableSessions();
+            } finally {
+                writingSessions.delete(id);
+                await recordingLease?.release();
+                // The preceding render may still have shown a finishing session.
+                void renderRecoverableSessions().catch(error => console.error(error));
             }
-            setRecordingControlState("finalizing");
-            status.textContent = "Finishing audio storage…";
-            await current.writeQueue;
-            let finalBlob;
-            try {
-                if (current.persistenceError && !(current.storageStopRequested &&
-                    current.persistenceError.message === "Audio storage is not keeping up with recording.")) {
-                    throw current.persistenceError;
-                }
-                const savedChunks = await getChunks(id);
-                const parts = savedChunks.map(chunk => chunk.blob).filter(blob => blob && blob.size > 0);
-                finalBlob = new Blob(parts, { type: current.metadata.mimeType || parts.find(part => part.type)?.type || "application/octet-stream" });
-                if (!finalBlob.size) throw new Error("No saved audio chunks were found.");
-                current.metadata.state = "completed";
-                current.metadata.completedAt = new Date().toISOString();
-                current.metadata.lastUpdatedAt = current.metadata.completedAt;
-                await putSession(current.metadata);
-                logRecordingEvent(current, "finalization-completed", { bytes: finalBlob.size, stopIntent: current.stopIntent });
-                showPlayback(finalBlob, id);
-                status.textContent = current.storageStopRequested
-                    ? "Recording stopped because storage was slow. Saved audio is available; check playback."
-                    : "Recording saved.";
-            } catch (error) {
-                logRecordingEvent(current, "finalization-error", { error: String(error) });
-                console.error("Could not finalize persisted recording:", error);
-                // Rebuild from committed chunks plus only the uncommitted tail.
-                // The latter is retained in RAM solely for emergency export.
-                let fallbackParts = [];
-                try {
-                    const committed = await getChunks(id);
-                    const bySequence = new Map(committed.map(chunk => [chunk.sequence, chunk.blob]));
-                    for (const [sequence, blob] of current.pendingChunks) bySequence.set(sequence, blob);
-                    fallbackParts = [...bySequence.entries()].sort((a, b) => a[0] - b[0])
-                        .map(([, blob]) => blob).filter(blob => blob && blob.size);
-                } catch (readError) {
-                    console.error("Could not read committed audio for emergency playback:", readError);
-                    fallbackParts = [...current.pendingChunks.entries()].sort((a, b) => a[0] - b[0])
-                        .map(([, blob]) => blob);
-                }
-                finalBlob = new Blob(fallbackParts, { type: current.metadata.mimeType || fallbackParts.find(part => part.type)?.type || "application/octet-stream" });
-                if (finalBlob.size) {
-                    retainEmergencyRecording(current, finalBlob);
-                    showPlayback(finalBlob, id);
-                }
-                current.metadata.state = "storage-error";
-                current.metadata.lastUpdatedAt = new Date().toISOString();
-                try { await putSession(current.metadata); } catch (saveError) { console.error(saveError); }
-                status.textContent = finalBlob.size
-                    ? "Storage failed. Emergency audio is available; download it before closing iMuse and check for missing sections."
-                    : "Recording could not be finalized. No playable audio was available.";
-            }
-            setReadyUI();
-            // Announce stop only after the session has left the active recording state.
-            void sayResponse("stopped");
-            await renderRecoverableSessions();
         });
         await setupSilenceMonitor(current);
         recorder.start(250);
+        recorderStarted = true;
 
         setRecordingControlState("recording");
         status.textContent = `Recording… Audio is being saved on this device.`;
@@ -2194,6 +2271,15 @@ async function startRecording() {
         setRecordingControlState("idle");
         if (!activeSession) { setAudioCommandsToggleLocked(false); setMicrophoneSelectionLocked(false); setSilencePauseLocked(false); }
         status.textContent = `Could not start durable recording: ${error.message || "microphone unavailable"}`;
+    } finally {
+        if (!recorderStarted) {
+            if (activeSession?.id === newSessionId) {
+                cleanupAudioMonitor(activeSession);
+                activeSession = null;
+            }
+            writingSessions.delete(newSessionId);
+            await recordingLease?.release();
+        }
     }
 }
 
@@ -2245,7 +2331,9 @@ deleteButton.addEventListener("click", async () => {
             else {
                 stopStream(current.stream);
                 await current.writeQueue;
+                writingSessions.delete(current.id);
                 await moveSessionToRecentlyDeleted(current.id);
+                await current.recordingLease?.release();
                 await renderRecoverableSessions();
             }
         } catch (error) {
