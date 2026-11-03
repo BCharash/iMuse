@@ -1414,3 +1414,16 @@ Earlier flight-recorder instrumentation produced startup lockups and was reverte
 The next proposed step is a bounded iPhone standalone audio-session investigation, with actual background speech as the success criterion and a stopping point if the host continues interrupting capture. An explicit Audio Session intent is an untested candidate, not a validated workaround. Recovery/truthful completion status is separate from uninterrupted capture; native recording is a conditional feasibility decision, not a migration already approved or begun.
 
 The [documentation index](README.md) now names the authoritative current files. The [recording investigation](recording-investigation.md) consolidates the handoff, lab evidence and remaining architecture questions. The [active roadmap](iMuse%20next%20steps.md) owns priorities; Memora and Swift documents retain distinct integration/proposal roles. The old stabilization review, November 2 handoff and detailed November 1 roadmap moved into Archive. The redundant lab-design file was removed after its evidence was incorporated. Earlier entries remain intact as history, not instructions to repeat completed experiments or restore retired controls.
+
+
+---
+
+# DJ012 — Capture-Only Installed Lab Reproduces the Failure
+
+**Date:** 3 November 2026. **Status:** User-reported minimal installed result; experiments reverted.
+
+The separate direct-tap microphone declaration was accepted and cleared successfully but did not help installed-iPhone background capture; Safari-tab capture succeeded. The experiment was reverted. A subsequent minimal lab, authorized at lab.html with a distinct standalone manifest, removed production imports, Web Audio, playback, voice models, silence handling, wake lock, persistence writes and audio-session controls. It retained only microphone → MediaRecorder capture with RAM-held chunks and post-stop playback. The user reported the same double beep and microphone loss in background.
+
+The minimal lab was reverted (`1cf3423`, revert `a739a57`); its exact source can be retrieved for a later iOS 27 comparison without retaining experimental files in the current app. No latest minimal JSON or new browser-control result was supplied with the report. The installed-host failure no longer requires any of the isolated iMuse subsystems. Its exact OS mechanism remains unresolved.
+
+The user prefers continued web development before native migration, lacks a cable for connected-device logging, and may wait days for an iOS 27 volunteer. Pause speculative production patches, retain the negative results, and develop on the successful Safari-tab route. The related Safari 27 release fix is not proof of restored standalone capture. Current details and priorities remain in the investigation and roadmap.

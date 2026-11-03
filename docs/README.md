@@ -13,7 +13,7 @@ Updated 3 November 2026. Start here; current findings take precedence over older
 
 ## Current checkpoint
 
-The interruption-warning playback, warning setting, WAV, and temporary background labs have been removed. On the user's iPhone, Safari-tab recording succeeds without the warning, whereas installed iMuse and an installed lab lose background capture with an external double beep. MacBook browser and installed-app tests succeed. No iPhone standalone workaround is established. Device tests and code inspection are recorded separately in the investigation.
+The interruption-warning playback, warning setting, WAV, and temporary background labs have been removed. On the user's iPhone, Safari-tab recording succeeds without the warning, whereas installed iMuse and an installed lab lose background capture with an external double beep. MacBook browser and installed-app tests succeed. The new capture-only installed lab also failed with the same beep, and its commit was reverted. Accepted microphone declaration and explicit audio-session selection provided no benefit. No iPhone standalone workaround is established. Continue web-first using the tested Safari-tab route while awaiting an iOS 27 comparison or new platform evidence; the minimal reproducer is recoverable from Git. Device tests and code inspection are recorded separately in the investigation.
 
 ## Document maintenance
 

@@ -1,6 +1,6 @@
 # Recording and iPhone standalone background investigation
 
-Updated 3 November 2026. This consolidates the former recording handoff, background lab notes, and remaining architecture audit questions. Historical startup regressions and earlier source reviews are in the [archive](Archive/README.md). The [roadmap](iMuse%20next%20steps.md) owns work priorities.
+Updated 3 November 2026. **Latest result:** the newly installed minimal microphone → MediaRecorder lab also produced the double beep and lost background capture. That test was reverted after use; its result is retained below. This consolidates the former recording handoff, background lab notes, and remaining architecture audit questions. Historical startup regressions and earlier source reviews are in the [archive](Archive/README.md). The [roadmap](iMuse%20next%20steps.md) owns work priorities.
 
 ## Conclusion and evidence boundary
 
@@ -113,4 +113,15 @@ The iOS 27 volunteer comparison may take several days. The next recommended diag
 
 Safari Web Inspector can also inspect installed Home Screen apps ([WebKit instructions](https://webkit.org/web-inspector/enabling-web-inspector/)), but any debugger-attached result must be checked against an unattached control because inspection can change execution conditions. Prefer device-system logging first.
 
-A remaining configuration gap is whether the installed lab reproduction used a genuinely minimal profile with no Web Audio and no cue playback, rather than just Audio commands off. Establish that before proposing a new capture-only comparison; do not repeat the already-passed Safari-tab matrix. Foreground recovery/truthful session completion can be developed on the working browser route while the OS investigation remains unresolved, without promising that it restores missing background audio.
+That configuration gap has now been tested: the dedicated minimal installed recorder also failed. See the latest result below; do not repeat the capture-only comparison. Foreground recovery/truthful session completion can be developed on the working browser route while the OS investigation remains unresolved, without promising that it restores missing background audio.
+
+
+## Minimal installed recorder failed — component isolation complete
+
+The user tested the new minimal lab on the installed iPhone and reported the same external double beep and microphone loss on backgrounding. The page used getUserMedia({audio:true}) → MediaRecorder at a requested 250 ms, retaining chunks in RAM, with no production imports, Web Audio graph, cues, models, silence handling, wake lock, storage writes or audio-session controls. This closes the remaining question about whether those iMuse subsystems are necessary for reproduction. The exact OS/host mechanism and meaning of the beep remain unverified; this does not prove every possible web workaround impossible. No diagnostic JSON or new Safari minimal-control result accompanied this latest report.
+
+The repository shows the lab commit `1cf3423` reverted by `a739a57`; lab.html and lab.webmanifest are currently absent. Do not silently restore them. The exact minimal reproducer remains retrievable from commit `1cf3423` if needed for the iOS 27 comparison or a WebKit report. Production recording code is unchanged by this result update.
+
+Keep the known successful Safari-tab route for continued web development. No further production graph/storage/activation patches are justified by these results alone. Await an actual iOS 27 comparison or a specific new platform-level hypothesis; native development remains deferred per the user's web-first preference. Mac device-system logging is also deferred because no suitable cable is available.
+
+For an iOS 27 volunteer, retrieve the same minimal page/manifest from its historical commit when needed, explicitly confirm Standalone mode, then compare saved before/background/after speech in installed and browser runs. Record device/OS, exact served code, beep and audio result. A release note or microphone indicator cannot substitute for this test. Do not call an upgrade a verified cure: a related Safari 27 audio-session fix is documented, but this exact installed-host outcome remains untested there.
