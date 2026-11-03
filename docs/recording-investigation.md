@@ -104,3 +104,13 @@ Preserve the old recorder's final data before replacing it where possible. If re
 ## Cleanup completed
 
 Removed `Lab.html`, `BackgroundCaptureLab.html`, `js/labs/background-capture-lab.js`, the interruption-warning setting/code and `audio/recording-interrupted.wav`. Written findings, visual lifecycle notices, normal cues, pre-existing command labs and production recording data remain. Old lab IndexedDB data was not deleted. No capture workaround was added as part of cleanup.
+
+## Direct-button result and investigation while awaiting iOS 27 comparison
+
+The user subsequently reported that the corrected direct-tap activation was **accepted** and cleanup was confirmed in both Safari-tab and installed iPhone runs. Installed mode still produced the external double beep and lost background acquisition; Safari-tab background recording remained successful. This is a valid negative result for the accepted declaration, unlike the prior user-gesture rejection. The user reverted the corrected experiment (`2ae6f9c`, revert `0502fa3`); no test button/helper remains. Automatic / Play and record also showed no benefit. Do not repeat either declaration approach without a new reason.
+
+The iOS 27 volunteer comparison may take several days. The next recommended diagnostic is a short **device-system log comparison** using Mac Console and the connected iPhone, reproducing one standalone failure and one Safari-tab success with matching microphone/action/duration. Record the approximate switch/beep times and look for capture interruption, audio-session deactivation, process suspension or host stop-capture messages. [Apple documents connected-device logging in Console](https://support.apple.com/en-mide/guide/console/cnsl1012/mac). Logs may omit the relevant details; do not promise a definitive cause or identify the beep without evidence. No native build or extra capture instrumentation is required for this collection.
+
+Safari Web Inspector can also inspect installed Home Screen apps ([WebKit instructions](https://webkit.org/web-inspector/enabling-web-inspector/)), but any debugger-attached result must be checked against an unattached control because inspection can change execution conditions. Prefer device-system logging first.
+
+A remaining configuration gap is whether the installed lab reproduction used a genuinely minimal profile with no Web Audio and no cue playback, rather than just Audio commands off. Establish that before proposing a new capture-only comparison; do not repeat the already-passed Safari-tab matrix. Foreground recovery/truthful session completion can be developed on the working browser route while the OS investigation remains unresolved, without promising that it restores missing background audio.
