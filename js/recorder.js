@@ -4,6 +4,7 @@ import { loadVoicuteWakeWord } from "./voicute/voicute-adapter.js";
 import { loadHeedWakeWord } from "./heed/heed-adapter.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { loadCommands, startCommands, stopCommands } from "./tensorflow/commands-adapter.js";
+import { createMicrophoneActivationTest } from "./microphone-activation-test.js";
 
 const recordButton = document.getElementById("recordButton");
 const pauseButton = document.getElementById("pauseButton");
@@ -13,6 +14,8 @@ const deleteButton = document.getElementById("deleteButton");
 const status = document.getElementById("status");
 const wakeStatus = document.getElementById("wakeStatus");
 const lifecycleStatus = document.getElementById("lifecycleStatus");
+const microphoneActivationButton = document.getElementById("microphoneActivationButton");
+const microphoneActivationStatus = document.getElementById("microphoneActivationStatus");
 
 // Assess the device class once during startup. Keep this vocabulary aligned with
 // Memora: every device is classified as either "mobile" or "desktop".
@@ -72,6 +75,8 @@ const MAX_PENDING_AUDIO_BYTES = 8 * 1024 * 1024;
 
 let db = null;
 let activeSession = null;
+const microphoneActivationTests = new WeakMap();
+let microphoneActivationDisplayOwner = null;
 let recordingUrl = null;
 let displayedSessionId = null;
 let startRequest = 0;
@@ -178,6 +183,7 @@ function logCaptureSnapshot(current, phase) {
     const details = {
         phase,
         audioContextState: current.audioContext?.state || "unavailable",
+        microphoneActivation: current.microphoneActivationTest?.snapshot() || null,
         recorderMimeType: current.recorder?.mimeType || "",
         trackEnabled: track?.enabled ?? null,
         chunksReceived: current.sequence,
@@ -333,7 +339,15 @@ async function restoreRecentlyDeletedSession(id) {
 
 function stopStream(stream) {
     if (stream?.getAudioTracks?.().length) publishMicrophoneProcessing(stream, false);
-    releaseRecordingMicrophone(stream);
+    try {
+        releaseRecordingMicrophone(stream);
+    } finally {
+        if (stream) {
+            microphoneActivationTests.get(stream)?.release();
+            microphoneActivationTests.delete(stream);
+        }
+        updateMicrophoneActivationButton();
+    }
 }
 
 // Prefer a format this browser can both record and play, with M4A/AAC first.
@@ -477,7 +491,25 @@ function setRecordingControlState(state) {
     recordButton.classList.toggle("is-recording", state === "recording");
     recordButton.disabled = state === "preparing" || state === "finalizing";
     pauseButton.disabled = !["recording", "paused"].includes(state);
+    updateMicrophoneActivationButton(state);
 }
+
+function updateMicrophoneActivationButton(uiState) {
+    const current = activeSession;
+    const test = current?.microphoneActivationTest?.snapshot();
+    microphoneActivationButton.disabled = !current || current.stopHandled || current.deleteRequested ||
+        current.recorder.state !== "recording" || current.metadata.state === "finalizing" ||
+        (uiState !== undefined && uiState !== "recording") ||
+        !test || test.released || ["requesting", "accepted", "unsupported"].includes(test.phase);
+}
+
+// Keep the activation call on this synchronous click stack, after capture exists.
+microphoneActivationButton.addEventListener("click", () => {
+    const current = activeSession;
+    if (!current || microphoneActivationButton.disabled || current.recorder.state !== "recording") return;
+    current.microphoneActivationTest.activate();
+    updateMicrophoneActivationButton();
+});
 
 function finalizeRecording(source = "unspecified") {
     closeCommandWindow({ restorePauseReminder: false });
@@ -1791,7 +1823,20 @@ async function startRecording() {
             lastChunkBytes: null
         };
         activeSession = current;
-        logRecordingEvent(current, "session-created", { mimeType: actualMimeType });
+        microphoneActivationDisplayOwner = current;
+        microphoneActivationStatus.textContent = "Recording started. Optional: tap Test microphone activation before switching apps.";
+        current.microphoneActivationTest = createMicrophoneActivationTest((message, result) => {
+            logRecordingEvent(current, "microphone-activation-test", result);
+            if (microphoneActivationDisplayOwner === current) {
+                microphoneActivationStatus.textContent = message;
+                updateMicrophoneActivationButton();
+            }
+        });
+        microphoneActivationTests.set(stream, current.microphoneActivationTest);
+        logRecordingEvent(current, "session-created", {
+            mimeType: actualMimeType,
+            standalone: window.matchMedia?.("(display-mode: standalone)")?.matches || navigator.standalone === true
+        });
         lastRecordingPeakBytes = 0;
         publishRecordingDiagnostics();
         // Freeze voice-command preference throughout this recording session.
