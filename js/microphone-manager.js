@@ -8,6 +8,12 @@ const indicator = document.getElementById("microphoneStatus");
 let selectedId = "";
 try { selectedId = localStorage.getItem(KEY) || ""; } catch (_) {}
 let ownedStream = null;
+// Keep the original request: browsers may omit unrecognized constraints afterward.
+const requestedAudioByStream = new WeakMap();
+export function getRequestedMicrophoneConstraints(stream) {
+    const audio = requestedAudioByStream.get(stream);
+    return audio ? JSON.parse(JSON.stringify(audio)) : null;
+}
 let locked = false;
 let operation = 0;
 let refreshGeneration = 0;
@@ -84,13 +90,15 @@ export async function acquireRecordingMicrophone() {
         } catch (error) { console.warn("Could not inspect microphones; using system default:", error); }
     }
     let stream;
+    let requestedAudio = audio;
     try {
         stream = await navigator.mediaDevices.getUserMedia({ audio });
     } catch (error) {
         if (selectedId || !candidate) throw error;
         // Automatic mode can fall back if a headset vanished or could not open.
         console.warn("Preferred headset unavailable; trying system microphone:", error);
-        stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: { ideal: 1 }, ...processingConstraints } });
+        requestedAudio = { channelCount: { ideal: 1 }, ...processingConstraints };
+        stream = await navigator.mediaDevices.getUserMedia({ audio: requestedAudio });
     }
     const track = stream.getAudioTracks()[0];
     if (!track || track.readyState !== "live" || request !== operation) {
@@ -102,6 +110,7 @@ export async function acquireRecordingMicrophone() {
         stream.getTracks().forEach(t => t.stop());
         throw Error("Browser returned a different microphone than the manually selected device");
     }
+    requestedAudioByStream.set(stream, JSON.parse(JSON.stringify(requestedAudio)));
     ownedStream = stream;
     report("Microphone: recording — " + (track.label || "Unidentified input"));
     track.addEventListener("ended", () => {

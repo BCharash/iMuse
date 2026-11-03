@@ -1,5 +1,5 @@
 import { playSpokenResponse, prepareSpokenResponses } from "./audio-response-manager.js";
-import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSelectionLocked } from "./microphone-manager.js";
+import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSelectionLocked, getRequestedMicrophoneConstraints } from "./microphone-manager.js";
 import { loadVoicuteWakeWord } from "./voicute/voicute-adapter.js";
 import { loadHeedWakeWord } from "./heed/heed-adapter.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
@@ -465,10 +465,10 @@ function currentSilenceRmsThreshold() {
 function publishMicrophoneProcessing(stream, live = true) {
     const track = stream?.getAudioTracks?.()[0];
     if (!track) return;
-    const safe = (fn) => { try { return fn() || {}; } catch (_) { return {}; } };
+    const safe = (fn) => { try { return fn() || null; } catch (_) { return null; } };
     window.imuseMicrophoneProcessing = {
         label: track.label || "Not reported",
-        requested: safe(() => track.getConstraints?.()),
+        requested: getRequestedMicrophoneConstraints(stream),
         active: safe(() => track.getSettings?.()),
         supported: safe(() => navigator.mediaDevices?.getSupportedConstraints?.()),
         live

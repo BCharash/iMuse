@@ -212,18 +212,23 @@ function renderMicrophoneProcessing() {
     table.className = "imuse-mic-table";
     const header = document.createElement("div");
     header.className = "imuse-mic-table-row";
-    for (const heading of ["Feature", "Requested", "Active", "Supported"]) {
+    for (const heading of ["Feature", "iMuse requested", "Browser reports", "Browser control"]) {
         const cell = document.createElement("strong"); cell.textContent = heading; header.append(cell);
     }
     table.append(header);
     for (const [label, key] of fields) {
         const row = document.createElement("div"); row.className = "imuse-mic-table-row";
-        for (const value of [label, format(data.requested, key), format(data.active, key), format(data.supported, key)]) {
+        const requested = !data.requested ? "Unknown" : Object.prototype.hasOwnProperty.call(data.requested, key) ? format(data.requested, key) : "Not requested";
+        const control = !data.supported ? "Unknown" : data.supported[key] === true ? "Exposed" : "Not exposed";
+        for (const value of [label, requested, format(data.active, key), control]) {
             const cell = document.createElement("span"); cell.textContent = value; row.append(cell);
         }
         table.append(row);
     }
     target.append(table);
+    const note = document.createElement("p");
+    note.textContent = "Requests are preferences. Not exposed means the browser offers no standard control; it does not mean processing is off.";
+    target.append(note);
 }
 window.addEventListener("imuse-microphone-processing", renderMicrophoneProcessing);
 renderMicrophoneProcessing();

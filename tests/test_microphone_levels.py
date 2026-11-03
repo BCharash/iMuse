@@ -94,6 +94,62 @@ globalThis.testResult='PASS';
 
 
 class MicrophoneLevelTests(unittest.TestCase):
+    def test_processing_report_preserves_original_requests(self):
+        manager = (Path(__file__).resolve().parents[1] / 'js/microphone-manager.js').read_text()
+        manager = '\n'.join(line for line in manager.splitlines() if not line.startswith('import ')).replace('export ', '')
+        report = between('function publishMicrophoneProcessing(', 'const PAUSED_BEEP_INTERVAL_MS')
+        render = SETTINGS[SETTINGS.index('function renderMicrophoneProcessing()'):SETTINGS.index('window.addEventListener("imuse-microphone-processing"')]
+        evaluate(r"""
+globalThis.testResult='pending';
+const assert=(value,message)=>{if(!value)throw Error(message);};
+class Element {
+    constructor(){this.children=[];this.textContent='';}
+    append(...children){this.children.push(...children);}
+    replaceChildren(...children){this.children=children;}
+}
+const target=new Element();
+const document={getElementById:id=>id==='microphoneProcessingDetails'?target:null,
+    createElement:()=>new Element(),addEventListener:()=>{}};
+const window={dispatchEvent:()=>{}};
+class Event {constructor(type){this.type=type;}}
+const localStorage={getItem:()=>''};
+const getSettings=()=>({autoGainControl:false,noiseSuppression:true,echoCancellation:true});
+const setMicrophoneProcessingLocked=()=>{};
+const track={readyState:'live',label:'Test mic',getSettings:()=>({sampleRate:48000,echoCancellation:true}),
+    getConstraints:()=>({echoCancellation:{ideal:true}}),addEventListener:()=>{}};
+const stream={getAudioTracks:()=>[track],getTracks:()=>[track]};
+let lastRequest;
+const navigator={mediaDevices:{enumerateDevices:async()=>[],
+    getUserMedia:async request=>{lastRequest=request.audio;return stream;},
+    getSupportedConstraints:()=>({echoCancellation:true,sampleRate:true})}};
+""" + manager + report + render + r"""
+(async()=>{
+    await acquireRecordingMicrophone();
+    publishMicrophoneProcessing(stream,false);
+    const data=window.imuseMicrophoneProcessing;
+    assert(data.requested.autoGainControl.ideal===false,'original AGC-off request survives browser omission');
+    assert(data.requested.noiseSuppression.ideal===true,'original suppression request survives omission');
+    lastRequest.autoGainControl.ideal=true;
+    getRequestedMicrophoneConstraints(stream).noiseSuppression.ideal=false;
+    assert(getRequestedMicrophoneConstraints(stream).autoGainControl.ideal===false&&getRequestedMicrophoneConstraints(stream).noiseSuppression.ideal===true,'request snapshot cannot be mutated through caller objects');
+    renderMicrophoneProcessing();
+    const rows=target.children[1].children;
+    const cells=index=>rows[index].children.map(cell=>cell.textContent);
+    assert(cells(0)[2]==='Browser reports','browser settings are clearly labeled');
+    assert(cells(1).join('|')==='Automatic gain control|false (preferred)|Not reported|Not exposed','missing iPhone controls are not reported as off');
+    assert(cells(4).join('|')==='Sample rate|Not requested|48000|Exposed','default sample rate is distinct from an explicit request');
+    track.getSettings=()=>({autoGainControl:false,noiseSuppression:true,echoCancellation:true});
+    navigator.mediaDevices.getSupportedConstraints=()=>({autoGainControl:true,noiseSuppression:true,echoCancellation:true});
+    publishMicrophoneProcessing(stream);renderMicrophoneProcessing();
+    assert(cells(1)[2]==='Not reported','old rendering remains an independent snapshot');
+    assert(target.children[1].children[1].children[2].textContent==='false','Chrome-reported false is preserved');
+    navigator.mediaDevices.getSupportedConstraints=()=>{throw Error('unavailable');};
+    publishMicrophoneProcessing(stream);renderMicrophoneProcessing();
+    assert(target.children[1].children[1].children[3].textContent==='Unknown','failed support query is not mistaken for unsupported');
+    globalThis.testResult='PASS';
+})().catch(error=>{globalThis.testResult=String(error.stack||error);});
+""")
+
     def test_passive_level_meter(self):
         evaluate(MOCKS + METER + UI + TESTS)
 
