@@ -48,7 +48,7 @@ Web Locks protection covers cooperating updated pages in the same storage scope.
 
 ### Passive microphone-level evaluation
 
-The separate [wake-word review lab](wake-word-evaluation.md) now retains replayable trigger/near-trigger clips and manual missed-phrase clips for evaluation. Production wake behavior is unchanged.
+The separate [wake-word and filename lab](wake-word-evaluation.md) now provides a simple recorder, local Whisper filename suggestions and Silero speech-gated Heed/Voicute detection. The earlier clip-review lab is archived with its separate storage preserved. Production wake behavior is unchanged.
 
 Refactoring is stopped. **Settings → Microphone levels → View** shows one needle-style RMS dBFS meter above both thresholds; the initial duplicate readouts were consolidated at the user's request. The dial spans −70 to 0 dBFS, with an exact numeric reading even below that range. Start recording first; readings continue while paused. It measures normalized input after browser microphone processing, before Heed's filtering/preprocessing—not model confidence, peak level or calibrated room sound pressure. Less-negative values mean louder input.
 

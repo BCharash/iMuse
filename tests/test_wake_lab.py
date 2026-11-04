@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from recording_test_support import evaluate
 
-LAB = (Path(__file__).resolve().parents[1] / 'lab.html').read_text()
+LAB = (Path(__file__).resolve().parents[1] / 'docs/Archive/wake-word-comparison-lab-2026-11-04.html').read_text()
 HELPERS = LAB[LAB.index('// Encode away from the detection thread.'):LAB.index('// END WAKE OPTIMIZATION HELPERS')]
 CORE = LAB[LAB.index('// BEGIN WAKE CLIP CORE'):LAB.index('// END WAKE CLIP CORE')]
 

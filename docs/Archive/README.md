@@ -17,3 +17,5 @@ Reviewed 3 November 2026. These are historical source reviews, installation snap
 | [Root cleanup checklist](root-cleanup-checklist.md) | Historical relocation/deletion instructions; not a fresh instruction to delete files |
 
 Evidence is preserved here rather than merged verbatim into current briefs. Previous ZIP artifacts and Desktop JSON files may not be available. Request an exact historical artifact only if investigating its specific regression; current workspace files are the source for present changes.
+
+The [4 November comparison lab](wake-word-comparison-lab-2026-11-04.html) and its [review instructions](wake-word-review-notes-2026-11-04.md) preserve the previous wake-word audio-review experiment. Current findings and the replacement recorder lab are documented in [wake-word evaluation](../wake-word-evaluation.md).

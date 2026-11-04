@@ -1,0 +1,227 @@
+{
+  "version": 1,
+  "cache": "imuse-simple-lab-v1",
+  "bytes": 82523332,
+  "assets": [
+    {
+      "path": "js/heed/filter-coeffs.js",
+      "bytes": 23412,
+      "sha256": "f1123468e92b4941b421f5c52352da5b8c4cbc5368aca603163b8695c3558f0f"
+    },
+    {
+      "path": "js/heed/preprocessing.js",
+      "bytes": 12376,
+      "sha256": "011168251b72201b3346f9c08502363885cb0635742a2e6244faf69c14478d42"
+    },
+    {
+      "path": "js/heed/wake.json",
+      "bytes": 1781,
+      "sha256": "eb5e5e06a315f625f8c6cbe7cc61d0f3d33242d814eb9ce1397790bb14ac2b6d"
+    },
+    {
+      "path": "js/heed/wake.onnx",
+      "bytes": 110936,
+      "sha256": "2635f8c007651c39a8f63d9f6834c65f85359b7361d99e2e5d0770fa9513aa01"
+    },
+    {
+      "path": "js/heed/wakeword.js",
+      "bytes": 6015,
+      "sha256": "da12924ea9da141fd229d98c72470f53f422ee7add398f6f48fd2d2457c9375b"
+    },
+    {
+      "path": "js/lab/SOURCES.md",
+      "bytes": 2400,
+      "sha256": "a42df52c69cfe5e431538f65e9e3d8ed5e0eab684358c79f1dcbffcc7a4eda8a"
+    },
+    {
+      "path": "js/lab/app.js",
+      "bytes": 21002,
+      "sha256": "cc481f5a6c5a606fd67771594f281332a5077203b794f4c9b66debb0586187ea"
+    },
+    {
+      "path": "js/lab/capture.js",
+      "bytes": 2186,
+      "sha256": "e22152bbfbbd74e339d3066dc88a95eea6da08837c8b184dfa736a0d84c0f192"
+    },
+    {
+      "path": "js/lab/core.js",
+      "bytes": 3566,
+      "sha256": "a6bf0f47f089dfa6e73b7d7562a2e6054f7378933b388edb3cabf91e414d2bf5"
+    },
+    {
+      "path": "js/lab/detection-worker.js",
+      "bytes": 5795,
+      "sha256": "1a4aacc6e5dffbae3c190064e5429bb425a7a05bc725b5e0779063d96dbcae11"
+    },
+    {
+      "path": "js/lab/models/voicute/hey_friday.onnx",
+      "bytes": 130572,
+      "sha256": "24f0403ffc57b47342d71009d6cda86e19f1ef355d170f9dee76de5cd7c73350"
+    },
+    {
+      "path": "js/lab/models/voicute/melspectrogram.onnx",
+      "bytes": 1087958,
+      "sha256": "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f"
+    },
+    {
+      "path": "js/lab/models/voicute/model_info.json",
+      "bytes": 130,
+      "sha256": "f2c2f2c0063b147a0020af5c1c906ed262c6b35e72a844c3b3620f1520b53900"
+    },
+    {
+      "path": "js/lab/models/whisper-tiny.en/added_tokens.json",
+      "bytes": 2082,
+      "sha256": "598c98875c01fe7ebd08ba6779f052f1136de6d36d9e7b99e04b432f78ecb28d"
+    },
+    {
+      "path": "js/lab/models/whisper-tiny.en/config.json",
+      "bytes": 2202,
+      "sha256": "37a1073be00d19118c06557896c7c148598f4d8277edc0f5bc07c9f5554839f1"
+    },
+    {
+      "path": "js/lab/models/whisper-tiny.en/generation_config.json",
+      "bytes": 1590,
+      "sha256": "132c95ba9db45f4498f2eab3fea7c1d6a174005010f8f6b7d20cfd5e9795996b"
+    },
+    {
+      "path": "js/lab/models/whisper-tiny.en/merges.txt",
+      "bytes": 456318,
+      "sha256": "1ce1664773c50f3e0cc8842619a93edc4624525b728b188a9e0be33b7726adc5"
+    },
+    {
+      "path": "js/lab/models/whisper-tiny.en/normalizer.json",
+      "bytes": 52666,
+      "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd"
+    },
+    {
+      "path": "js/lab/models/whisper-tiny.en/onnx/decoder_model_merged_quantized.onnx",
+      "bytes": 30727382,
+      "sha256": "dbb2e063b7fbc41d9803b9698f93ecb035c50cbb3fb87b56cb131e4a5eb99059"
+    },
+    {
+      "path": "js/lab/models/whisper-tiny.en/onnx/encoder_model_quantized.onnx",
+      "bytes": 10124913,
+      "sha256": "8cc3c6f8563d1b3fbd2c5af9f64c2bed8b020bc593c402d1ef53b9f08fbf1b90"
+    },
+    {
+      "path": "js/lab/models/whisper-tiny.en/preprocessor_config.json",
+      "bytes": 339,
+      "sha256": "a6a76d28c93edb273669eb9e0b0636a2bddbb1272c3261e47b7ca6dfdbac1b8d"
+    },
+    {
+      "path": "js/lab/models/whisper-tiny.en/special_tokens_map.json",
+      "bytes": 1717,
+      "sha256": "7da611d517fe29e77335b8d8384e71795fb7b37cbf95bdc3b5252fa7e09dd1f8"
+    },
+    {
+      "path": "js/lab/models/whisper-tiny.en/tokenizer.json",
+      "bytes": 2128494,
+      "sha256": "c6ee8f089220a5b1188f6426456772572671c6141ae007eecb83c6a8349f5deb"
+    },
+    {
+      "path": "js/lab/models/whisper-tiny.en/tokenizer_config.json",
+      "bytes": 835,
+      "sha256": "e082c1ad251541bf277967a703252cddd4bb37a71a43737e03d050c22ec08238"
+    },
+    {
+      "path": "js/lab/models/whisper-tiny.en/vocab.json",
+      "bytes": 999186,
+      "sha256": "f6bd25a65e4e63ca31360e9fb11c7e4f9a391a78385d640acd814092dd6eee4f"
+    },
+    {
+      "path": "js/lab/store.js",
+      "bytes": 2519,
+      "sha256": "4aecda92024395332d60e96afd3a81bfbf03706c8280622fe4ed0bf89bcab12f"
+    },
+    {
+      "path": "js/lab/style.css",
+      "bytes": 1429,
+      "sha256": "00a164d75c6da2067f9b9e234bd6d7ea430914d8eba29cb01003dedf8202d5ae"
+    },
+    {
+      "path": "js/lab/vendor/licenses/heed-Apache-2.0.txt",
+      "bytes": 11301,
+      "sha256": "b303d05840a814f14bf71c1f9378e0eae9d8861367c4fedf9cf0bc287bd877f5"
+    },
+    {
+      "path": "js/lab/vendor/licenses/onnxruntime-MIT.txt",
+      "bytes": 1073,
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    },
+    {
+      "path": "js/lab/vendor/licenses/silero-MIT.txt",
+      "bytes": 1075,
+      "sha256": "2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b"
+    },
+    {
+      "path": "js/lab/vendor/licenses/transformers-Apache-2.0.txt",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "js/lab/vendor/licenses/voicute-MIT.txt",
+      "bytes": 1064,
+      "sha256": "3f185a3cd6e7914b3c00daae68970e13b0102c5486175f773bedda831cbd9a52"
+    },
+    {
+      "path": "js/lab/vendor/licenses/whisper-MIT.txt",
+      "bytes": 1063,
+      "sha256": "b5d65a59060e68c4ff940e1eddfa6f94b2d68fdf58ed7f4dd57721c997e35e9d"
+    },
+    {
+      "path": "js/lab/vendor/ort-wasm-simd-threaded.mjs",
+      "bytes": 24618,
+      "sha256": "745eb7c0ce6f18a6aa521971b2877babc7ffb27eecb58ab3bc6e5ef4692672e8"
+    },
+    {
+      "path": "js/lab/vendor/ort-wasm-simd-threaded.wasm",
+      "bytes": 11246032,
+      "sha256": "207d02be4591c156b0a98f024f3d58005b5b04c92274d759fb390338c63559ea"
+    },
+    {
+      "path": "js/lab/vendor/ort.min.mjs",
+      "bytes": 446164,
+      "sha256": "7eb964c1adb20e5c316733013659d2d0ef6b84d62f8a3cd77c0020ebf3b3c50e"
+    },
+    {
+      "path": "js/lab/vendor/silero_vad_v5.onnx",
+      "bytes": 2327524,
+      "sha256": "2623a2953f6ff3d2c1e61740c6cdb7168133479b267dfef114a4a3cc5bdd788f"
+    },
+    {
+      "path": "js/lab/vendor/transformers.min.js",
+      "bytes": 871803,
+      "sha256": "489ae9fa3deae4eed28f83b9f94a32342c63cffdabd56ad990f76d28c858a1c2"
+    },
+    {
+      "path": "js/lab/vendor/voicute.js",
+      "bytes": 23169,
+      "sha256": "36e06cf31b9d61eab0b356ac0f172926662afea5c4ab573668f1c2ab68ee7f7a"
+    },
+    {
+      "path": "js/lab/vendor/whisper/ort-wasm-simd-threaded.jsep.mjs",
+      "bytes": 44484,
+      "sha256": "08fb86ec433c78bfb032c5d84a68b8e8e5a8d81268fa39e24314179a5767a5b9"
+    },
+    {
+      "path": "js/lab/vendor/whisper/ort-wasm-simd-threaded.jsep.wasm",
+      "bytes": 21596019,
+      "sha256": "c46655e8a94afc45338d4cb2b840475f88e5012d524509916e505079c00bfa39"
+    },
+    {
+      "path": "js/lab/whisper-worker.js",
+      "bytes": 1177,
+      "sha256": "71a0286869b81ab42ce433d3bc670f6051b3e3f3fc457d240dc8b8aca5f9450d"
+    },
+    {
+      "path": "lab-sw.js",
+      "bytes": 1532,
+      "sha256": "bc99a095997d6e2e7720fc0e08e7e8a856eada69c2fe28fa8969b78c0a775c1d"
+    },
+    {
+      "path": "lab.html",
+      "bytes": 4075,
+      "sha256": "a9598ec12209b756214231e6fa6d9108c919c4440d03f78c5bd5cc458f265e13"
+    }
+  ]
+}
