@@ -13,16 +13,21 @@ export function filenameSuffix(text) {
  return String(text||'').replace(/^\s*(?:title|file\s*name|subject)\s*[:,-]?\s*/i,'')
   .replace(/<\|[^>]+\|>/g,'').replace(/[^\p{L}\p{N}\s-]/gu,' ').trim().split(/\s+/).slice(0,7).join('-').slice(0,70).replace(/-+$/,'');
 }
-// Preserve a short phrase from the first two sentences, without rearranging words.
+// Opening-sentence keywords, in spoken order. Keep negations and topic words.
 export function filenameKeywords(text) {
- const opening=(String(text||'').replace(/<\|[^>]+\|>/g,'').match(/[^.!?]+[.!?]*/g)||[]).slice(0,2).map(sentence=>sentence.trim()
-  .replace(/^(?:(?:hey\s+(?:doc|friday)|hello|hi|okay|ok)[,!.]?\s*)+/i,'')
-  .replace(/^(?:(?:today\s+)?I\s+(?:want to|would like to|am going to)\s+(?:talk about|discuss)|(?:this is|lets|let’s|let us)\s+(?:a recording about|talk about|discuss)|(?:title|subject|file name)\s*:)\s*/i,'').trim())
-  .find(sentence=>/[\p{L}\p{N}]/u.test(sentence));
- const words=(opening||'').match(/[\p{L}\p{N}]+(?:[’'-][\p{L}\p{N}]+)*/gu)||[];
- const selected=[];for(const word of words.slice(0,6)){if([...selected,word].join('-').length>48)break;selected.push(word);}
- while(selected.length&&/^(?:a|an|the|and|or|but|for|of|to|with|in|on|about)$/i.test(selected[selected.length-1]))selected.pop();
- return selected.join('-');
+ const common=new Set(('a an the and or but so as at by for from in into of on onto to with about after before between during over under is am are was were be been being have has had do does did i me my mine we us our ours you your yours he him his she her hers it its they them their theirs this that these those there here then than um uh erm hmm well okay ok hello hi hey doc docs friday please just really very also today now').split(' '));
+ const sentences=(String(text||'').replace(/<\|[^>]+\|>/g,'').match(/[^.!?]+[.!?]*/g)||[]).slice(0,2);
+ for(const sentence of sentences){
+  const opening=sentence.trim()
+   .replace(/^(?:(?:hey\s+(?:doc|friday)|hello|hi|okay|ok)[,!.]?\s*)+/i,'')
+   .replace(/^(?:(?:today\s+)?I\s+(?:want to|would like to|am going to)\s+(?:talk about|discuss)|(?:this is|lets|let’s|let us)\s+(?:a recording about|talk about|discuss)|(?:title|subject|file name)\s*:)\s*/i,'');
+  const words=opening.match(/[\p{L}\p{N}]+(?:[’'-][\p{L}\p{N}]+)*/gu)||[];
+  const selected=[],seen=new Set();
+  for(const word of words){const key=word.toLowerCase();if(common.has(key)||seen.has(key))continue;
+   if(selected.length===6||[...selected,word].join('-').length>48)break;selected.push(word);seen.add(key);}
+  if(selected.length)return selected.join('-');
+ }
+ return '';
 }
 export function filename(prefix,suffix,extension) {const clean=filenameSuffix(suffix);return `${prefix}${clean?'_'+clean:''}.${extension}`;}
 export function audioExtension(mime='') {return mime.includes('mp4')?'m4a':mime.includes('webm')?'webm':mime.includes('ogg')?'ogg':'audio';}

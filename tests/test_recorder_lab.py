@@ -19,7 +19,10 @@ assert(diagnosticEvent('wake',{type:'measurement',prob:.8}).type==='wake','engin
 const prefix=datePrefix(new Date(2026,10,4,9,5,2));
 assert(prefix==='2026-11-04_09-05-02','local date and time always lead filename');
 assert(filename(prefix,'Title: Garden irrigation, plans!','m4a')===prefix+'_Garden-irrigation-plans.m4a','title marker and unsafe punctuation are removed');
-assert(filenameKeywords('Today I want to talk about garden irrigation and plans for the garden')==='garden-irrigation-and-plans','preserve a coherent opening phrase');
+assert(filenameKeywords('Today I want to talk about garden irrigation and plans for the garden')==='garden-irrigation-plans','suppress common words and repetition within the opening sentence');
+assert(filenameKeywords('Well this is just a note about the garden and the irrigation schedule.')==='note-garden-irrigation-schedule','common words do not occupy the filename word limit');
+assert(filenameKeywords('Well this is it. The garden needs water.')==='garden-needs-water','a filler-only first sentence allows the second sentence');
+assert(filenameKeywords('The pump is not working at 12 volts.')==='pump-not-working-12-volts','negations and numbers retain meaning');
 assert(filenameKeywords('Garden irrigation plans. Budget review. Completely unrelated architecture architecture architecture.')==='Garden-irrigation-plans','later topics cannot pollute the opening title');
 assert(filenameKeywords('Hey Doc. Today I want to talk about garden irrigation.')==='garden-irrigation','skip a greeting within the first two sentences');
 assert(filenameKeywords('Hey Doc. Hey Doc. Third sentence topic.')==='','never mine the third sentence for keywords');
