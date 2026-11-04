@@ -1,6 +1,7 @@
 import { datePrefix, filename, filenameSuffix, audioExtension, diagnosticEvent } from './core.js';
 import { createLabStore } from './store.js';
 import { createLabCapture } from './capture.js';
+import { createLabRecorderChoice, closeLabAudioContext } from './media.js';
 const $=id=>document.getElementById(id),store=createLabStore(),records=new Map(),rows=new Map(),pendingCaptures=new Set(),deleting=new Set();
 let current=null,preparing=false,preparingCleanup=null,maintenance=false,generation=0,temporaryStream=null,playerUrl=null,whisper=null,whisperReady=false,whisperLoading=null,whisperSerial=0;
 let events=[],displayStart=0,candidates=0,accepted=0,rejected=0,titleRequests=new Map(),offlinePreparing=false;
@@ -95,7 +96,7 @@ function prepareWhisper() {
  });return whisperLoading;
 }
 async function suggestName(capture) {
- const record=capture.record;if(!records.has(record.id)||deleting.has(record.id))return;if(!$('autoName').checked){record.namingStatus='Automatic filename suggestions are off.';renderRecord(record);return;}
+ const record=capture.record;if(!records.has(record.id)||deleting.has(record.id)||record.state==='failed')return;if(!$('autoName').checked){record.namingStatus='Automatic filename suggestions are off.';renderRecord(record);return;}
  record.namingStatus='Preparing filename suggestion…';renderRecord(record);
  try{
   const samples=await Promise.race([capture.titleAudio,new Promise(resolve=>setTimeout(()=>resolve(null),4000))]);
@@ -110,7 +111,7 @@ async function suggestName(capture) {
 function stopAnalysis(capture) {
  if(capture.analysisStopped)return;capture.analysisStopped=true;
  capture.processor?.disconnect();capture.source?.disconnect();capture.silent?.disconnect();if(capture.processor)capture.processor.onaudioprocess=null;
- void capture.context?.close();capture.stream?.getTracks().forEach(track=>track.stop());
+ void closeLabAudioContext(capture.context,error=>log('context-cleanup-error',{message:error.message}));capture.stream?.getTracks().forEach(track=>track.stop());
  if(capture.detectorReady)capture.worker.postMessage({type:'finish'});else capture.resolveTitle(null);
  setTimeout(()=>{capture.worker?.terminate();capture.resolveTitle(null);},4500);
 }
@@ -143,16 +144,17 @@ async function start() {
    }
   };
   worker.onerror=event=>{readyReject(Error(event.message||'Detection worker failed'));if(capture){capture.detectorReady=false;worker.terminate();resolveTitle(null);}$('detectionStatus').textContent='Detection worker failed; audio recording remains available.';};
-  preparingCleanup=()=>{readyReject(Error('Preparation cancelled'));worker.terminate();void context.close();stream.getTracks().forEach(track=>track.stop());};
+  preparingCleanup=()=>{readyReject(Error('Preparation cancelled'));worker.terminate();void closeLabAudioContext(context,error=>log('context-cleanup-error',{message:error.message}));stream.getTracks().forEach(track=>track.stop());};
   worker.postMessage({type:'prepare',options:config,sampleRate:context.sampleRate,generation:run});
   let detectorReady=true;try{await Promise.race([ready,new Promise((_,reject)=>setTimeout(()=>reject(Error('Model preparation timed out')),45000))]);$('detectionStatus').textContent='Speech detector ready · '+(config.engine==='off'?'wake detector off':config.engine+' ready');}
   catch(error){if(run!==generation)return;detectorReady=false;worker.terminate();resolveTitle(null);$('detectionStatus').textContent='Recording without detection: '+error.message;}
-  if(run!==generation){worker.terminate();await context.close();stream.getTracks().forEach(track=>track.stop());return;}
-  const mime=['audio/webm;codecs=opus','audio/mp4','audio/ogg;codecs=opus'].find(type=>MediaRecorder.isTypeSupported(type));
-  const recorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
-  const record={id:crypto.randomUUID(),prefix:datePrefix(),startedAt:new Date().toISOString(),suffix:'',mime:recorder.mimeType,state:'starting',saved:false,settings:config,microphone:stream.getAudioTracks()[0].getSettings(),namingStatus:'Opening speech will be used after Stop.'};
-  capture=createLabCapture({recorder,record,store,onUpdate:c=>{renderRecord(c.record);if(c.record.state==='interrupted'&&current===c){current=null;preparing=false;controls();status('Recording interrupted. Available audio was retained.');}},
-   onStopped:c=>stopAnalysis(c),onFinalized:c=>{pendingCaptures.delete(c.record.id);if(current===c){current=null;preparing=false;status('Stopped. Recording retained.');}controls();void suggestName(c);}});
+  if(run!==generation){worker.terminate();await closeLabAudioContext(context,error=>log('context-cleanup-error',{message:error.message}));stream.getTracks().forEach(track=>track.stop());return;}
+  if(!stream.active||!stream.getAudioTracks().some(track=>track.readyState==='live'))throw Error('The microphone ended during preparation. Press Record to reacquire it.');
+  const choice=createLabRecorderChoice(stream,MediaRecorder,attempt=>log('recorder-construction-failed',attempt));
+  const recorder=choice.recorder;
+  const record={id:crypto.randomUUID(),prefix:datePrefix(),startedAt:new Date().toISOString(),suffix:'',mime:recorder.mimeType||choice.requestedMime,state:'starting',saved:false,settings:config,microphone:stream.getAudioTracks()[0].getSettings(),namingStatus:'Opening speech will be used after Stop.'};
+  capture=createLabCapture({recorder,record,store,fallbacks:choice.fallbacks,onStartFailure:attempt=>log('recorder-start-attempt-failed',attempt),onUpdate:c=>{renderRecord(c.record);if(c.record.state==='interrupted'&&current===c){current=null;preparing=false;controls();status('Recording interrupted. Available audio was retained.');}},
+   onStopped:c=>stopAnalysis(c),onFinalized:c=>{pendingCaptures.delete(c.record.id);if(current===c){current=null;preparing=false;status(c.record.state==='failed'?'Could not start recording: '+(c.record.captureError||'No audio was acquired.'):'Stopped. Recording retained.');}controls();void suggestName(c);}});
   Object.assign(capture,{stream,context,worker,titleAudio,resolveTitle,detectorReady});
   records.set(record.id,record);pendingCaptures.add(record.id);current=capture;
   if(detectorReady){capture.source=context.createMediaStreamSource(stream);capture.processor=context.createScriptProcessor(1024,1,1);capture.silent=context.createGain();capture.silent.gain.value=0;
@@ -160,13 +162,18 @@ async function start() {
    capture.processor.onaudioprocess=event=>{event.outputBuffer.getChannelData(0).fill(0);if(current!==capture||capture.stopping||!capture.detectorReady)return;
     if(pending.size>=8){resetNext=true;log('analysis-gap',{id:record.id,reason:'Analysis queue limit reached'});return;}
     const pcm=event.inputBuffer.getChannelData(0).slice(),id=++packet;pending.add(id);
-    worker.postMessage({type:'audio',pcm,id,generation:run,sentAt:Date.now(),sampleRate:context.sampleRate,recording:recorder.state==='recording',reset:resetNext},[pcm.buffer]);resetNext=false;
+    worker.postMessage({type:'audio',pcm,id,generation:run,sentAt:Date.now(),sampleRate:context.sampleRate,recording:capture.recorder.state==='recording',reset:resetNext},[pcm.buffer]);resetNext=false;
    };
   }
   const began=await capture.start();preparingCleanup=null;if(!began)return;preparing=false;temporaryStream=null;controls();status('Recording. Say the subject near the beginning for a filename suggestion.');log('recording-started',{id:record.id,settings:config,microphone:record.microphone});
   stream.getAudioTracks()[0].addEventListener('ended',()=>{if(current===capture&&!capture.stopping){record.captureError='Microphone ended';capture.stop();}});
   $('microphone').textContent=stream.getAudioTracks()[0].label+' · Browser reports '+JSON.stringify(record.microphone);
- }catch(error){worker?.terminate();void context?.close();stream?.getTracks().forEach(track=>track.stop());if(run!==generation)return;preparingCleanup=null;if(capture){capture.record.captureError=String(error);capture.stop();}preparing=false;temporaryStream=null;if(current===capture)current=null;controls();status('Could not start recording: '+error.message);}
+ }catch(error){
+  log('recording-start-failed',{name:error.name,message:error.message,streamActive:stream?.active,tracks:stream?.getAudioTracks().map(track=>({state:track.readyState,muted:track.muted,enabled:track.enabled,settings:track.getSettings()})),formatAttempts:capture?.record.formatAttempts});
+  if(capture){capture.record.captureError=String(error);capture.stop();}
+  else{worker?.terminate();await closeLabAudioContext(context,cleanup=>log('context-cleanup-error',{message:cleanup.message}));stream?.getTracks().forEach(track=>track.stop());}
+  if(run!==generation)return;preparingCleanup=null;preparing=false;temporaryStream=null;if(current===capture)current=null;controls();status('Could not start recording: '+error.message);
+ }
 }
 $('record').onclick=start;$('pause').onclick=togglePause;$('stop').onclick=()=>{if(preparing&&!current){generation++;preparingCleanup?.();preparingCleanup=null;preparing=false;temporaryStream?.getTracks().forEach(track=>track.stop());temporaryStream=null;controls();status('Preparation cancelled.');return;}if(current){current.stop();controls();status('Finishing recording…');}};
 $('engine').onchange=()=>{$('wakeThreshold').value=$('engine').value==='voicute'?.9:.7;};

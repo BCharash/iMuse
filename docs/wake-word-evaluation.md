@@ -35,7 +35,7 @@ Open the hosted **`lab.html`** address. It provides:
 - Raw candidate/accepted/rejected counts and event rows. Default wake action is **Mark detection**; **Pause / resume recording** is an explicit alternative. No spoken acknowledgement or command-model startup is inserted.
 - Full per-prediction diagnostic export with speech history, scores, input level, analysis/transport timing, gate results and recording settings. This supports comparison; it does not select optimal parameters automatically.
 
-Audio uses the supported MediaRecorder format (Opus/WebM, MP4 or Ogg) and its matching extension. The new path does not route recording audio through the previous custom PCM-to-MP3 encoder. This is an isolation step, not a claim that the old encoder caused the whine. The analysis branch explicitly outputs silence to its audio sink.
+Audio first uses the browser’s default MediaRecorder format and its matching extension. If actual start fails before any data or active capture, it tries supported AAC/MP4, WebM and Ogg alternatives. An advertised MIME type is not treated as proof that the encoder can start. Failed never-started attempts are labeled failed, rather than completed recordings. Format attempts and microphone state are included in diagnostics. The new path does not route recording audio through the previous custom PCM-to-MP3 encoder. This is an isolation step, not a claim that the old encoder caused the whine. The analysis branch explicitly outputs silence to its audio sink.
 
 The live analysis branch uses a continuous windowed-sinc resampler with anti-aliasing rather than dropping/interpolating samples independently at callback boundaries. Its queue is bounded; delayed analysis is dropped/reset and reported instead of allowing a growing queue of old wake audio. Recording remains on the independent native MediaRecorder branch. Whisper runs in a separate worker after Stop. Starting another recording while transcription finishes is allowed, so CPU contention remains a device test.
 
@@ -68,6 +68,8 @@ New recordings retain previous recordings. Reload recovers available journal chu
 3. Repeat with **Heed / Require speech**. Leave a quiet interval, say “Hey Doc,” then Stop. Inspect candidate/accepted/rejected events and export diagnostics. Repeat with Voicute/“Hey Friday.”
 4. Compare **Require speech** on/off in separate recordings. Ordinary background speech can still pass the speech gate.
 5. Reload offline in the same browser. Confirm saved playback, then a fresh recording with model loading. Try deletion only with disposable recordings.
+
+The Safari startup follow-up also makes AudioContext cleanup idempotent: failed startup and normal Stop share a single close operation. ScriptProcessor remains in this experimental analysis branch and is deprecated; its warning alone does not establish the cause of a MediaRecorder startup failure. Native Safari retesting is required.
 
 Desktop controlled tests and isolated headless Chrome verify filename/DSP/gate helpers, recorder recovery/late tail, script parsing and offline asset hashes. Real-model browser checks additionally cover both wake engines, Silero inference, compressed recording, pause/resume, Whisper transcription, scoped caching and offline reload. Device-specific performance, the reported whine, true/false wake rates and iPhone installed-app background microphone loss still require user testing. No wake engine fixes an OS-suspended microphone source.
 

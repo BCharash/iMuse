@@ -87,6 +87,58 @@ const settle=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
             self.assertTrue(file.is_file(),asset['path'])
             self.assertEqual(hashlib.sha256(file.read_bytes()).hexdigest(),asset['sha256'],asset['path'])
 
+    def test_startup_retries_actual_encoder_failures(self):
+        media=(ROOT/'js/lab/media.js').read_text().replace('export ', '')
+        evaluate(media + CAPTURE + r"""
+globalThis.testResult='pending';
+const assert=(value,message)=>{if(!value)throw Error(message);};
+class Blob {constructor(parts,{type}){this.parts=parts;this.type=type;this.size=parts.reduce((sum,part)=>sum+part.size,0);}}
+const attempts=[],saved=new Map();
+class Recorder {
+ static isTypeSupported(){return true;}
+ constructor(stream,options){this.mimeType=options?.mimeType||'';this.state='inactive';}
+ start(ms){attempts.push(this.mimeType||'default');if(!this.mimeType)throw new DOMException('Advertised encoder could not start','NotSupportedError');this.state='recording';}
+ stop(){this.state='inactive';}
+}
+// JavaScriptCore test contexts do not provide DOMException.
+function DOMException(message,name){this.message=message;this.name=name;}
+const store={put:async record=>saved.set(record.id,record),append:async()=>{},finalize:async record=>saved.set(record.id,record)};
+const settle=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
+(async()=>{
+ const choice=createLabRecorderChoice({},Recorder);
+ assert(choice.requestedMime===''&&choice.recorder.mimeType==='','browser default is tried before explicit formats');
+ const initial=choice.recorder,record={id:'fallback',mime:''},capture=createLabCapture({recorder:initial,record,store,fallbacks:choice.fallbacks,setTimer:()=>1,clearTimer:()=>{}});
+ await capture.start();assert(attempts[0]==='default'&&attempts[1]==='audio/mp4;codecs=mp4a.40.2','start failure advances to AAC, even though support was advertised');
+ assert(capture.recorder!==initial&&capture.recorder.state==='recording','live capture follows successful replacement recorder');
+ assert(initial.ondataavailable===null&&initial.onerror===null,'failed recorder cannot deliver stale events');
+ capture.recorder.ondataavailable({data:{size:41}});capture.stop();capture.recorder.ondataavailable({data:{size:9}});capture.recorder.onstop();await settle();
+ assert(saved.get('fallback').audio.size===50&&saved.get('fallback').mime.includes('mp4'),'replacement recorder retains all chunks with correct MIME type');
+ class Failing extends Recorder {start(){throw Error('Cannot allocate encoder');}}
+ const badChoice=createLabRecorderChoice({},Failing),bad=createLabCapture({recorder:badChoice.recorder,record:{id:'failed'},store,fallbacks:badChoice.fallbacks,setTimer:()=>1,clearTimer:()=>{}});
+ let failed=false;try{await bad.start();}catch(error){failed=true;}
+ assert(failed&&bad.record.formatAttempts.length===7,'all start failures are retained for diagnostics');
+ bad.stop();await settle();assert(bad.record.state==='failed'&&!bad.record.audio.size,'never-started attempt is not labeled a completed recording');
+ assert(saved.get('fallback').audio.size===50,'later startup failure does not affect older audio');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
+""")
+
+    def test_audio_context_cleanup_is_idempotent(self):
+        media=(ROOT/'js/lab/media.js').read_text().replace('export ', '')
+        evaluate(media + r"""
+globalThis.testResult='pending';
+const assert=(value,message)=>{if(!value)throw Error(message);};
+(async()=>{
+ let calls=0,release;const context={state:'running',close(){calls++;this.state='closed';return new Promise(resolve=>release=resolve);}};
+ const first=closeLabAudioContext(context),second=closeLabAudioContext(context);await Promise.resolve();
+ assert(calls===1&&first===second,'simultaneous cleanup paths share a single close request');release();await first;await closeLabAudioContext(context);assert(calls===1,'later cleanup never closes an already-closed context');
+ const closed={state:'closed',close(){throw Error('must not close twice');}};await closeLabAudioContext(closed);
+ let reported=0;await closeLabAudioContext({state:'running',close(){return Promise.reject(Error('Hardware failure'));}},()=>reported++);
+ assert(reported===1,'genuine cleanup failure is reported without an unhandled rejection');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
+""")
+
 
 if __name__ == '__main__':
     unittest.main()
