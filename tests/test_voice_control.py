@@ -62,7 +62,7 @@ PRODUCTION = CONTROLLER + VOICE + FINALIZE + '\nasync function productionPause(c
 
 def check(script):
     for diagnostics in [False, True]:
-        enable = 'voiceDiagnostics.setEnabled(true);' if diagnostics else ''
+        enable = 'voiceDiagnostics.setEnabled('+str(diagnostics).lower()+');'
         evaluate(HARNESS + DIAGNOSTICS + PRODUCTION + "\nglobalThis.testResult='pending';\n(async()=>{\n" + enable + script + "\nglobalThis.testResult='PASS';\n})().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));")
 
 

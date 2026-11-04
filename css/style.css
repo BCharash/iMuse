@@ -233,8 +233,8 @@ button:active {
 .imuse-mic-processing-controls input:disabled { opacity:.45;cursor:not-allowed; }
 .imuse-mic-processing-controls label:has(input:disabled) { opacity:.55; }
 
-/* Optional voice diagnostics stay inside Advanced until enabled. */
-.advanced-settings { margin-top: 1rem; border-top: 1px solid #8884; padding-top: .75rem; }
+/* All advanced controls share one collapsible rounded group. */
+.advanced-settings { border:1px solid var(--border);border-radius:12px;padding:14px;margin:18px 0 0;background:var(--surface);min-width:0; }
 .advanced-settings summary { cursor: pointer; }
 .voice-diagnostic-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .voice-diagnostic-actions button, #refreshVoiceDiagnostics { font-size: .8rem; padding: .35rem .6rem; }

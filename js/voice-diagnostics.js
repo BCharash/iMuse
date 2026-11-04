@@ -1,8 +1,8 @@
-// Opt-in, page-memory-only observation. No model, microphone, recording or storage ownership.
-export const VOICE_DIAGNOSTICS_VERSION = '2026-11-04.3';
-export function createVoiceDiagnostics({limit=4000, now=()=>performance.now(), timestamp=()=>new Date().toISOString()}={}) {
-    const capacity=Math.max(1,Math.min(10000,Math.floor(limit)||4000));
-    let enabled=false,buffer=new Array(capacity),start=0,size=0,dropped=0,sequence=0,onChange=()=>{};
+// Bounded, page-memory-only observation. No model, microphone, recording or storage ownership.
+export const VOICE_DIAGNOSTICS_VERSION = '2026-11-04.4';
+export function createVoiceDiagnostics({limit=500, enabledByDefault=true, now=()=>performance.now(), timestamp=()=>new Date().toISOString()}={}) {
+    const capacity=Math.max(1,Math.min(500,Math.floor(limit)||500));
+    let enabled=Boolean(enabledByDefault),buffer=new Array(capacity),start=0,size=0,dropped=0,sequence=0,onChange=()=>{};
     const forbidden=new Set(['audio','samples','pcm','stream','spectrogram','transcript','text']);
     function copy(value,depth=0) {
         if(value===null||typeof value==='boolean')return value;
@@ -49,8 +49,8 @@ export const voiceDiagnostics=createVoiceDiagnostics();
 export function summarizeVoiceDiagnostics(snapshot) {
     const windows=new Map();
     for(const event of snapshot.events) {
-        if(event.windowId===undefined||!event.sessionId)continue;
-        const key=event.sessionId+':'+event.windowId;
+        if(event.windowId===undefined)continue;
+        const key=(event.sessionId||'unreported-session')+':'+event.windowId;
         let window=windows.get(key);
         if(!window){window={id:event.windowId,sessionId:event.sessionId,at:event.at,phase:event.phase,result:'Partial window',peakStop:null};windows.set(key,window);}
         if(event.type==='command-window-created')window.result='Preparing';
@@ -62,10 +62,10 @@ export function summarizeVoiceDiagnostics(snapshot) {
         if(event.type==='command-accepted')Object.assign(window,{command:event.command,result:'Accepted '+event.command[0].toUpperCase()+event.command.slice(1),score:event.score,threshold:event.threshold,elapsedMs:event.elapsedMs});
     }
     const rows=[...windows.values()];
-    return {windows:rows,goStopWindows:rows.filter(row=>row.phase==='go-stop').length,stops:rows.filter(row=>row.command==='stop').length};
+    return {windows:rows,goStopWindows:rows.filter(row=>row.phase==='go-stop').length,stops:rows.filter(row=>row.command==='stop').length,gos:rows.filter(row=>row.command==='go').length};
 }
 const eventNames={
-    'diagnostics-enabled':'Diagnostics enabled','diagnostics-disabled':'Diagnostics disabled',
+    'diagnostics-ready':'Diagnostics ready','diagnostics-enabled':'Diagnostics enabled','diagnostics-disabled':'Diagnostics disabled',
     'wake-command-entry':'Wake opened commands','command-window-created':'Command window opened',
     'model-preload-request':'Preparing command model','model-preload-ready':'Command model prepared',
     'model-load-request':'Loading command model','model-load-ready':'Command model ready',
@@ -90,16 +90,19 @@ export function initializeVoiceDiagnostics() {
     const toggle=document.getElementById('voiceDiagnosticsEnabled'),download=document.getElementById('downloadVoiceDiagnostics');
     const clear=document.getElementById('clearVoiceDiagnostics'),status=document.getElementById('voiceDiagnosticsStatus');
     const advanced=document.getElementById('advancedSettings'),settings=document.getElementById('settingsPanel');
-    const viewButton=document.getElementById('viewVoiceDiagnostics'),view=document.getElementById('voiceDiagnosticsView');
+    const settingsButton=document.getElementById('settingsButton');
+    const view=document.getElementById('voiceDiagnosticsView');
     const summary=document.getElementById('voiceDiagnosticsSummary'),windows=document.getElementById('voiceDiagnosticsWindows');
     const events=document.getElementById('voiceDiagnosticsEvents'),refresh=document.getElementById('refreshVoiceDiagnostics');
-    if(!toggle||!download||!clear||!status||!viewButton||!view||!summary||!windows||!events||!refresh)return;
+    if(!toggle||!download||!clear||!status||!view||!summary||!windows||!events||!refresh)return;
+    // Settings adds its storage-protection section dynamically; Advanced stays last.
+    if(settings&&advanced)settings.appendChild(advanced);
     function renderView(){
         const snapshot=voiceDiagnostics.snapshot(),report=summarizeVoiceDiagnostics(snapshot);
-        summary.textContent=snapshot.events.length?`${report.goStopWindows} Go/Stop windows with retained data · ${report.stops} Stop recognitions. Scores are model outputs, not verified speech. Some windows may have partial data. Showing the latest 30 windows and 60 events.${snapshot.droppedEvents?' Older events were dropped; some windows may be incomplete.':''}`:'No events yet. Enable voice diagnostics before using voice commands.';
+        summary.textContent=report.windows.length?`${report.goStopWindows} command attempts · ${report.gos} Go and ${report.stops} Stop recognitions. These are model decisions, not verified speech.${snapshot.droppedEvents?' Older data was dropped; some attempts may be incomplete.':''}`:voiceDiagnostics.enabled?'No command attempts logged yet. Open a voice-command listening period; activity appears below.':'Diagnostics are off. Enable collection to log new command attempts.';
         windows.replaceChildren();events.replaceChildren();
         for(const window of report.windows.slice(-30).reverse())appendDiagnosticRow(windows,[diagnosticTime(window.at),window.id,phaseText(window.phase),window.error?'Error: '+window.error:window.result,scoreText(window.score)+' / '+scoreText(window.threshold),secondsText(window.elapsedMs),scoreText(window.peakStop)]);
-        for(const event of snapshot.events.slice(-60).reverse()) {
+        for(const event of snapshot.events.slice(-500).reverse()) {
             let detail=event.message||'';
             if(event.type==='command-prediction'){
                 const words=event.phase==='yes-no'?['yes','no']:['go','stop'];
@@ -114,18 +117,16 @@ export function initializeVoiceDiagnostics() {
     }
     function render(){
         toggle.checked=voiceDiagnostics.enabled;download.disabled=voiceDiagnostics.size===0;clear.disabled=voiceDiagnostics.size===0;
-        status.textContent=`${voiceDiagnostics.enabled?'On':'Off'} · ${voiceDiagnostics.size} events retained${voiceDiagnostics.dropped?' · '+voiceDiagnostics.dropped+' older events dropped':''}. This page only; download before reloading. No audio is logged.`;
-        if(!view.hidden&&advanced?.open&&!settings?.hidden)renderView();
+        status.textContent=`${voiceDiagnostics.enabled?'On':'Off'} · ${voiceDiagnostics.size} / 500 events retained${voiceDiagnostics.dropped?' · '+voiceDiagnostics.dropped+' older events dropped':''}. This page only; download before reloading. No audio is logged.`;
+        if(advanced?.open&&!settings?.hidden)renderView();
     }
     voiceDiagnostics.onChange(render);
     toggle.addEventListener('change',()=>voiceDiagnostics.setEnabled(toggle.checked));
     clear.addEventListener('click',()=>voiceDiagnostics.clear());
-    viewButton.addEventListener('click',()=>{
-        view.hidden=!view.hidden;viewButton.textContent=view.hidden?'View diagnostics':'Hide diagnostics';
-        viewButton.setAttribute('aria-expanded',String(!view.hidden));if(!view.hidden)renderView();
-    });
-    refresh.addEventListener('click',renderView);
+    refresh.addEventListener('click',render);
     advanced?.addEventListener('toggle',render);
+    settingsButton?.addEventListener('click',render);
+    if(voiceDiagnostics.size===0)voiceDiagnostics.record('diagnostics-ready',{diagnosticVersion:VOICE_DIAGNOSTICS_VERSION});
     download.addEventListener('click',()=>{
         const data=voiceDiagnostics.snapshot({userAgent:navigator.userAgent,platform:navigator.platform,hardwareConcurrency:navigator.hardwareConcurrency,visibility:document.visibilityState});
         const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');

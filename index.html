@@ -146,16 +146,16 @@
         <p class="settings-note">Settings are saved on this device. Wake phrases enter the Go/Stop command window during recording or pause.</p>
         <details id="advancedSettings" class="advanced-settings">
             <summary>Advanced</summary>
-            <label class="settings-check"><input id="voiceDiagnosticsEnabled" type="checkbox"> Enable voice diagnostics</label>
-            <p id="voiceDiagnosticsStatus" class="settings-note" role="status">Off. This page only; download before reloading. No audio is logged.</p>
-            <div class="voice-diagnostic-actions"><button id="viewVoiceDiagnostics" type="button" aria-expanded="false" aria-controls="voiceDiagnosticsView">View diagnostics</button><button id="downloadVoiceDiagnostics" type="button" disabled>Download diagnostics</button><button id="clearVoiceDiagnostics" type="button" disabled>Clear diagnostics</button></div>
-            <p class="settings-note">Keeps the latest 4,000 score/timing events. View them here, or download JSON for detailed review.</p>
-            <div id="voiceDiagnosticsView" hidden>
+            <label class="settings-check"><input id="voiceDiagnosticsEnabled" type="checkbox" checked> Enable voice diagnostics</label>
+            <p id="voiceDiagnosticsStatus" class="settings-note" role="status">On · latest 500 events. This page only; download before reloading. No audio is logged.</p>
+            <div class="voice-diagnostic-actions"><button id="downloadVoiceDiagnostics" type="button" disabled>Download diagnostics</button><button id="clearVoiceDiagnostics" type="button" disabled>Clear diagnostics</button></div>
+            <p class="settings-note">Keeps the latest 500 score/timing events. Download JSON to keep a copy before reloading.</p>
+            <div id="voiceDiagnosticsView">
                 <p id="voiceDiagnosticsSummary" class="settings-note"></p>
                 <button id="refreshVoiceDiagnostics" type="button">Refresh view</button>
-                <h4>Recent listening windows</h4>
+                <h4>Command attempts</h4><p class="settings-note">One row per listening period: what the model accepted and when. A Yes/No confirmation gets its own row.</p>
                 <div class="voice-diagnostics-scroll"><table class="voice-diagnostics-table"><thead><tr><th>Time</th><th>Window</th><th>Listening for</th><th>Result</th><th>Accepted score / threshold</th><th>After</th><th>Highest Stop score</th></tr></thead><tbody id="voiceDiagnosticsWindows"></tbody></table></div>
-                <details><summary>Recent events and prediction scores</summary><div class="voice-diagnostics-scroll"><table class="voice-diagnostics-table"><thead><tr><th>Time</th><th>Window</th><th>Event</th><th>Details</th><th>After</th></tr></thead><tbody id="voiceDiagnosticsEvents"></tbody></table></div></details>
+                <details><summary>Detailed activity log</summary><p class="settings-note">Many entries per attempt: individual score checks, prompts, and listener startup/shutdown. Use this to investigate a row above.</p><div class="voice-diagnostics-scroll"><table class="voice-diagnostics-table"><thead><tr><th>Time</th><th>Window</th><th>Event</th><th>Details</th><th>After</th></tr></thead><tbody id="voiceDiagnosticsEvents"></tbody></table></div></details>
             </div>
         </details>
     </section>
