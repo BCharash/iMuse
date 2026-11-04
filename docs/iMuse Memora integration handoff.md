@@ -1,12 +1,16 @@
 # iMuse → Memora integration handoff
 
-Updated 3 November 2026. This document owns the integration contract, not the recording investigation or immediate development queue. See the [index](README.md), [current priorities](iMuse%20next%20steps.md), and [platform evidence](recording-investigation.md).
+Updated 4 November 2026. This document owns the integration contract, not the recording investigation or immediate development queue. See the [index](README.md), [current priorities](iMuse%20next%20steps.md), and [platform evidence](recording-investigation.md).
 
 ## Objective and scope
 
-Incorporate iMuse's independent Record subsystem into the Memora-based application with intended tab order **Record → Transcribe → Edit and Combine → Search**. Reuse Memora's existing desktop/mobile file opening and saving, Whisper runtime/model management, transcription, editing/combining, and search. Record must work independently of transcription, voice models, and network-dependent features.
+The earlier web integration option would incorporate iMuse's independent Record subsystem into the Memora-based application with intended tab order **Record → Transcribe → Edit and Combine → Search**. Reuse Memora's existing desktop/mobile file opening and saving, Whisper runtime/model management, transcription, editing/combining, and search. Record must work independently of transcription, voice models, and network-dependent features.
 
 The iPhone installed-app background failure is unresolved. Safari-tab recording succeeds in the reported warning-free tests; that does not certify installed iOS capture or lock-screen reliability. Combining repositories must not be presented as a fix for host lifecycle behavior. The removed interruption warning must not return during integration.
+
+The user is also considering keeping Memora web-based and building native iMuse with its own transcription and multiple cached models, while retaining web iMuse for other platforms. That expands the native proposal; it does not authorize a repository merger or require this web integration. See the [native scope](iMuse%20Swift%20migration%20plan.md). The transfer contract below applies regardless of UI packaging.
+
+Recording always takes priority over transcription and filename jobs, including during pause/startup/finalization. Future jobs run only when recording is inactive and yield to Record requests. This scheduler is a requirement, not implemented production behavior.
 
 ## Ownership and minimum transfer contract
 
@@ -40,4 +44,4 @@ Integration is not evidence that background capture or every recovered container
 
 ## Deferred work
 
-Idle voice-start before first Record, custom wake training, command-audio removal, OPFS/storage redesign, native recording, and headset media-button research are independent workstreams. A future native recorder exports audio/metadata to Memora rather than reproducing its entire transcription/search stack. Nothing in this contract schedules those features automatically.
+Idle voice-start before first Record, custom wake training, command-audio removal, OPFS/storage redesign, native recording, and headset media-button research are independent workstreams. A future native iMuse may transcribe locally and still export audio/metadata to Memora. Model-management and recording behavior can share contracts without sharing runtime files or databases; full native Search/editor parity is not agreed. Nothing in this contract schedules those features automatically.

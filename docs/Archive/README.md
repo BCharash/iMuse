@@ -1,8 +1,10 @@
 # Documentation archive
 
-Reviewed 3 November 2026. These are historical source reviews, installation snapshots and research records. Their imperative wording and “current” labels describe their original dates; use the [active documentation index](../README.md) for present work. No archived checklist is authority to restore removed features or rerun completed tests.
+Reviewed 4 November 2026. These are historical source reviews, installation snapshots and research records. Their imperative wording and “current” labels describe their original dates; use the [active documentation index](../README.md) for present work. No archived checklist is authority to restore removed features or rerun completed tests.
 
 | Snapshot | Why retained / what supersedes it |
+| [Native proposal snapshot, 4 November](native-proposal-2026-11-04.md) | Earlier recorder-only scope, system-integration details and proposed phases; current native guide includes possible transcription/model management and recording priority |
+| [Recorder lab guide snapshot, 4 November](recorder-lab-guide-2026-11-04.md) | Detailed build/startup history and live Whisper procedures; current evaluation guide records rejected latency and focused wake-model work |
 | --- | --- |
 | [Recording investigation/stage history, 3 November](recording-investigation-stages-2026-11-03.md) | Detailed lab evidence, negative experiments and four preservation-stage implementation notes; current behavior and one acceptance checklist now live in the concise recording brief |
 | [Architecture stabilization review](architecture-stabilization-review.md) | Earlier iMuse(7).zip audit; current source observations and remaining questions consolidated into the recording investigation |

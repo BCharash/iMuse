@@ -1,6 +1,6 @@
 # Recording reliability and iPhone background capture
 
-Updated 3 November 2026. This is the current recording reference. The four preservation stages and interface cleanup are implemented; no further stage is underway. The [roadmap](iMuse%20next%20steps.md) owns future priorities. Detailed experiment/stage history is [archived](Archive/recording-investigation-stages-2026-11-03.md).
+Updated 4 November 2026. This is the current recording reference. The four preservation stages and interface cleanup are implemented; no further stage is underway. The [roadmap](iMuse%20next%20steps.md) owns future priorities. Detailed experiment/stage history is [archived](Archive/recording-investigation-stages-2026-11-03.md).
 
 ## Current code ownership
 
@@ -10,7 +10,7 @@ Updated 3 November 2026. This is the current recording reference. The four prese
 
 [recording-recovery.js](../js/recording-recovery.js) now owns retained emergency assemblies, bounded reads, the finalization watchdog, chunk assembly/checks, saved recovery/export and finalization outcome decisions. It receives storage and presentation callbacks, and imports the existing integrity rules. Its constructor has no storage, timer or DOM effects. It does not own the microphone, audio elements, pending-write queue or writer lease.
 
-[recorder.js](../js/recorder.js) retains capture, recording transitions, pending chunks, wake/silence analysis and the top player. The approved `voice-controller.js` extraction now owns command coordination, countdown presentation and Go/Stop/Yes/No sequencing through recorder-owned session capabilities; [voice-controller acceptance](voice-control-refactor.md) is pending on devices. It creates the three modules and delegates through their interfaces. It updates counters only after a store commit, performs microphone cleanup through a callback when finalization is delayed, and releases the writer lease only after recovery/finalization processing settles. The recovery service marks finalization finished/clears its watchdog at that boundary. Recovery/initialization keep the existing explicitly owned metadata-write path inside the coordinator, avoiding a nested queue. Settings' read-only diagnostics remain separate.
+[recorder.js](../js/recorder.js) retains capture, recording transitions, pending chunks, wake/silence analysis and the top player. The approved `voice-controller.js` extraction now owns command coordination, countdown presentation and Go/Stop/Yes/No sequencing through recorder-owned session capabilities; the full [voice-controller acceptance matrix](voice-control-refactor.md) remains open despite subsequent real-device diagnostic use. It creates the three modules and delegates through their interfaces. It updates counters only after a store commit, performs microphone cleanup through a callback when finalization is delayed, and releases the writer lease only after recovery/finalization processing settles. The recovery service marks finalization finished/clears its watchdog at that boundary. Recovery/initialization keep the existing explicitly owned metadata-write path inside the coordinator, avoiding a nested queue. Settings' read-only diagnostics remain separate.
 
 These are approved extractions, not a storage redesign or an implementation of strict durability/OPFS. No schema migration or audio format change was added. The user reported all three extractions and the confirmed Discard correction worked, including on iPhone. The simulated failure's extra memory tail was about one word plus a fraction, consistent with rapid protective stopping; this does not measure a prolonged real storage stall. Broader acceptance limits remain below.
 
@@ -85,7 +85,7 @@ The installed capture-only lab reproduced the loss without production processing
 
 Reviewed Safari logs showed all received chunks committed, even when background speech was missing. Context resuming, a live track, recorder state or the microphone indicator alone did not establish acquisition. The exact OS/host mechanism and meaning of the beep remain unverified. [WebKit issue 236509](https://bugs.webkit.org/show_bug.cgi?id=236509) is a historical close match, not proof of a current fix. The prior forum search found no verified same-PWA iOS 26→27 repair comparison; a Safari 27 release note is not such a test.
 
-Continue web-first on the tested Safari-tab route. Await an actual iOS 27 comparison or targeted device-system logs when a suitable cable is available; inspection can change timing. Foreground acquisition repair remains separate from saving received audio. Native recording remains a [conditional proposal](iMuse%20Swift%20migration%20plan.md), not scheduled work. Do not restore warning playback or add speculative keep-alive patches.
+Continue using the tested Safari-tab route for web recording. Await verified platform evidence or targeted device-system logs when a suitable cable is available; inspection can change timing. Reported OS labels and earlier references to an iOS/Safari 27 comparison are not independently verified device/build evidence. Foreground acquisition repair remains separate from saving received audio. A small native recorder is deferred pending equipment; the [conditional native proposal](iMuse%20Swift%20migration%20plan.md) now includes possible transcription/model management after capture verification. Do not restore warning playback or add speculative keep-alive patches.
 
 ## Automated checks
 
@@ -95,7 +95,7 @@ From the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-Six suites (nine test methods) cover emergency preservation/player isolation, direct library/recovery components, fault controls, store schema/open failures, coordinated writes, finalization/integrity, persistence policy and the passive meter. Meter checks cover RMS arithmetic, paused/unavailable input and visibility/timer lifecycle. Recovery/store coverage retains late-write, fullest-copy, abort and ownership checks. See [tests/README.md](../tests/README.md) for limits. Python is a development test runner; no real recording or microphone is accessed.
+The last verified checkpoint has **eleven suites and 49 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
 
 The suites execute production functions with controlled DOM/storage/lock/timer mocks. They do not prove native player rendering, actual IndexedDB behavior, browser permission decisions, container decoding, background capture or multi-hour memory reliability.
 
@@ -104,7 +104,7 @@ The suites execute production functions with controlled DOM/storage/lock/timer m
 Use disposable recordings in an updated build. Do not clear site data or reinstall to test preservation.
 
 1. **Normal capture:** record, pause/resume, Stop, and check beginning/middle/end. Verify the normal saved status, saved **▶** player, download, and unchanged top player. Close the dialog and check a disposable Delete/Restore round trip, including KB in Recently Deleted.
-2. **Storage failure:** enable **Settings → Recording preservation test → Enable failure testing for this page**. Record/count for ten seconds, then tap **Simulate storage failure** while recording. Expect automatic stop and a positive unsaved-byte result. Play/export its single entry, make a second normal recording, then play/export the first again. Keep the page open until exports are checked; disable the test afterward. Starting the second recording must not release the first's emergency audio.
+2. **Storage failure:** enable **Settings → Advanced → Recording preservation test → Enable failure testing for this page**. Record/count for ten seconds, then tap **Simulate storage failure** while recording. Expect automatic stop and a positive unsaved-byte result. Play/export its single entry, make a second normal recording, then play/export the first again. Keep the page open until exports are checked; disable the test afterward. Starting the second recording must not release the first's emergency audio.
 3. **Reload recovery:** separately, without needed memory-only audio in the page, reload during capture. Load committed audio and verify interrupted history remains; some ending loss is possible.
 4. **Ownership:** prefer two updated Mac tabs at the same URL. Record in A; B must refuse a competing recording or mutation of A's live session. Stop A, then Refresh recordings in B and verify normal playback/download. Do not confuse this with iPhone background capture.
 5. **Protection:** open Settings, read status, close/reopen and check that it refreshes. Grants can differ by browser/container. Refusal does not block recording or mean recordings disappear on normal closure.
@@ -118,4 +118,4 @@ Stuck writes, missing stop events, encoder errors and malformed structures are s
 3. Start Record during a check, then speak, Stop and play. The check must release its input; the recording must retain its own live microphone. Closing Settings while recording must not stop capture.
 4. Where permission has not been granted, cancel a pending check by closing Settings or pressing Record. A late response must not resurrect the check or end a newer recording.
 
-Automated coverage and isolated Chrome checks are reported in the journal. Native Safari/iPhone permission timing and indicator behavior remain device checks.
+The user reported the microphone check and countdown worked. Automated coverage and isolated Chrome checks are reported in the journal; this report does not establish every Safari/iPhone permission race or indicator scenario.

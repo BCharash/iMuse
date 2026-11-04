@@ -1,6 +1,6 @@
 # TensorFlow command adapter
 
-`commands-adapter.js` loads TensorFlow.js and Speech Commands through its configured CDN URLs. Go/Stop and Yes/No inference is used in bounded command windows owned by the recorder/controller; Whisper is not involved.
+`commands-adapter.js` loads TensorFlow.js and Speech Commands through its configured CDN URLs. Go/Stop and Yes/No inference is used in bounded command windows owned by `js/voice-controller.js` through recorder-owned session capabilities; Whisper is not involved.
 
 Listener startup temporarily intercepts `navigator.mediaDevices.getUserMedia` to supply a clone of the active recording track, restoring the original method in `finally`. Generation guards and serialized startup/shutdown reject late callbacks. This does not prove all microphone-lifecycle races are resolved; preserve the recording track when changing adapter ownership.
 

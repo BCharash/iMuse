@@ -1,6 +1,6 @@
 # iMuse Design Journal
 
-Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated snapshots. DJ012 records the installed failure; DJ013 records preservation; DJ014–DJ016 record library/store/recovery extractions. Older proposals and labels are historical, not current instructions.
+Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated snapshots. DJ012 records the installed failure; DJ013 records preservation; DJ014–DJ016 record library/store/recovery extractions. DJ025 records the latest roadmap, transcription priority and documentation consolidation. Older proposals, test counts and labels are historical, not current instructions.
 
 ---
 
@@ -1605,3 +1605,22 @@ The user approved a short explicit microphone acquisition for the existing meter
 All 49 repository tests pass. New checks cover timeout/repeated cleanup, permission/setup failures, late resume, cancelled manager ownership and the recording-start cleanup barrier. Existing preservation and voice tests remain passing. An initial isolated Chrome run verified live preview with zero MediaRecorder starts, ten-second disposal, closing Settings and recording handoff. It exposed a check button left disabled after finalization; refreshing its state after writer release corrects that UI issue. The repeated isolated Chrome run passed both immediate and late-permission Record handoffs: canceled preview tracks ended while the recording track stayed live, and both recordings retained nonempty audio. Runtime exceptions were empty. A stalled-context test also verifies the ten-second microphone deadline starts before resume completes. Native MacBook Safari/iPhone acceptance remains pending.
 
 **Level-check countdown:** The user confirmed the check button already disables during recording and requested a countdown instead. The status now shows seconds remaining against the existing acquisition deadline, refreshed by the meter’s existing poll; no additional timer or recording behavior change. Extended tests cover elapsed-time rounding and clearing the countdown on completion/cancellation. All 49 methods pass.
+
+
+---
+
+# DJ025 — Roadmap and documentation checkpoint
+
+**Date:** 4 November 2026. **Status:** Documentation updated; no production change authorized by this entry.
+
+The user reported that the microphone check and countdown worked. Native/Xcode testing is deferred because a suitable cable is unavailable. The next intended refactor is wake detection: characterize the adapters and describe a narrow extraction before production edits, preserving scaling, resampling, buffering, inference cadence, thresholds, cooldown and microphone ownership. DSP/model changes remain separate.
+
+Readable command diagnostics showed intended Go/Stop scores at least 0.90 and unintended decisions at most 0.88 in the user's sample; they raised the threshold. Preserve that setting. This supersedes the earlier instruction to hold the original 0.70 threshold for evidence collection, but does not prove absence or cause of intermittent false commands.
+
+Whisper stays out of live wake verification. The user favors evaluating Base over Tiny based on Memora experience. Whole-file post-recording cleanup remains an experiment: validate timestamps and retain original audio/transcripts with reversible derivatives. Recognition misses prevent promising automatic exact removal.
+
+The user is considering native iMuse with transcription and multiple cached models, retaining Memora web and web iMuse for desktop/other platforms. This supersedes the earlier recorder-only native scope, without agreeing to all Memora features or authorizing a port. Multiple stored models need not be simultaneously loaded. Re-estimate the expanded project after native capture/file-recovery feasibility is established.
+
+**Recording always has priority.** Future transcription/naming runs only outside active recording sessions, yields to Record, and retains queued work/source audio. Paused sessions, startup and finalization retain priority. Required live wake/command processing remains available. Verify real cancellation/resource release on-device. The lab currently permits an earlier filename inference to overlap a new recording; the requirement is not yet implemented there or as a production scheduler.
+
+Reviewed active guides, retained regression-test documentation and archived the superseded detailed native proposal/lab guide with explicit historical notices. Updated the index, roadmap, voice-control plan, recording reference and integration contract; corrected old test counts and the Advanced failure-test path. No production files, model assets, browser data or test code changed. The last code checkpoint is 49 methods across eleven suites; this documentation pass checks links/diff rather than rerunning code tests. Current guides take precedence over historical journal entries and archived plans.

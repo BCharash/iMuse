@@ -24,6 +24,8 @@ Python 3 runs JavaScript through Node when available, otherwise the macOS JavaSc
 
 There are eleven suites with forty-nine test methods. `recording_test_support.py` contains the shared engine bridge, source extraction and recorder fixtures. Complete library/store/recovery modules and actual recorder wiring run in integration checks; direct component tests supply fake callbacks, DOM or IndexedDB services. Test suites do not import another suite. Each JavaScript evaluation has a fresh context. Individual files still run with `python3 tests/test_recording_storage.py`, for example.
 
+Retain all eleven suites: each covers an active production boundary or a still-available lab. The archived comparison suite remains useful while its HTML tool and saved-review database remain supported. No Python test file is removed by the documentation cleanup.
+
 These are regression checks, not temporary recording labs. They execute extracted production functions with controlled mocks and never access real recordings, a microphone, or browser databases. They do not certify actual IndexedDB/Web Locks behavior, native player layout/decoding, file saving, background execution or long-recording memory use. Function-boundary changes may require updating source extraction in the harness.
 
 Manual acceptance lives in the [current recording brief](../docs/recording-investigation.md#focused-manual-checks). Keep that checklist current instead of adding a stage-specific checklist for every change.
