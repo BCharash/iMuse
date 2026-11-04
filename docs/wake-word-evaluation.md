@@ -38,7 +38,7 @@ The subsequently supplied **42.858 s M4A** allowed full-sequence replay with the
 
 ## Current lab
 
-Hosted **lab.html**, build **2026-11-04.13**, is separate from production recording. No API key/cloud inference is used.
+Hosted **lab.html**, build **2026-11-04.14**, is separate from production recording. No API key/cloud inference is used.
 
 | Mode/control | Purpose |
 | --- | --- |
@@ -79,3 +79,5 @@ The [previous comparison lab](Archive/wake-word-comparison-lab-2026-11-04.html) 
 The **Wake tracking** panel and trigger review table are always visible, including in Filename mode, which explicitly reports that wake tracking is off. Choose **Use wake detector lab**, then **Record**; the panel reports active tracking once the analysis graph is connected. **Review trigger clips and classifications** jumps to the event table. Browsers restoring the task selector on navigation are reconciled with the panel visibility.
 
 **Clear all logged data…** is available while stopped. After confirmation it clears current event history and removes saved review clips, labels, notes and Whisper verification results from all lab recordings in one transaction. It resets the comparison counters, retains full recordings and filename suggestions, and prevents late worker/verification results from restoring cleared reviews. Downloaded exports and the archived lab database are unaffected. A failed storage transaction keeps the existing in-memory results. **Clear displayed events** still only hides rows.
+
+Build .14 displays **Processing ms** and **Packet → result ms** per event. The former is elapsed worker processing within the current packet; the latter includes delivery/queue wait plus that processing, so they overlap and must not be summed. Both preexisting fields remain in diagnostics/review exports. Missing values (for example manual marks) show a dash. Neither includes microphone/packet buffering, detector-window accumulation or audible-response onset, so these are not phrase-end-to-acknowledgement measurements.

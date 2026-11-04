@@ -8,7 +8,7 @@ const $=id=>document.getElementById(id),store=createLabStore(),records=new Map()
 let current=null,preparing=false,preparingCleanup=null,maintenance=false,generation=0,temporaryStream=null,playerUrl=null,whisper=null,whisperReady=false,whisperLoading=null,whisperSerial=0;
 let logEpoch=0;
 let events=[],displayStart=0,titleRequests=new Map(),offlinePreparing=false;
-const LAB_BUILD='2026-11-04.13';$('build').textContent='Lab build '+LAB_BUILD;
+const LAB_BUILD='2026-11-04.14';$('build').textContent='Lab build '+LAB_BUILD;
 const status=text=>$('status').textContent=text;
 const modelStatus=text=>$('modelStatus').textContent=text;
 const settings=()=>({verifyWake:$('verifyWake').checked&&$('liveAnalysis').checked&&$('labMode').value==='wake'&&$('engine').value!=='off',autoName:$('autoName').checked,nearThreshold:Number($('nearThreshold').value),formatPreference:$('format').value,liveAnalysis:$('liveAnalysis').checked,engine:$('engine').value,threshold:Number($('wakeThreshold').value),requireSpeech:$('speechGate').checked,speechThreshold:Number($('speechThreshold').value),minimumDb:$('levelGate').checked?Number($('minimumDb').value):null});
@@ -30,7 +30,7 @@ function renderEvents() {
  for(const event of events.slice(displayStart).filter(event=>reviewTypes.has(event.type)).slice(-100).reverse()){
   const row=document.createElement('tr');
   const result=event.type==='wake'?(event.accepted?'Accepted':!event.levelPass?'Rejected: level':'Rejected: speech'):event.type==='near-wake'?'Near trigger':event.type==='missed-wake'?'Manual miss':'Manual negative';
-  for(const value of [new Date(event.at).toLocaleTimeString(),result,event.prob?.toFixed(3)??'—',event.speechMax?.toFixed(3)??'—',event.inputDb?.toFixed(1)??'—',event.transportMs??'—']){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}
+  for(const value of [new Date(event.at).toLocaleTimeString(),result,event.prob?.toFixed(3)??'—',event.speechMax?.toFixed(3)??'—',event.inputDb?.toFixed(1)??'—',Number.isFinite(event.analysisMs)?event.analysisMs.toFixed(1):'—',Number.isFinite(event.transportMs)?event.transportMs.toFixed(1):'—']){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}
   const playback=document.createElement('td'),play=document.createElement('button');play.textContent=event.audio?'▶ Play clip':'Awaiting clip';play.disabled=!!current||preparing||!event.audio?.size;play.onclick=()=>playReview(event);playback.append(play);
   const info=document.createElement('p');info.textContent=event.duration===undefined?'':`${event.duration.toFixed(1)} s · event at ${event.eventOffset.toFixed(1)} s${event.shortPreRoll?' · short pre-roll':''}${event.shortPostRoll?' · short post-roll':''}`;playback.append(info);row.append(playback);
   const review=document.createElement('td'),choice=document.createElement('select');

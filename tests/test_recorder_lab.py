@@ -213,17 +213,18 @@ let puts=0;const createLabStore=()=>({put:async record=>{puts++;assert(record.re
 const urls=[];const URL={createObjectURL:audio=>{urls.push(audio);return 'blob:test';},revokeObjectURL:()=>{}};
 """ + ui + r"""
 (async()=>{
- const event={id:'record',eventId:'event',type:'wake',at:new Date().toISOString(),accepted:true,levelPass:true,speechPass:false,prob:.9,speechMax:.1,audio:{size:160044},duration:5,eventOffset:3};
+ const event={id:'record',eventId:'event',type:'wake',at:new Date().toISOString(),accepted:true,levelPass:true,speechPass:false,prob:.9,speechMax:.1,analysisMs:3.19999999995,transportMs:3,audio:{size:160044},duration:5,eventOffset:3};
  records.set('record',{id:'record',reviews:[event]});events.push(event);renderEvents();
- let row=$('events').children[0];assert(row.children[6].children[0].disabled===false,'completed audio can be played');
- current={};renderEvents();row=$('events').children[0];assert(row.children[6].children[0].disabled,'review playback disabled during recording');playReview(event);assert(urls.length===0,'playback guard also protects direct calls');
- current=null;renderEvents();row=$('events').children[0];row.children[6].children[0].onclick();assert($('player').played&&urls[0]===event.audio,'clip audio is passed to native player');
- const select=row.children[7].children[0];select.value='false positive';select.onchange();await reviewWrites;
+ let row=$('events').children[0];assert(row.children[5].textContent==='3.2'&&row.children[6].textContent==='3.0','processing and overlapping packet latency are shown separately');assert(row.children[7].children[0].disabled===false,'completed audio can be played');
+ current={};renderEvents();row=$('events').children[0];assert(row.children[7].children[0].disabled,'review playback disabled during recording');playReview(event);assert(urls.length===0,'playback guard also protects direct calls');
+ current=null;renderEvents();row=$('events').children[0];row.children[7].children[0].onclick();assert($('player').played&&urls[0]===event.audio,'clip audio is passed to native player');
+ const select=row.children[8].children[0];select.value='false positive';select.onchange();await reviewWrites;
  assert(puts===1&&event.review==='false positive','classification is persisted');
  assert($('comparison').textContent.includes('1 FP')&&$('comparison').textContent.includes('1 TN'),'summary compares identical reviewed event with gate on and off');
  pendingCaptures.add('record');persistReview(event);await reviewWrites;assert(puts===1,'active capture defers review writes to capture finalization');
  pendingCaptures.clear();deleting.add('record');persistReview(event);await reviewWrites;assert(puts===1,'review updates cannot resurrect deleted recordings');
  const metadata=reviewMetadata(event);assert(!('audio' in metadata)&&metadata.review==='false positive','diagnostics omit binary audio and retain labels');
+ delete event.analysisMs;delete event.transportMs;renderEvents();row=$('events').children[0];assert(row.children[5].textContent==='—'&&row.children[6].textContent==='—','missing timing is not reported as zero latency');
  globalThis.testResult='PASS';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
 """)
