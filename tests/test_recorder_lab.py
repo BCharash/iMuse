@@ -19,10 +19,12 @@ assert(diagnosticEvent('wake',{type:'measurement',prob:.8}).type==='wake','engin
 const prefix=datePrefix(new Date(2026,10,4,9,5,2));
 assert(prefix==='2026-11-04_09-05-02','local date and time always lead filename');
 assert(filename(prefix,'Title: Garden irrigation, plans!','m4a')===prefix+'_Garden-irrigation-plans.m4a','title marker and unsafe punctuation are removed');
-assert(filenameKeywords('Today I want to talk about garden irrigation and plans for the garden')==='garden-irrigation-plans','extract content words rather than the opening sentence');
-assert(filenameKeywords('Quick note about things: irrigation irrigation maintenance schedule').includes('irrigation'),'later repeated topic words outrank introductory words');
+assert(filenameKeywords('Today I want to talk about garden irrigation and plans for the garden')==='garden-irrigation-and-plans','preserve a coherent opening phrase');
+assert(filenameKeywords('Garden irrigation plans. Budget review. Completely unrelated architecture architecture architecture.')==='Garden-irrigation-plans','later topics cannot pollute the opening title');
+assert(filenameKeywords('Hey Doc. Today I want to talk about garden irrigation.')==='garden-irrigation','skip a greeting within the first two sentences');
+assert(filenameKeywords('Hey Doc. Hey Doc. Third sentence topic.')==='','never mine the third sentence for keywords');
 assert(filenameKeywords('Hey Doc. Hey Doc. Please record this.')==='','wake phrases and filler do not become a title');
-assert(filenameKeywords('Architecture architecture budget schedule review extra').length<=40,'keyword suffix stays short');
+assert(filenameKeywords('Architecture architecture budget schedule review extra').length<=48,'keyword suffix stays short');
 assert(filename(prefix,'','webm')===prefix+'.webm','empty recognition preserves usable date-only name');
 assert(interruptedMessage({captureError:'Microphone ended',audio:{size:0}}).includes('No audio was captured'),'zero-byte interruption is reported honestly');
 assert(interruptedMessage({captureError:'Microphone ended',audio:{size:20}}).includes('Available audio'),'retained data is distinguished from empty metadata');
@@ -44,6 +46,91 @@ assert(!evaluateSpeechGate(history,30000).pass,'old speech cannot validate a lat
 assert(evaluateSpeechGate([],11000,{enabled:false}).pass,'gate can be disabled for a controlled comparison');
 assert(!evaluateSpeechGate(history,11000,{minimumDb:-40,inputDb:-50}).pass,'optional level gate rejects faint input independently');
 globalThis.testResult='PASS';
+""")
+
+    def test_review_clip_boundaries_and_classification(self):
+        review=(ROOT/'js/lab/review.js').read_text().replace('export ', '')
+        evaluate(review + r"""
+const assert=(value,message)=>{if(!value)throw Error(message);};
+const ready=[],buffer=new ReviewBuffer({rate:10,onReady:(entry,pcm)=>ready.push({entry,pcm})});
+const samples=(start,n)=>Float32Array.from({length:n},(_,i)=>(start+i)/1000);
+for(let i=0;i<10;i++)buffer.ingest(samples(i*10,10));
+buffer.mark({eventId:'trigger',type:'wake'});buffer.ingest(samples(100,10));
+assert(ready.length===0,'wait for two seconds of post-roll');buffer.ingest(samples(110,10));
+assert(ready[0].pcm.length===50&&ready[0].entry.eventOffset===3,'exact three-second pre and two-second post window');
+assert(Math.abs(ready[0].pcm[0]-.07)<1e-6&&Math.abs(ready[0].pcm[49]-.119)<1e-6,'clip contains correct source samples');
+buffer.mark({eventId:'manual',type:'missed-wake'});buffer.ingest(samples(120,5));buffer.flush(true);
+assert(ready[1].entry.shortPostRoll&&ready[1].entry.duration===3.5,'Stop retains and flags short post-roll');
+const early=[];const startup=new ReviewBuffer({rate:10,onReady:(e,p)=>early.push({e,p})});const input=samples(0,10);startup.ingest(input);input.fill(1);startup.mark({});startup.gap();
+assert(early[0].e.shortPreRoll&&early[0].e.shortPostRoll&&early[0].p[0]===0,'startup/gap preserves honest bounds and owned audio');
+startup.ingest(samples(100,10));startup.mark({});startup.flush(true);assert(early[1].p.length===10,'audio gaps do not splice unrelated history');
+const rejected={type:'wake',levelPass:true,speechPass:false,review:'false negative'};
+assert(reviewClassification(rejected,false)==='true positive'&&reviewClassification(rejected,true)==='false negative','gate comparison counts lost genuine phrases');
+const noise={...rejected,review:'true negative'};
+assert(reviewClassification(noise,false)==='false positive'&&reviewClassification(noise,true)==='true negative','gate comparison counts rejected noise');
+assert(reviewClassification({type:'missed-wake',review:'false negative'},false)==='false negative','manual missed wake remains a negative result');
+assert(reviewClassification({type:'near-wake',review:'true negative'},true)==='true negative','sampled negative classification');
+assert(reviewClassification({type:'wake'},true)==='unreviewed','never infer correctness from detector scores');
+const wav=new DataView(reviewWav(new Float32Array([-2,0,2]),16000));assert(wav.getUint32(24,true)===16000&&wav.getInt16(44,true)===-32768&&wav.getInt16(48,true)===32767,'playable WAV rate and bounded samples');
+globalThis.testResult='PASS';
+""")
+
+    def test_detection_worker_review_messages(self):
+        worker=(ROOT/'js/lab/detection-worker.js').read_text()
+        worker=re.sub(r'^import .*?;\s*$', '', worker, flags=re.M).replace('import.meta.url', "'http://localhost/js/lab/'")
+        review=(ROOT/'js/lab/review.js').read_text().replace('export ', '')
+        evaluate(CORE + review + r"""
+globalThis.testResult='pending';
+const assert=(value,message)=>{if(!value)throw Error(message);};
+const messages=[];const self={postMessage:message=>messages.push(message)};
+const performance={now:()=>0};class URL {constructor(path){this.href=path;}}
+const fetch=async()=>({json:async()=>({})});
+const ort={env:{wasm:{}},Tensor:class {constructor(type,data,dims){this.data=data;}},InferenceSession:{create:async()=>({run:async()=>({stateN:{},output:{data:[.9]}})})}};
+class WakeWordDetector {constructor(){this.calls=0;}reset(){}async step(){this.calls++;return {prob:this.calls===40?.99:.1,triggered:this.calls===40};}}
+""" + worker + r"""
+(async()=>{
+ await prepare({generation:7,options:{engine:'heed',threshold:.7,speechThreshold:.6,requireSpeech:true,nearThreshold:.5,autoName:false}});
+ resampler={push:pcm=>pcm};
+ for(let i=0;i<65;i++)await consume({generation:7,sentAt:Date.now(),sampleRate:16000,pcm:new Float32Array(1600).fill(.1),recording:true});
+ const event=messages.find(item=>item.type==='review-event');const clip=messages.find(item=>item.type==='review-clip');
+ assert(event?.event.type==='wake'&&event.event.accepted,'real worker candidate becomes review event after speech gate');
+ assert(clip?.entry.eventId===event.event.eventId&&clip.samples.length===80000,'worker matches five-second audio to candidate');
+ assert(title.length===0,'wake-only session does not collect filename audio');
+ self.onmessage({data:{type:'mark-review',generation:7,kind:'missed-wake'}});await serial;
+ self.onmessage({data:{type:'finish',generation:7}});await serial;
+ const manual=messages.filter(item=>item.type==='review-clip').at(-1);
+ assert(manual.entry.type==='missed-wake'&&manual.entry.shortPostRoll,'manual miss is retained at Stop even without future audio');
+ assert(messages.at(-1).type==='title-audio','review clips flush before worker completion so main thread can terminate safely');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
+""")
+
+    def test_review_ui_playback_and_saved_labels(self):
+        app=(ROOT/'js/lab/app.js').read_text()
+        ui=app[app.index('const $='):app.index('function download(')]
+        review=(ROOT/'js/lab/review.js').read_text().replace('export ', '')
+        evaluate(review + r"""
+globalThis.testResult='pending';
+const assert=(value,message)=>{if(!value)throw Error(message);};
+class Element {constructor(){this.children=[];this.value='';}append(...items){this.children.push(...items);}replaceChildren(){this.children=[];}setAttribute(){}play(){this.played=true;return Promise.resolve();}}
+const elements=new Map();const document={getElementById:id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id);},createElement:()=>new Element()};
+let puts=0;const createLabStore=()=>({put:async record=>{puts++;assert(record.reviews[0].review==='false positive','saved record includes changed classification');}});
+const urls=[];const URL={createObjectURL:audio=>{urls.push(audio);return 'blob:test';},revokeObjectURL:()=>{}};
+""" + ui + r"""
+(async()=>{
+ const event={id:'record',eventId:'event',type:'wake',at:new Date().toISOString(),accepted:true,levelPass:true,speechPass:false,prob:.9,speechMax:.1,audio:{size:160044},duration:5,eventOffset:3};
+ records.set('record',{id:'record',reviews:[event]});events.push(event);renderEvents();
+ let row=$('events').children[0];assert(row.children[6].children[0].disabled===false,'completed audio can be played');
+ current={};renderEvents();row=$('events').children[0];assert(row.children[6].children[0].disabled,'review playback disabled during recording');playReview(event);assert(urls.length===0,'playback guard also protects direct calls');
+ current=null;renderEvents();row=$('events').children[0];row.children[6].children[0].onclick();assert($('player').played&&urls[0]===event.audio,'clip audio is passed to native player');
+ const select=row.children[7].children[0];select.value='false positive';select.onchange();await reviewWrites;
+ assert(puts===1&&event.review==='false positive','classification is persisted');
+ assert($('comparison').textContent.includes('1 FP')&&$('comparison').textContent.includes('1 TN'),'summary compares identical reviewed event with gate on and off');
+ pendingCaptures.add('record');persistReview(event);await reviewWrites;assert(puts===1,'active capture defers review writes to capture finalization');
+ pendingCaptures.clear();deleting.add('record');persistReview(event);await reviewWrites;assert(puts===1,'review updates cannot resurrect deleted recordings');
+ const metadata=reviewMetadata(event);assert(!('audio' in metadata)&&metadata.review==='false positive','diagnostics omit binary audio and retain labels');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
 """)
 
     def test_capture_preserves_tail_and_previous_recordings(self):

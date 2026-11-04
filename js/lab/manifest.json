@@ -1,7 +1,7 @@
 {
   "version": 1,
   "cache": "imuse-simple-lab-v1",
-  "bytes": 82537253,
+  "bytes": 82546752,
   "assets": [
     {
       "path": "js/heed/filter-coeffs.js",
@@ -35,8 +35,8 @@
     },
     {
       "path": "js/lab/app.js",
-      "bytes": 26594,
-      "sha256": "5706283277c0534548ced34d5f34dda95f27a65dccb9192a255ff85b73662f23"
+      "bytes": 31183,
+      "sha256": "6e7b7d6ed48316d9d4aa9ca372700c6142ed49fc776070a8cdc4ab9a4ff441a7"
     },
     {
       "path": "js/lab/capture.js",
@@ -45,13 +45,13 @@
     },
     {
       "path": "js/lab/core.js",
-      "bytes": 5260,
-      "sha256": "d4b82e00b415f231e6a278db328efc6bdcd2bcdf8d7763c7282213b56f0a4f47"
+      "bytes": 4816,
+      "sha256": "d9fe40994702381a8fc680790393d2f53537c7702f12c817e8c52606382b819b"
     },
     {
       "path": "js/lab/detection-worker.js",
-      "bytes": 5982,
-      "sha256": "b63e7195d26c538472cbe0f6034249fc06bd2c50c4b6b14660ba95abbcedc8b4"
+      "bytes": 7279,
+      "sha256": "ed113e41b3fd0a39ff984bb8e43e1a5bcfa1f81c2713fe031f692ed58aa3ac9c"
     },
     {
       "path": "js/lab/input-worklet.js",
@@ -137,6 +137,11 @@
       "path": "js/lab/models/whisper-tiny.en/vocab.json",
       "bytes": 999186,
       "sha256": "f6bd25a65e4e63ca31360e9fb11c7e4f9a391a78385d640acd814092dd6eee4f"
+    },
+    {
+      "path": "js/lab/review.js",
+      "bytes": 2762,
+      "sha256": "71bae24638d000f88d1a64132b6d34af0a0b9adf3ffe0be0a30d915a7879af47"
     },
     {
       "path": "js/lab/store.js",
@@ -225,13 +230,13 @@
     },
     {
       "path": "lab-sw.js",
-      "bytes": 1576,
-      "sha256": "d33d735a859c4e27935aeea38ec2e0a2cd8c78865403c6683140933267e4b59d"
+      "bytes": 1595,
+      "sha256": "9bd9b9d44f8fab93a9329987b56d372c812826d9a94190722c682c0ee5f60a7a"
     },
     {
       "path": "lab.html",
-      "bytes": 6207,
-      "sha256": "dab8de72f5b564746af7f16878c5cfb7c7e816e744e10c4c765ce89897b4219b"
+      "bytes": 7483,
+      "sha256": "84482d54db3951e85aed284b2bb471e21181fb706f158461ff5eaac3a05b6fc1"
     }
   ]
 }

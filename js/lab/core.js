@@ -13,15 +13,16 @@ export function filenameSuffix(text) {
  return String(text||'').replace(/^\s*(?:title|file\s*name|subject)\s*[:,-]?\s*/i,'')
   .replace(/<\|[^>]+\|>/g,'').replace(/[^\p{L}\p{N}\s-]/gu,' ').trim().split(/\s+/).slice(0,7).join('-').slice(0,70).replace(/-+$/,'');
 }
-// Lightweight English keyword extraction; Whisper transcribes, it does not summarize.
+// Preserve a short phrase from the first two sentences, without rearranging words.
 export function filenameKeywords(text) {
- const stop=new Set(('a an the and or but for nor so yet as at by from in into of on onto to with without about after before between through during over under is am are was were be been being have has had do does did can could will would shall should may might must i me my mine we us our ours you your yours he him his she her hers it its they them their theirs this that these those there here then than very really just also please okay ok hello hi hey doc docs friday today now want wanted going gonna talk talking discuss discussing record recording let lets title filename subject').split(' '));
- const words=String(text||'').replace(/<\|[^>]+\|>/g,'').replace(/[’']/g,'').match(/[\p{L}\p{N}]+/gu)||[];
- const counts=new Map();
- words.forEach((word,index)=>{const key=word.toLowerCase();if(stop.has(key)||key.length<2)return;const item=counts.get(key);if(item)item.count++;else counts.set(key,{word,index,count:1});});
- // Rank the whole opening transcript, rewarding repeated topic words and specificity.
- const selected=[...counts.values()].sort((a,b)=>(b.count*3+Math.min(b.word.length,12)/3)-(a.count*3+Math.min(a.word.length,12)/3)||a.index-b.index).slice(0,4).sort((a,b)=>a.index-b.index);
- return selected.map(item=>item.word).join('-').slice(0,40).replace(/-+$/,'');
+ const opening=(String(text||'').replace(/<\|[^>]+\|>/g,'').match(/[^.!?]+[.!?]*/g)||[]).slice(0,2).map(sentence=>sentence.trim()
+  .replace(/^(?:(?:hey\s+(?:doc|friday)|hello|hi|okay|ok)[,!.]?\s*)+/i,'')
+  .replace(/^(?:(?:today\s+)?I\s+(?:want to|would like to|am going to)\s+(?:talk about|discuss)|(?:this is|lets|let’s|let us)\s+(?:a recording about|talk about|discuss)|(?:title|subject|file name)\s*:)\s*/i,'').trim())
+  .find(sentence=>/[\p{L}\p{N}]/u.test(sentence));
+ const words=(opening||'').match(/[\p{L}\p{N}]+(?:[’'-][\p{L}\p{N}]+)*/gu)||[];
+ const selected=[];for(const word of words.slice(0,6)){if([...selected,word].join('-').length>48)break;selected.push(word);}
+ while(selected.length&&/^(?:a|an|the|and|or|but|for|of|to|with|in|on|about)$/i.test(selected[selected.length-1]))selected.pop();
+ return selected.join('-');
 }
 export function filename(prefix,suffix,extension) {const clean=filenameSuffix(suffix);return `${prefix}${clean?'_'+clean:''}.${extension}`;}
 export function audioExtension(mime='') {return mime.includes('mp4')?'m4a':mime.includes('webm')?'webm':mime.includes('ogg')?'ogg':'audio';}
