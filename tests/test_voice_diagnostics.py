@@ -18,27 +18,53 @@ assert(snapshot.events.length===3&&snapshot.droppedEvents===1&&snapshot.events[0
 assert(snapshot.events[0].scores.stop===.72&&!('audio' in snapshot.events[0])&&!('samples' in snapshot.events[0])&&!('stream' in snapshot.events[0])&&!('transcript' in snapshot.events[0])&&!('values' in snapshot.events[0]),'numeric snapshots are copied without raw audio or mutable media references');
 snapshot.events[0].scores.stop=.1;assert(log.snapshot().events[0].scores.stop===.72,'export cannot mutate retained evidence');
 log.onChange(()=>{throw Error('broken UI');});log.record('command-accepted',{command:'stop',windowId:7,sessionId:'session',generation:2,score:.72,threshold:.7});
-assert(log.canMark,'failing UI observer cannot interrupt collection');log.markUnintended();
-const mark=log.snapshot().events.at(-1);assert(mark.type==='unintended-confirmation'&&mark.windowId===7&&mark.acceptedSequence<mark.sequence&&!log.canMark,'marker links to accepted Stop');
-log.clear();assert(log.size===0&&log.dropped===0&&!log.canMark&&log.enabled,'clear removes all diagnostic memory without disabling collection');
+assert(log.snapshot().events.at(-1).command==='stop','failing UI observer cannot interrupt collection');
+log.clear();assert(log.size===0&&log.dropped===0&&log.enabled,'clear removes diagnostic memory without disabling collection');
 log.record('fresh');log.setEnabled(false);const size=log.size;log.record('ignored');assert(log.size===size&&!log.enabled,'disable retains exportable evidence without new logging');
 const fresh=createVoiceDiagnostics();assert(!fresh.enabled&&fresh.size===0,'fresh page has no saved setting or log');
 globalThis.testResult='PASS';
 """)
 
-    def test_advanced_controls_and_marker_do_not_control_audio(self):
+    def test_readable_window_summary_and_partial_data(self):
+        evaluate(SOURCE + r"""
+const assert=(value,message)=>{if(!value)throw Error(message);};
+const base={sessionId:'one',windowId:1,phase:'go-stop',at:'2026-11-04T10:00:00Z'};
+const events=[{...base,type:'command-window-created'},{...base,type:'listener-ready'},
+ {...base,type:'command-prediction',scores:{stop:.72}},{...base,type:'command-accepted',command:'stop',score:.72,threshold:.7,elapsedMs:4200},
+ {...base,type:'command-window-close'},
+ {...base,windowId:2,phase:'yes-no',type:'command-window-created'},
+ {...base,windowId:2,phase:'yes-no',type:'command-accepted',command:'no',score:.9,threshold:.55},
+ {...base,windowId:3,type:'command-window-timeout'},{...base,windowId:3,type:'command-window-close'},
+ {...base,sessionId:'two',type:'command-prediction',scores:{stop:.2}}];
+const report=summarizeVoiceDiagnostics({events});
+assert(report.goStopWindows===3&&report.stops===1,'summary counts retained windows and model Stop decisions, not user intent');
+assert(report.windows[0].result==='Accepted Stop'&&report.windows[0].score===.72&&report.windows[0].threshold===.7&&report.windows[0].elapsedMs===4200&&report.windows[0].peakStop===.72,'readable row preserves accepted score, threshold, timing and peak');
+assert(report.windows[1].result==='Accepted No'&&report.windows[2].result==='Timed out — no command','confirmation and timeout remain distinct after shutdown');
+assert(report.windows[3].result==='Partial window'&&report.windows[3].sessionId==='two','truncated data and repeated window IDs across sessions do not merge');
+globalThis.testResult='PASS';
+""")
+
+    def test_advanced_readable_view_refresh_clear_and_disable(self):
         evaluate(r"""
 const assert=(value,message)=>{if(!value)throw Error(message);};
-const performance={now:()=>0};class Element{constructor(){this.handlers={};}addEventListener(type,fn){this.handlers[type]=fn;}}
-const elements=new Map(),document={getElementById:id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id);}};
+const performance={now:()=>0};class Element{constructor(){this.handlers={};this.children=[];}addEventListener(type,fn){this.handlers[type]=fn;}setAttribute(){}append(...items){this.children.push(...items);}replaceChildren(){this.children=[];}}
+const elements=new Map(),document={createElement:()=>new Element(),getElementById:id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id);}};
 """ + SOURCE + r"""
-initializeVoiceDiagnostics();const el=id=>elements.get(id),toggle=el('voiceDiagnosticsEnabled'),marker=el('markUnintendedConfirmation');
-assert(!toggle.checked&&marker.hidden&&el('downloadVoiceDiagnostics').disabled,'initial UI has no enabled diagnostics or marker');
-toggle.checked=true;toggle.handlers.change();assert(voiceDiagnostics.enabled&&marker.hidden,'enable observes without inventing an incident');
-voiceDiagnostics.record('command-accepted',{command:'stop',windowId:4,score:.8,threshold:.7});assert(!marker.hidden,'Stop exposes marker even while confirmation prompt hides listening indicator');
-marker.handlers.click();assert(marker.hidden&&voiceDiagnostics.snapshot().events.at(-1).type==='unintended-confirmation','mark hides marker and records incident only');
-el('clearVoiceDiagnostics').handlers.click();assert(voiceDiagnostics.size===0&&el('downloadVoiceDiagnostics').disabled,'clear updates buttons');
-toggle.checked=false;toggle.handlers.change();assert(!voiceDiagnostics.enabled&&marker.hidden,'disable hides marker');
+const el=id=>document.getElementById(id);el('voiceDiagnosticsView').hidden=true;el('advancedSettings').open=true;
+initializeVoiceDiagnostics();const toggle=el('voiceDiagnosticsEnabled'),viewButton=el('viewVoiceDiagnostics');
+assert(!toggle.checked&&el('voiceDiagnosticsView').hidden&&el('downloadVoiceDiagnostics').disabled,'initial view is collapsed and collection off');
+viewButton.handlers.click();assert(el('voiceDiagnosticsSummary').textContent.includes('No events yet'),'empty view gives actionable guidance');
+toggle.checked=true;toggle.handlers.change();
+const metadata={windowId:4,sessionId:'session',phase:'go-stop'};
+voiceDiagnostics.record('command-accepted',{...metadata,command:'stop',score:.8,threshold:.7,elapsedMs:4200});
+assert(el('voiceDiagnosticsWindows').children[0].children[3].textContent==='Accepted Stop','live state boundary updates readable window result');
+assert(el('voiceDiagnosticsWindows').children[0].children[4].textContent==='0.80 / 0.70'&&el('voiceDiagnosticsWindows').children[0].children[5].textContent==='4.20 s','human scores and timing are formatted');
+voiceDiagnostics.record('command-prediction',{...metadata,scores:{top:'stop',topScore:.8,stop:.8},thresholds:{stop:.7},elapsedMs:4300});
+assert(el('voiceDiagnosticsEvents').children[0].children[2].textContent==='Command accepted','prediction does not force repeated DOM rendering');
+el('refreshVoiceDiagnostics').handlers.click();assert(el('voiceDiagnosticsEvents').children[0].children[2].textContent==='Prediction','manual refresh shows latest prediction scores');
+el('clearVoiceDiagnostics').handlers.click();assert(voiceDiagnostics.size===0&&el('voiceDiagnosticsWindows').children.length===0&&el('downloadVoiceDiagnostics').disabled,'clear resets visible tables and log');
+toggle.checked=false;toggle.handlers.change();assert(!voiceDiagnostics.enabled,'disable keeps viewer usable');
+viewButton.handlers.click();assert(el('voiceDiagnosticsView').hidden,'view can collapse again');
 globalThis.testResult='PASS';
 """)
 

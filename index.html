@@ -48,7 +48,7 @@
     <p id="microphoneStatus" class="microphone-status" role="status">Microphone: inactive (not listening)</p>
 
     <div id="recordingStatusGroup">
-    <div class="voice-command-status"><div id="commandListening" class="command-listening" hidden role="status" aria-live="polite">Listening for voice command <svg id="commandCountdown" class="command-timer" viewBox="0 0 40 40" aria-hidden="true"><circle class="command-timer-track" cx="20" cy="20" r="17"></circle><path id="commandTimerProgress" class="command-timer-progress"></path><line id="commandTimerHand" class="command-timer-hand" x1="20" y1="20" x2="20" y2="3" visibility="hidden"></line></svg></div><button id="markUnintendedConfirmation" class="voice-diagnostic-marker" type="button" title="Label the last Stop prompt; this does not cancel confirmation" hidden>Unintended confirmation</button></div>
+    <div id="commandListening" class="command-listening" hidden role="status" aria-live="polite">Listening for voice command <svg id="commandCountdown" class="command-timer" viewBox="0 0 40 40" aria-hidden="true"><circle class="command-timer-track" cx="20" cy="20" r="17"></circle><path id="commandTimerProgress" class="command-timer-progress"></path><line id="commandTimerHand" class="command-timer-hand" x1="20" y1="20" x2="20" y2="3" visibility="hidden"></line></svg></div>
     <div id="status" role="status" aria-live="polite">Ready to record.</div>
     <p id="wakeStatus" aria-live="polite">Preparing voice commands…</p>
     <p id="lifecycleStatus" aria-live="polite">Screen lock prevention activates during recording when available.</p>
@@ -148,8 +148,15 @@
             <summary>Advanced</summary>
             <label class="settings-check"><input id="voiceDiagnosticsEnabled" type="checkbox"> Enable voice diagnostics</label>
             <p id="voiceDiagnosticsStatus" class="settings-note" role="status">Off. This page only; download before reloading. No audio is logged.</p>
-            <div class="voice-diagnostic-actions"><button id="downloadVoiceDiagnostics" type="button" disabled>Download diagnostics</button><button id="clearVoiceDiagnostics" type="button" disabled>Clear diagnostics</button></div>
-            <p class="settings-note">Keeps the latest 4,000 score/timing events. After a false Stop prompt, tap “Unintended confirmation” beside the command indicator.</p>
+            <div class="voice-diagnostic-actions"><button id="viewVoiceDiagnostics" type="button" aria-expanded="false" aria-controls="voiceDiagnosticsView">View diagnostics</button><button id="downloadVoiceDiagnostics" type="button" disabled>Download diagnostics</button><button id="clearVoiceDiagnostics" type="button" disabled>Clear diagnostics</button></div>
+            <p class="settings-note">Keeps the latest 4,000 score/timing events. View them here, or download JSON for detailed review.</p>
+            <div id="voiceDiagnosticsView" hidden>
+                <p id="voiceDiagnosticsSummary" class="settings-note"></p>
+                <button id="refreshVoiceDiagnostics" type="button">Refresh view</button>
+                <h4>Recent listening windows</h4>
+                <div class="voice-diagnostics-scroll"><table class="voice-diagnostics-table"><thead><tr><th>Time</th><th>Window</th><th>Listening for</th><th>Result</th><th>Accepted score / threshold</th><th>After</th><th>Highest Stop score</th></tr></thead><tbody id="voiceDiagnosticsWindows"></tbody></table></div>
+                <details><summary>Recent events and prediction scores</summary><div class="voice-diagnostics-scroll"><table class="voice-diagnostics-table"><thead><tr><th>Time</th><th>Window</th><th>Event</th><th>Details</th><th>After</th></tr></thead><tbody id="voiceDiagnosticsEvents"></tbody></table></div></details>
+            </div>
         </details>
     </section>
     <section id="savedRecordingsLocation" aria-label="Saved recordings"></section>

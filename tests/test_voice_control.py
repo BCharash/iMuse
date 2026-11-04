@@ -201,7 +201,7 @@ class VoiceControlTests(unittest.TestCase):
  assert(!voiceController.active&&status.wake==='Stop cancelled. Recording paused.','Yes/No expiry begins after listener startup');
 """)
 
-    def test_diagnostic_scores_incident_linking_and_quiet_window(self):
+    def test_diagnostic_scores_window_linking_and_quiet_window(self):
         check(r"""
  voiceDiagnostics.setEnabled(true);settings.stopThreshold=.7;
  const current=seed('diagnostic-session');await handleWakeDetected(current);
@@ -213,15 +213,13 @@ class VoiceControlTests(unittest.TestCase):
  assert(prediction.sessionId===current.id&&prediction.windowId===accepted.windowId&&prediction.generation===accepted.generation,'prediction and acceptance share stable session/window/generation');
  assert(snapshot.events.some(e=>e.type==='listener-shutdown-request'&&e.windowId===accepted.windowId),'confirmation shutdown remains associated with original Go/Stop listener');
  assert(snapshot.events.some(e=>e.type==='listener-start-request')&&snapshot.events.some(e=>e.type==='listener-ready')&&snapshot.events.some(e=>e.type==='prompt-start'&&e.prompt==='confirmStop')&&snapshot.events.some(e=>e.type==='listener-shutdown-complete'),'listener and prompt lifecycle are recorded');
- assert(current.recorder.stops===0&&voiceDiagnostics.canMark,'diagnostic Stop remains provisional and exposes marker');
- voiceDiagnostics.markUnintended();
- const mark=voiceDiagnostics.snapshot().events.find(e=>e.type==='unintended-confirmation');
- assert(mark.acceptedSequence===accepted.sequence&&mark.windowId===accepted.windowId&&mark.score===.72&&!voiceDiagnostics.canMark,'incident links to original acceptance, not the new Yes/No window');
+ assert(current.recorder.stops===0,'observed Stop remains provisional');
+ assert(snapshot.events.some(e=>e.type==='command-window-created'&&e.phase==='yes-no'&&e.windowId!==accepted.windowId),'confirmation has a distinct window without changing original acceptance');
  const no=listeners.at(-1);no({top:'no',no:.99});await flush();
  await handleWakeDetected(current);clock=10200;for(const tick of [...intervals.values()])tick();await flush();
  assert(voiceDiagnostics.snapshot().events.some(e=>e.type==='command-window-timeout'&&e.phase==='go-stop'),'uneventful windows are retained for exposure comparisons');
  voiceDiagnostics.setEnabled(false);const count=voiceDiagnostics.size;listeners.at(-1)({top:'stop',stop:.99});await flush();
- assert(voiceDiagnostics.size===count&&!voiceDiagnostics.canMark,'disabled diagnostics stop observation');
+ assert(voiceDiagnostics.size===count,'disabled diagnostics stop observation');
 """)
 
     def test_adapter_clone_startup_cancellation_and_failure_cleanup(self):

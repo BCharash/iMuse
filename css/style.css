@@ -237,5 +237,8 @@ button:active {
 .advanced-settings { margin-top: 1rem; border-top: 1px solid #8884; padding-top: .75rem; }
 .advanced-settings summary { cursor: pointer; }
 .voice-diagnostic-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.voice-diagnostic-actions button, .voice-diagnostic-marker { font-size: .8rem; padding: .35rem .6rem; }
-.voice-command-status { display: flex; align-items: center; justify-content: center; gap: .5rem; flex-wrap: wrap; }
+.voice-diagnostic-actions button, #refreshVoiceDiagnostics { font-size: .8rem; padding: .35rem .6rem; }
+#voiceDiagnosticsView[hidden] { display: none; }
+.voice-diagnostics-scroll { overflow: auto; max-height: 320px; margin-top: .5rem; }
+.voice-diagnostics-table { border-collapse: collapse; width: 100%; font-size: .82rem; }
+.voice-diagnostics-table th, .voice-diagnostics-table td { text-align: left; padding: .4rem; border-bottom: 1px solid #8884; white-space: nowrap; }

@@ -319,7 +319,7 @@ const diagnosticsUpdated = document.createElement("span");
 diagnosticsUpdated.style.cssText = "font-size:.8rem;opacity:.8";
 diagnosticsActions.append(diagnosticsRefresh, diagnosticsUpdated);
 diagnosticsDetail.appendChild(diagnosticsActions);
-panel.appendChild(diagnosticsSection);
+document.getElementById("advancedSettings").appendChild(diagnosticsSection);
 // Show up to four significant figures; switch to GB above 500 MB.
 const formatBytes = bytes => {
     if (!Number.isFinite(bytes)) return "Unavailable";

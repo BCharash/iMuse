@@ -180,7 +180,7 @@ function initializePreservationTest() {
         }
     });
     panel.append(heading, note, label, preservationTestButton, preservationTestResult);
-    document.getElementById("settingsPanel").appendChild(panel);
+    document.getElementById("advancedSettings").appendChild(panel);
     updatePreservationTestControls();
 }
 
