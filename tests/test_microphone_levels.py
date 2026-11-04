@@ -4,9 +4,9 @@ from pathlib import Path
 from recording_test_support import SOURCE, between, evaluate
 
 SETTINGS = (Path(__file__).resolve().parents[1] / 'js/settings.js').read_text()
-settings_start = SETTINGS.index('// Read the existing recording analyser')
+settings_start = SETTINGS.index('// Read the recording or explicit temporary check analyser')
 UI = SETTINGS[settings_start:SETTINGS.index('function renderMicrophoneProcessing()', settings_start)]
-METER = between('function publishLiveMicrophoneLevel()', 'function openDatabase()')
+METER = between('function publishLiveMicrophoneLevel()', 'function microphoneCheckBusy()')
 
 MOCKS = r"""
 const assert=(value,message)=>{if(!value)throw Error(message);};
@@ -32,6 +32,7 @@ const elements={microphoneLevelLive:level,microphoneLevelDial:dial,microphoneLev
 markQuietRoom:quietButton,markNoisyRoom:noisyButton,quietRoomMarker:quietMarker,noisyRoomMarker:noisyMarker,
 quietRoomValue:quietValue,noisyRoomValue:noisyValue,microphoneLevelsDetail:levels,microphoneLevelsToggle:toggle};
 document.getElementById=id=>elements[id];
+const microphoneLevelCheck={source:null};
 let activeSession=null,reads=0,value=0.1;
 const track={readyState:'live',muted:false};
 const analyser={fftSize:2048,getFloatTimeDomainData(buffer){reads++;buffer.fill(value);}};

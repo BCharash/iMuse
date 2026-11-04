@@ -107,6 +107,7 @@ const URL = {createObjectURL: () => 'blob:test', revokeObjectURL: url => revoked
 let recordingUrl = null, displayedSessionId = null, activeSession = null, db = null;
 let recordingStore = {isOpen: () => Boolean(db)};
 let lastRecordingPeakBytes = 0, startRequest = 0, recordingLease = null;
+const microphoneLevelCheck={stop:()=>Promise.resolve()};
 function getRecoveryPanel() { return location.children.find(element => element.id === 'recoveryPanel'); }
 function getSavedPlayback() {
     const dialog = document.body.children.find(element => element.className === 'saved-audio-dialog');
@@ -151,7 +152,7 @@ function downloadAudioBlob(blob, name) {
 }
 function logRecordingEvent() {} function closeCommandWindow() {}
 function cleanupAudioMonitor() {} function stopStream() {}
-function publishRecordingDiagnostics() {} function setAudioCommandsToggleLocked() {}
+function publishRecordingDiagnostics() {} function publishMicrophoneCheckState() {} function setAudioCommandsToggleLocked() {}
 function setMicrophoneSelectionLocked() {} function setSilencePauseLocked() {}
 function releaseScreenWakeLock() {} function setWakeStatus() {}
 function setRecordingControlState() {} function setReadyUI() {}

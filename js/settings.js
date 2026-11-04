@@ -106,13 +106,24 @@ function wireDisclosure(buttonElement, detailElement) {
 }
 wireDisclosure(document.getElementById("microphoneLevelsToggle"), document.getElementById("microphoneLevelsDetail"));
 
-// Read the existing recording analyser only while its settings are visible.
-// This never requests a microphone, resumes audio, or changes a threshold.
+// Read the recording or explicit temporary check analyser while Settings are visible.
+// Polling never acquires audio; the explicit check button requests a short-lived preview.
 const liveLevelOutput = document.getElementById("microphoneLevelLive");
 const liveLevelDial = document.getElementById("microphoneLevelDial");
 const liveLevelNeedle = document.getElementById("microphoneLevelNeedle");
 const quietRoomButton = document.getElementById("markQuietRoom");
 const noisyRoomButton = document.getElementById("markNoisyRoom");
+const microphoneCheckButton=document.getElementById('checkMicrophoneLevel');
+const microphoneCheckStatus=document.getElementById('microphoneCheckStatus');
+microphoneCheckButton?.addEventListener('click',()=>window.dispatchEvent(new Event('imuse-toggle-microphone-check')));
+window.addEventListener('imuse-microphone-check-state',event=>{
+    const {phase,message,recordingBusy,recordingLive}=event.detail;
+    if(microphoneCheckButton){
+        microphoneCheckButton.disabled=recordingBusy||phase==='closing';
+        microphoneCheckButton.textContent=phase==='opening'||phase==='checking'?'Stop microphone check':'Check microphone level (10 s)';
+    }
+    if(microphoneCheckStatus)microphoneCheckStatus.textContent=recordingLive?'Using the recording microphone for levels.':recordingBusy?'Recording is preparing or finishing.':message;
+});
 let lastLiveDbfs = null;
 let smoothedLiveDbfs = null;
 // Display-only damping: at the 200 ms refresh rate, settle most of a change
@@ -161,6 +172,7 @@ function requestLiveMicrophoneLevel() {
 function stopLiveMicrophoneLevel() {
     if (liveLevelTimer !== null) window.clearInterval(liveLevelTimer);
     liveLevelTimer = null;
+    window.dispatchEvent(new Event('imuse-stop-microphone-check'));
     smoothedLiveDbfs = null;
     setMicrophoneDial(null, "—");
 }

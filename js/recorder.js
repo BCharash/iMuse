@@ -3,6 +3,7 @@ import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSe
 import { loadVoicuteWakeWord } from "./voicute/voicute-adapter.js";
 import { loadHeedWakeWord } from "./heed/heed-adapter.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
+import { createMicrophoneLevelCheck } from "./microphone-level-check.js";
 import { createVoiceController } from "./voice-controller.js";
 import { voiceDiagnostics, initializeVoiceDiagnostics } from "./voice-diagnostics.js";
 import { createRecordingStorageCoordinator } from "./recording-storage-coordinator.js";
@@ -220,9 +221,9 @@ function publishRecordingDiagnostics() {
 publishRecordingDiagnostics();
 
 function publishLiveMicrophoneLevel() {
-    const current = activeSession;
+    const current = activeSession || microphoneLevelCheck.source;
     let detail = { state: "inactive", dbfs: null };
-    if (current && ["recording", "paused"].includes(current.recorder.state)) {
+    if (current && (current.checking || ["recording", "paused"].includes(current.recorder.state))) {
         detail = { state: "unavailable", dbfs: null };
         const track = current.stream?.getAudioTracks?.()[0];
         if (document.visibilityState === "visible" && current.audioContext?.state === "running" &&
@@ -244,6 +245,31 @@ function publishLiveMicrophoneLevel() {
 }
 window.addEventListener("imuse-request-microphone-level", publishLiveMicrophoneLevel);
 
+
+function microphoneCheckBusy() {
+    return !!activeSession || recordButton.disabled || writingSessions.size>0;
+}
+function publishMicrophoneCheckState() {
+    const state=microphoneLevelCheck.state;
+    if(!microphoneCheckBusy())setMicrophoneSelectionLocked(state.phase!=='idle');
+    window.dispatchEvent(new CustomEvent('imuse-microphone-check-state',{detail:{...state,recordingBusy:microphoneCheckBusy(),recordingLive:!!activeSession&&['recording','paused'].includes(activeSession.recorder.state)}}));
+    publishLiveMicrophoneLevel();
+}
+const microphoneLevelCheck=createMicrophoneLevelCheck({
+    acquire: isCurrent=>acquireRecordingMicrophone({purpose:'level-check',isCurrent}),
+    release: releaseRecordingMicrophone,
+    createContext:()=>{const AudioContextClass=window.AudioContext||window.webkitAudioContext;return new AudioContextClass();},
+    isRecordingBusy:microphoneCheckBusy,
+    publishProcessing:publishMicrophoneProcessing,
+    onChange:publishMicrophoneCheckState
+});
+window.addEventListener('imuse-toggle-microphone-check',()=>{
+    if(microphoneLevelCheck.state.phase!=='idle')void microphoneLevelCheck.stop();
+    else if(!microphoneCheckBusy())void microphoneLevelCheck.start();
+});
+window.addEventListener('imuse-stop-microphone-check',()=>{void microphoneLevelCheck.stop();});
+window.addEventListener('pagehide',()=>{void microphoneLevelCheck.stop();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible')void microphoneLevelCheck.stop();});
 
 function openDatabase() {
     return recordingStore.open();
@@ -435,6 +461,7 @@ function setRecordingControlState(state) {
     recordButton.classList.toggle("is-recording", state === "recording");
     recordButton.disabled = state === "preparing" || state === "finalizing";
     pauseButton.disabled = !["recording", "paused"].includes(state);
+    publishMicrophoneCheckState();
 }
 
 function finalizeRecording(source = "unspecified") {
@@ -1147,6 +1174,7 @@ async function startRecording() {
     setMicrophoneSelectionLocked(true);
     setSilencePauseLocked(true);
     setRecordingControlState("preparing");
+    const microphoneCheckShutdown=microphoneLevelCheck.stop();
 
     // Hide the previous player. Committed audio remains in IndexedDB;
     // emergency audio remains independently accessible in emergencyRecordings.
@@ -1163,6 +1191,7 @@ async function startRecording() {
     let stream;
     let recordingLease = null, recorderStarted = false, newSessionId = null;
     try {
+        await microphoneCheckShutdown;
         recordingLease = await recordingStorage.hold();
         stream = await acquireRecordingMicrophone();
         publishMicrophoneProcessing(stream);
@@ -1449,6 +1478,7 @@ async function startRecording() {
                 recordingRecovery.finish(current);
                 await recordingLease?.release();
                 writingSessions.delete(id);
+                publishMicrophoneCheckState();
                 // The preceding render may still have shown a finishing session.
                 void renderRecoverableSessions().catch(error => console.error(error));
             }
@@ -1480,6 +1510,7 @@ async function startRecording() {
             }
             writingSessions.delete(newSessionId);
             await recordingLease?.release();
+            publishMicrophoneCheckState();
         }
     }
 }
@@ -1576,7 +1607,7 @@ initialize();
 initializeWakeWord();
 // Give startup UI and microphone setup priority, then prepare the model in advance.
 window.setTimeout(preloadCommandModel, 1000);
-// Microphone is acquired only when recording begins; no startup readiness capture.
+// Microphone opens only for explicit recording or a short level check; no startup capture.
 setLifecycleStatus("Screen lock prevention activates during recording when available.");
 
 // Cache short response files without opening the microphone.

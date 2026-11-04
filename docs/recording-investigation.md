@@ -46,21 +46,21 @@ Web Locks protection covers cooperating updated pages in the same storage scope.
 
 ## Evidence and user-reported results
 
-### Passive microphone-level evaluation
+### Microphone-level evaluation
 
 The separate [wake-word and filename lab](wake-word-evaluation.md) now provides a simple recorder, local Whisper filename suggestions and Silero speech-gated Heed/Voicute detection. The earlier clip-review lab is archived with its separate storage preserved. Production wake behavior is unchanged.
 
-Refactoring is stopped. **Settings → Microphone levels → View** shows one needle-style RMS dBFS meter above both thresholds; the initial duplicate readouts were consolidated at the user's request. The dial spans −70 to 0 dBFS, with an exact numeric reading even below that range. Start recording first; readings continue while paused. It measures normalized input after browser microphone processing, before Heed's filtering/preprocessing—not model confidence, peak level or calibrated room sound pressure. Less-negative values mean louder input.
+**Settings → Microphone levels → View** shows one needle-style RMS dBFS meter above both thresholds; the initial duplicate readouts were consolidated at the user's request. The dial spans −70 to 0 dBFS, with an exact numeric reading even below that range. Before recording, click **Check microphone level (10 s)**. During recording or pause the same meter automatically uses the recording input. It measures normalized input after browser microphone processing, before Heed's filtering/preprocessing—not model confidence, peak level or calibrated room sound pressure. Less-negative values mean louder input.
 
 **Mark quiet room** and **Mark noisy room** place Q/N reference markers at the current measured level. No universal room-to-dBFS bands are assumed. Markers last until reload, do not affect thresholds and should be remeasured after microphone/gain changes. They are available only for finite live readings. The dial includes text/shape identifiers rather than relying on color, and respects reduced-motion preferences.
 
 The user requested damping after the initial dial felt too rapid. Displayed dBFS now uses an exponential average (25% of each new sample every 200 ms), settling about 94% of a change in two seconds, with a short needle transition. The number and Q/N markers use the same smoothed value; let it settle before marking. Inactive/unavailable states clear immediately and reopening starts fresh. This is display-only: the analyser samples, silence threshold and wake processing are unchanged.
 
-Polling runs every 200 ms only while Settings, the disclosure and the page are visible. It uses a reusable separate buffer and never requests a microphone, resumes AudioContext or modifies the graph. Invalid, muted, suspended/interrupted or inactive input clears stale readings; digital silence displays −∞ dBFS. Closing/hiding the panel or page stops polling. Silence threshold remains active; **wake-word minimum remains evaluation-only** and does not filter activations.
+Polling runs every 200 ms only while Settings, the disclosure and the page are visible. The meter uses a reusable separate buffer and never acquires audio itself. The explicit check action opens a temporary stream/analyser through the microphone manager, using the selected device and the same processing requests. It creates no MediaRecorder, voice models or recording data. Invalid, muted, suspended/interrupted or inactive input clears stale readings; digital silence displays −∞ dBFS. Closing Settings or the level disclosure, hiding/leaving the page, or reaching the ten-second measurement deadline stops the temporary check, releases its tracks and closes its context. Recording start cancels it immediately and awaits existing resource cleanup before acquiring recording input; a late canceled permission result is released without becoming the recording owner. Closing Settings during an actual recording stops only meter polling, not capture. Silence threshold remains active; **wake-word minimum remains evaluation-only** and does not filter activations.
 
 The microphone-processing report preserves the actual successful acquisition request separately from browser-returned settings. **iMuse requested** shows preferences (or Not requested), **Browser reports** shows available settings, and **Browser control** distinguishes Exposed, Not exposed and Unknown when the support query fails. Not exposed does not mean processing is off. The user’s Chrome reports AGC off; the iPhone omits AGC/noise-suppression controls and settings, so their state cannot be verified. Last acquired identifies the previous stream’s snapshot. Reporting changes do not strengthen constraints or change capture behavior.
 
-Measure/mark the quiet room, then household conversation/noise, then compare your intended wake phrase at the usual microphone distance. Verify readings while paused and after Stop. Check browser-reported AGC rather than assuming the request was honored. An eventual gate can reject quieter distant conversation, but cannot identify the speaker or reject equally loud voices. No gate, streaming fix, model change or voice refactor is included. The reviewed Heed buffering and upstream Voicute concerns remain hypotheses, not established causes of the separate standalone app's false activations. Native dial layout still requires device inspection.
+Use the check to measure/mark the quiet room, then household conversation/noise, then compare your intended wake phrase at the usual microphone distance. Let the damped meter settle before placing a marker. Verify readings while paused and after Stop. Check browser-reported AGC rather than assuming the request was honored. An eventual gate can reject quieter distant conversation, but cannot identify the speaker or reject equally loud voices. No gate, streaming fix, model change or voice refactor is included. The reviewed Heed buffering and upstream Voicute concerns remain hypotheses, not established causes of the separate standalone app's false activations. Native dial layout still requires device inspection.
 
 | Environment | Background capture | Storage protection |
 | --- | --- | --- |
@@ -110,3 +110,12 @@ Use disposable recordings in an updated build. Do not clear site data or reinsta
 5. **Protection:** open Settings, read status, close/reopen and check that it refreshes. Grants can differ by browser/container. Refusal does not block recording or mean recordings disappear on normal closure.
 
 Stuck writes, missing stop events, encoder errors and malformed structures are simulated in automated tests. Do not fill storage or manually corrupt saved chunks. For real delayed finalization, export available audio before closure and report the exact notice and whether it eventually finishes.
+
+### Short microphone-check acceptance
+
+1. On MacBook and iPhone, open Settings → Microphone levels → View, then Check microphone level (10 s). Confirm level response and the microphone-processing report; no saved recording should appear.
+2. Wait for automatic completion and check that microphone access ends. Repeat and stop early, close Settings/disclosure, or background the page.
+3. Start Record during a check, then speak, Stop and play. The check must release its input; the recording must retain its own live microphone. Closing Settings while recording must not stop capture.
+4. Where permission has not been granted, cancel a pending check by closing Settings or pressing Record. A late response must not resurrect the check or end a newer recording.
+
+Automated coverage and isolated Chrome checks are reported in the journal. Native Safari/iPhone permission timing and indicator behavior remain device checks.

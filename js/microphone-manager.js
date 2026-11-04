@@ -1,5 +1,5 @@
 import { getSettings, setMicrophoneProcessingLocked } from "./settings.js";
-// Recorder-owned microphone selection. Never opens a microphone until recording starts.
+// Shared microphone selection for recording and an explicit temporary level check.
 // Automatic mode prefers identifiable external headsets, then the system default.
 const KEY = "imuse.microphone-device.v1";
 const select = document.getElementById("microphoneChoice");
@@ -69,7 +69,7 @@ if (navigator.mediaDevices?.addEventListener) {
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && !locked) void refreshMicrophones();
 });
-export async function acquireRecordingMicrophone() {
+export async function acquireRecordingMicrophone({purpose="recording",isCurrent=()=>true}={}) {
     if (!navigator.mediaDevices?.getUserMedia) throw Error("Microphone access unavailable");
     const request = ++operation;
     const processing = getSettings();
@@ -89,19 +89,20 @@ export async function acquireRecordingMicrophone() {
             if (candidate) audio.deviceId = { exact: candidate.deviceId };
         } catch (error) { console.warn("Could not inspect microphones; using system default:", error); }
     }
+    if(request!==operation||!isCurrent())throw Error("Microphone request superseded");
     let stream;
     let requestedAudio = audio;
     try {
         stream = await navigator.mediaDevices.getUserMedia({ audio });
     } catch (error) {
-        if (selectedId || !candidate) throw error;
+        if (selectedId || !candidate || request!==operation || !isCurrent()) throw error;
         // Automatic mode can fall back if a headset vanished or could not open.
         console.warn("Preferred headset unavailable; trying system microphone:", error);
         requestedAudio = { channelCount: { ideal: 1 }, ...processingConstraints };
         stream = await navigator.mediaDevices.getUserMedia({ audio: requestedAudio });
     }
     const track = stream.getAudioTracks()[0];
-    if (!track || track.readyState !== "live" || request !== operation) {
+    if (!track || track.readyState !== "live" || request !== operation || !isCurrent()) {
         stream.getTracks().forEach(t => t.stop());
         throw Error(request !== operation ? "Microphone request superseded" : "No live microphone track was acquired");
     }
@@ -112,7 +113,7 @@ export async function acquireRecordingMicrophone() {
     }
     requestedAudioByStream.set(stream, JSON.parse(JSON.stringify(requestedAudio)));
     ownedStream = stream;
-    report("Microphone: recording — " + (track.label || "Unidentified input"));
+    report("Microphone: "+(purpose==="level-check"?"checking levels":"recording")+" — " + (track.label || "Unidentified input"));
     track.addEventListener("ended", () => {
         if (ownedStream === stream) { ownedStream = null; report("Microphone: disconnected"); }
     });
