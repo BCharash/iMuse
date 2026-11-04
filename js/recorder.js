@@ -3,7 +3,7 @@ import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSe
 import { loadVoicuteWakeWord } from "./voicute/voicute-adapter.js";
 import { loadHeedWakeWord } from "./heed/heed-adapter.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
-import { loadCommands, startCommands, stopCommands } from "./tensorflow/commands-adapter.js";
+import { createVoiceController } from "./voice-controller.js";
 import { createRecordingStorageCoordinator } from "./recording-storage-coordinator.js";
 import { createRecordingRecovery } from "./recording-recovery.js";
 import { createRecordingLibrary } from "./recording-library.js";
@@ -52,7 +52,7 @@ window.addEventListener("imuse-settings-changed", event => {
         wakeWord?.engine?.setThreshold?.(threshold);
     }
     if (event.detail.audioCommands) preloadCommandModel();
-    if (event.detail.audioCommands && activeSession && !commandActive && wakeWord) {
+    if (event.detail.audioCommands && activeSession && !voiceController.active && wakeWord) {
         scheduleWakeDetectorArm(activeSession, 0);
     }
 });
@@ -507,50 +507,45 @@ async function initializeWakeWord() {
  }
 }
 
-// Voice command state is independent of MediaRecorder state.
-const commandIndicator = document.getElementById("commandListening");
-const commandCountdown = document.getElementById("commandCountdown");
-const commandTimerProgress = document.getElementById("commandTimerProgress");
-const commandTimerHand = document.getElementById("commandTimerHand");
-function updateCommandTimer(remainingFraction) {
-    if (!commandTimerProgress) return;
-    const fraction = Math.max(0, Math.min(1, remainingFraction));
-    const cx = 20, cy = 20, radius = 17;
-    if (fraction >= 0.99999) {
-        commandTimerProgress.setAttribute("d", `M ${cx} ${cy-radius} A ${radius} ${radius} 0 1 1 ${cx} ${cy+radius} A ${radius} ${radius} 0 1 1 ${cx} ${cy-radius} Z`);
-        commandTimerHand.setAttribute("visibility", "hidden");
-    } else if (fraction <= 0) {
-        commandTimerProgress.setAttribute("d", "");
-        commandTimerHand.setAttribute("visibility", "hidden");
-    } else {
-        // The blue sector shrinks from its clockwise edge; its boundary travels
-        // counterclockwise toward 12 o'clock as the command window expires.
-        const angle = -Math.PI / 2 + fraction * 2 * Math.PI;
-        const x = cx + radius * Math.cos(angle);
-        const y = cy + radius * Math.sin(angle);
-        const largeArc = fraction > 0.5 ? 1 : 0;
-        commandTimerProgress.setAttribute("d", `M ${cx} ${cy} L ${cx} ${cy-radius} A ${radius} ${radius} 0 ${largeArc} 1 ${x} ${y} Z`);
-        commandTimerHand.setAttribute("x2", String(x));
-        commandTimerHand.setAttribute("y2", String(y));
-        commandTimerHand.setAttribute("visibility", "visible");
+// Recorder-owned capabilities: voice control cannot mutate the session's storage,
+// replace its MediaRecorder, or release the original microphone track.
+const voiceSessions = new WeakMap();
+function getVoiceSession(current) {
+    if (!current) return null;
+    let session = voiceSessions.get(current);
+    if (!session) {
+        session = {
+            get isCurrent() { return activeSession === current; },
+            get state() { return current.recorder.state; },
+            get discard() { return current.discard; },
+            get finalizing() { return current.metadata.state === "finalizing"; },
+            get wakeDetectorEnabled() { return current.wakeDetectorEnabled; },
+            get stream() { return current.stream; },
+            pauseForWake() {
+                let resolveAnnouncement;
+                current.pauseAnnouncement = new Promise(resolve => { resolveAnnouncement = resolve; });
+                current.resolvePauseAnnouncement = resolveAnnouncement;
+                try { current.recorder.pause(); }
+                catch (error) {
+                    current.resolvePauseAnnouncement?.();
+                    current.resolvePauseAnnouncement = null;
+                    throw error;
+                }
+                return current.pauseAnnouncement;
+            },
+            resume() { current.recorder.resume(); },
+            finalize(source) { if (activeSession === current) finalizeRecording(source); },
+            stopReminder() { stopPausedBeep(current); },
+            startReminder() { startPausedBeep(current); },
+            clearWake() { clearWakeDetectorTimers(current); },
+            armWake(delayMs) { scheduleWakeDetectorArm(current, delayMs); }
+        };
+        voiceSessions.set(current, session);
     }
+    return session;
 }
 
-let commandActive = false, commandGeneration = 0, commandInterval = null;
-let commandModel = null, commandStream = null;
-// Warm the command recognizer without acquiring a microphone or starting listening.
-// The adapter shares one loading promise with subsequent Go/Stop and Yes/No use.
-function preloadCommandModel() {
-    if (!getSettings().audioCommands) return;
-    void loadCommands().then(model => {
-        commandModel = model;
-    }).catch(error => {
-        // A failed preload must never prevent recording or a later retry.
-        console.warn("Command model preload unavailable; will retry when needed:", error);
-    });
-}
-
-// Spoken responses are serialized by one dedicated audio manager.
+// Spoken responses remain serialized by the dedicated audio manager.
 async function sayResponse(name) {
     const result = await playSpokenResponse(name);
     if (!result.ok) {
@@ -559,187 +554,18 @@ async function sayResponse(name) {
     }
     return result.ok;
 }
-function closeCommandWindow({ restorePauseReminder = true } = {}) {
-    commandActive = false;
-    ++commandGeneration;
-    if (commandInterval !== null) clearInterval(commandInterval);
-    commandInterval = null;
-    commandIndicator.hidden = true;
-    const pausedSession = activeSession;
-    if (pausedSession) stopPausedBeep(pausedSession);
-    // Do not play a pause reminder when transitioning to Resume or Stop.
-    if (restorePauseReminder && pausedSession && !pausedSession.discard &&
-        pausedSession.recorder.state === "paused" &&
-        pausedSession.metadata.state !== "finalizing") {
-        startPausedBeep(pausedSession);
-    }
-    const shutdown = stopCommands(commandModel);
-    void shutdown.catch(error => console.warn("Cannot stop command listener:", error));
-    return shutdown;
-}
-
-// Both voice Go and the manual button must await command shutdown before capture resumes.
-async function resumeAfterCommandShutdown(current) {
-    if (activeSession !== current || current.discard || current.recorder.state !== "paused") return;
-    const shutdown = closeCommandWindow({ restorePauseReminder: false });
-    try {
-        await shutdown;
-        if (activeSession !== current || current.discard || current.recorder.state !== "paused" ||
-            current.metadata.state === "finalizing") return;
-        current.recorder.resume();
-        status.textContent = "Resuming recording...";
-    } catch (error) {
-        console.error("Command listener did not shut down; recording remains paused:", error);
-        if (activeSession === current && current.recorder.state === "paused") {
-            startPausedBeep(current);
-            status.textContent = "Could not safely resume. Recording remains paused; check voice commands.";
-        }
-    }
-}
-
-// Voice Stop is provisional until an explicit Yes is recognized.
-// The original recorder remains paused and all persisted chunks are untouched.
-async function confirmVoiceStop(current) {
-    if (activeSession !== current || current.discard || current.recorder.state !== "paused") return;
-    commandActive = true;
-    const generation = ++commandGeneration;
-    if (commandInterval !== null) clearInterval(commandInterval);
-    commandInterval = null;
-    stopPausedBeep(current);
-    clearWakeDetectorTimers(current);
-    commandIndicator.hidden = true;
-    setWakeStatus("Preparing stop confirmation…");
-    try {
-        // Do not overlap listeners: wait until Go/Stop has completely released TensorFlow.
-        await stopCommands(commandModel);
-        if (generation !== commandGeneration || activeSession !== current || !commandActive) return;
-        // Preload/model preparation is allowed; speech recognition is NOT running during playback.
-        commandModel = await loadCommands();
-        if (generation !== commandGeneration || activeSession !== current || !commandActive) return;
-        const heard = await sayResponse("confirmStop");
-        if (generation !== commandGeneration || activeSession !== current || !commandActive) return;
-        if (!heard) throw new Error("Stop confirmation prompt could not be played.");
-        // Starting a fresh listener AFTER playback prevents its audio windows from
-        // including the spoken Yes/No prompt. No artificial post-prompt delay.
-        const seconds = getSettings().commandWindow;
-        let expiresAt = Infinity;
-        commandIndicator.firstChild.textContent = "Listening for Yes or No ";
-        commandIndicator.hidden = false;
-        updateCommandTimer(1);
-        setWakeStatus("Say “Yes” to stop or “No” to stay paused.");
-        await startCommands(commandModel, current.stream, effectiveOverlap(deviceClass), scores => {
-            if (generation !== commandGeneration || !commandActive || performance.now() >= expiresAt) return;
-            const settings = getSettings();
-            if (scores.top === "yes" && scores.yes >= settings.yesThreshold) {
-                closeCommandWindow({ restorePauseReminder: false });
-                finalizeRecording("voice-stop-confirmed-yes");
-            } else if (scores.top === "no" && scores.no >= settings.noThreshold) {
-                closeCommandWindow();
-                if (activeSession === current && current.recorder.state === "paused") {
-                    void sayResponse("pause");
-                    scheduleWakeDetectorArm(current, 0);
-                    setWakeStatus("Stop cancelled. Recording paused.");
-                }
-            }
-        });
-        if (generation !== commandGeneration || !commandActive) return;
-        expiresAt = performance.now() + seconds * 1000;
-        commandInterval = window.setInterval(() => {
-            if (generation !== commandGeneration || !commandActive) return;
-            const remaining = Math.max(0, (expiresAt - performance.now()) / 1000);
-            updateCommandTimer(remaining / seconds);
-            if (remaining === 0) {
-                closeCommandWindow();
-                if (activeSession === current && current.recorder.state === "paused") {
-                    void sayResponse("pause");
-                    scheduleWakeDetectorArm(current, 0);
-                    setWakeStatus("No response received. Recording paused.");
-                }
-            }
-        }, 100);
-    } catch (error) {
-        console.warn("Stop confirmation unavailable:", error);
-        if (generation !== commandGeneration) return;
-        closeCommandWindow();
-        if (activeSession === current && current.recorder.state === "paused") {
-            void sayResponse("pause");
-            scheduleWakeDetectorArm(current, 0);
-            setWakeStatus("Stop not confirmed. Recording paused.");
-        }
-    }
-}
-
-async function handleWakeDetected(current) {
-    if (!getSettings().audioCommands || commandActive || activeSession !== current || !current.wakeDetectorEnabled) return;
-    commandActive = true;
-    // Silence the periodic double beep throughout the wake acknowledgement,
-    // model preparation, and Go/Stop listening window.
-    stopPausedBeep(current);
-    const generation = ++commandGeneration;
-    clearWakeDetectorTimers(current);
-    const wasRecording = current.recorder.state === "recording";
-    if (wasRecording) {
-        // The pause event owns the spoken acknowledgement for every pause cause.
-        // Wait for it before opening TensorFlow's command window.
-        let resolveAnnouncement;
-        current.pauseAnnouncement = new Promise(resolve => { resolveAnnouncement = resolve; });
-        current.resolvePauseAnnouncement = resolveAnnouncement;
-        try { current.recorder.pause(); }
-        catch (error) {
-            current.resolvePauseAnnouncement?.();
-            current.resolvePauseAnnouncement = null;
-            console.warn("Wake pause failed", error);
-            closeCommandWindow();
-            return;
-        }
-    }
-    setWakeStatus(`Wake word detected. Preparing voice commands…`);
-    if (wasRecording) await current.pauseAnnouncement;
-    else await sayResponse("yes");
-    if (generation !== commandGeneration || !commandActive || activeSession !== current) return;
-    try {
-        commandModel = await loadCommands();
-        if (generation !== commandGeneration || !commandActive) return;
-        commandStream = current.stream;
-        const seconds = getSettings().commandWindow;
-        const expiresAt = performance.now() + seconds * 1000;
-        commandIndicator.firstChild.textContent = "Listening for Go or Stop ";
-        commandIndicator.hidden = false;
-        updateCommandTimer(1);
-        await startCommands(commandModel, commandStream, effectiveOverlap(deviceClass), scores => {
-            if (generation !== commandGeneration || !commandActive || performance.now() >= expiresAt) return;
-            const settings = getSettings();
-            const command = scores.top === "go" && scores.go >= settings.goThreshold ? "go"
-                : scores.top === "stop" && scores.stop >= settings.stopThreshold ? "stop" : null;
-            if (!command) return;
-            if (command === "go") {
-                void resumeAfterCommandShutdown(current);
-            } else {
-                // Do NOT close the command window here: closeCommandWindow() starts
-                // an unawaited recognizer shutdown and restarts pause beeps.
-                // Confirmation owns the one awaited shutdown and keeps the
-                // recording paused throughout the transition.
-                void confirmVoiceStop(current);
-            }
-        });
-        if (generation !== commandGeneration || !commandActive) return;
-        commandInterval = setInterval(() => {
-            if (generation !== commandGeneration || !commandActive) return;
-            const remaining = Math.max(0, (expiresAt - performance.now()) / 1000);
-            updateCommandTimer(remaining / seconds);
-            if (remaining === 0) {
-                closeCommandWindow();
-                if (activeSession === current) scheduleWakeDetectorArm(current, 0);
-                setWakeStatus(`No command heard. Listening for “${wakeWordPhrase}”.`);
-            }
-        }, 100);
-    } catch (error) {
-        console.warn("TensorFlow command recognition failed:", error);
-        closeCommandWindow();
-        if (activeSession === current) scheduleWakeDetectorArm(current, 0);
-        setWakeStatus(`Voice commands unavailable. Use the recording buttons.`);
-    }
-}
+const voiceController = createVoiceController({
+    getSettings,
+    getCurrentSession: () => getVoiceSession(activeSession),
+    getWakePhrase: () => wakeWordPhrase,
+    getOverlap: () => effectiveOverlap(deviceClass),
+    sayResponse, setWakeStatus,
+    setStatus: text => { status.textContent = text; }
+});
+function preloadCommandModel() { return voiceController.preload(); }
+function closeCommandWindow(options) { return voiceController.close(options); }
+function resumeAfterCommandShutdown(current) { return voiceController.resume(getVoiceSession(current)); }
+function handleWakeDetected(current) { return voiceController.wake(getVoiceSession(current)); }
 
 function resetWakeAudioBuffer(current) {
     current.wakeRingPos = 0;
@@ -770,7 +596,7 @@ function scheduleWakeDetectorArm(current, delayMs = 650) {
             activeSession !== current ||
             current.discard ||
             !["paused", "recording"].includes(current.recorder.state) ||
-            !wakeWord || !getSettings().audioCommands || commandActive
+            !wakeWord || !getSettings().audioCommands || voiceController.active
         ) return;
 
         resetWakeAudioBuffer(current);
@@ -1087,13 +913,13 @@ async function setupSilenceMonitor(current) {
 
 async function playPausedBeep(current) {
     const context = current.audioContext;
-    if (!context || context.state === "closed" || commandActive ||
+    if (!context || context.state === "closed" || voiceController.active ||
         activeSession !== current || current.recorder.state !== "paused") return;
 
     // Keep wake-word detection active while the reminder tone plays.
     try {
         if (context.state === "suspended") await context.resume();
-        if (context.state !== "running" || commandActive ||
+        if (context.state !== "running" || voiceController.active ||
             activeSession !== current || current.recorder.state !== "paused") return;
 
         // Two distinct tones make the paused-state reminder easier to notice.
@@ -1129,7 +955,7 @@ async function playPausedBeep(current) {
 }
 function startPausedBeep(current) {
     stopPausedBeep(current);
-    if (commandActive || activeSession !== current || current.discard ||
+    if (voiceController.active || activeSession !== current || current.discard ||
         current.recorder.state !== "paused") return;
     playPausedBeep(current);
     current.pausedBeepTimer = window.setInterval(
@@ -1531,7 +1357,7 @@ async function startRecording() {
             setRecordingControlState("paused");
             current.autoPausing = false;
             current.silenceSince = null;
-            if (!commandActive) scheduleWakeDetectorArm(current, 0);
+            if (!voiceController.active) scheduleWakeDetectorArm(current, 0);
             startPausedBeep(current);
             // Announce each successful transition once. The periodic double beep remains.
             const pauseSpeech = sayResponse("pause");
@@ -1554,11 +1380,11 @@ async function startRecording() {
             if (activeSession !== current || current.stopHandled) return;
             setRecordingControlState("recording");
             stopPausedBeep(current);
-            if (!commandActive) scheduleWakeDetectorArm(current, 0);
+            if (!voiceController.active) scheduleWakeDetectorArm(current, 0);
             current.silenceSince = null;
             current.pauseReason = null;
             current.autoPausing = false;
-            if (!commandActive) setWakeStatus(`Listening for “${wakeWordPhrase}”.`);
+            if (!voiceController.active) setWakeStatus(`Listening for “${wakeWordPhrase}”.`);
             status.textContent = `Recording resumed in ${current.formatLabel} — ${savedChunkProgress(current)} to this browser.`;
             void sayResponse("recording");
         });

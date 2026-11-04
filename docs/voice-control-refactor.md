@@ -1,12 +1,14 @@
 # Voice-control stabilization and extraction
 
-Updated 4 November 2026. This is the current plan for voice-control architecture. The user authorized **tests and documentation only** and requested notice before any production code change. No controller extraction, deployed-build change, microphone change or model-tuning change is authorized by this document.
+Updated 4 November 2026. This is the current plan for voice-control architecture. After the initial tests/documentation checkpoint, the user reviewed and approved the **first command-controller extraction**. That extraction is implemented; device acceptance is pending. Wake detection, the audio graph, deployed-build work and model tuning are separate later changes requiring a new checkpoint.
 
 ## Current checkpoint
 
-`tests/test_voice_control.py` adds nine test methods against existing production source. The suite executes the command-coordination block and `finalizeRecording()` from `js/recorder.js`, its real pause-event body and manual Record/Stop handlers, plus the complete `js/tensorflow/commands-adapter.js` module in a separate fixture. Dependencies such as playback, model calls, timers, MediaRecorder and metadata storage are controlled fakes; the coordination under test is not a reimplementation.
+`js/voice-controller.js` now owns command state/generation, model preload, command countdown presentation, prompt/listener sequencing, and Go/Stop/Yes/No windows. `js/recorder.js` keeps capture, recording transitions, storage/finalization and spoken-response playback ownership. It supplies stable per-session capabilities with live identity/state getters and specific recording/reminder operations; the controller does not receive the mutable recorder session or storage internals. The borrowed stream remains available to the unchanged TensorFlow adapter.
 
-All **37 repository test methods** pass across nine suites. Production files are unchanged at this checkpoint. There is no browser/device retest requirement for adding these tests and documents; device acceptance becomes necessary when production behavior or ownership changes.
+`tests/test_voice_control.py` runs the complete controller with the real recorder bridge, `finalizeRecording()`, pause-event body and manual Record/Stop handlers. A separate fixture runs the complete TensorFlow adapter. Models, playback, timers, MediaRecorder and metadata storage remain controlled dependencies. Existing behavioral assertions were retained; two additional methods cover the narrow session interface and the existing Go/Stop versus Yes/No deadline distinction.
+
+All **39 repository test methods** pass across nine suites. An isolated headless Chrome check loaded the production page/module, recorded, manually paused/resumed/stopped, then recorded again; both sessions retained nonempty chunks and completed status, with no runtime exceptions. It used a synthetic microphone, disposable profile and blocked CDN model downloads. It does not establish spoken-command accuracy or replace MacBook/iPhone device acceptance.
 
 These are characterization tests: they capture the behavior to retain during extraction. They do not prove that every possible race is handled or that current models recognize real speech accurately.
 
@@ -16,7 +18,7 @@ These are characterization tests: they capture the behavior to retain during ext
 | --- | --- |
 | Recorder | Session identity, MediaRecorder state transitions, capture microphone lifetime, ordered writes, protective stops and finalization |
 | Existing store/recovery/library modules | Durable audio, structural checks, recovery, saved-player UI and deletion |
-| Proposed voice controller | Command state/generation, model readiness, prompt/listener sequencing, command windows and requests for recording actions |
+| Voice controller | Command state/generation, model readiness, prompt/listener sequencing, command windows and requests for recording actions |
 | Existing audio-analysis setup, initially unchanged | Shared analysis context, silence monitoring, level observation and wake audio buffer |
 | Future post-recording jobs | Naming/transcription/cleaned derivatives using retained audio; errors cannot redefine recording completion or destroy originals |
 
@@ -45,9 +47,9 @@ Preserve current timing semantics during the move: Go/Stop computes its expiry b
 
 The adapter test also confirms that non-audio getUserMedia requests retain the original route. It does not establish safety for every concurrent microphone request or multiple recognizer instances. The temporary override remains a documented integration boundary, not a target for simultaneous redesign.
 
-## Ordered changes requiring separate approval
+## Ordered changes and approval checkpoints
 
-1. **Command-controller extraction.** Move command-window state, generation guards, countdown presentation, prompt coordination and Go/Stop/Yes/No sequencing together behind a small interface. Keep model versions, thresholds, prompt files, timeout semantics and the existing audio graph unchanged. Recorder operations remain recorder-owned; manual buttons and recognized commands use the same guarded operations. Adapt tests to import the extracted implementation and continue exercising the recorder integration.
+1. **Command-controller extraction — implemented; device acceptance pending.** Command-window state, generation guards, countdown presentation, prompt coordination and Go/Stop/Yes/No sequencing moved behind a small interface. Model versions, thresholds, prompt files, timeout semantics, TensorFlow adapter and the existing audio graph are unchanged. Recorder operations remain recorder-owned; manual buttons and recognized commands use the same guarded operations. Tests execute the complete extracted implementation and recorder integration.
 2. **Wake-detector extraction.** Separately move model selection/loading and inference routing. Retain existing adapters, sample representation, buffering, cadence and trigger behavior. Establish adapter contract tests before changing those details.
 3. **Production version identification.** Add visible deployed-build identity and a coherent asset-version strategy, without clearing storage. Version display alone is not evidence that imported modules match. Review any service-worker/deployment implications separately.
 4. **Optional analysis ownership cleanup.** Only after the first boundaries are accepted, consider moving shared sample delivery, silence monitoring and meter observation. A ScriptProcessor-to-AudioWorklet migration is a distinct runtime change, not part of a file move.

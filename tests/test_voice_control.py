@@ -1,10 +1,12 @@
-"""Characterize production voice coordination before extraction; no real models or microphone."""
+"""Exercise extracted production voice coordination and recorder bridges; no real models or microphone."""
 from pathlib import Path
 import unittest
 from recording_test_support import SOURCE, between, evaluate
 
 ROOT = Path(__file__).resolve().parents[1]
-VOICE = between('const commandIndicator =', 'function resetWakeAudioBuffer(')
+CONTROLLER = (ROOT / 'js/voice-controller.js').read_text()
+CONTROLLER = '\n'.join(line for line in CONTROLLER.splitlines() if not line.startswith('import ')).replace('export ', '')
+VOICE = between('// Recorder-owned capabilities:', 'function resetWakeAudioBuffer(')
 FINALIZE = between('function finalizeRecording(', '// Silence duration')
 
 def event_body(name, following):
@@ -54,7 +56,7 @@ function seed(id,state='paused'){
  activeSession=current;return current;
 }
 """
-PRODUCTION = VOICE + FINALIZE + '\nasync function productionPause(current){' + PAUSE + '\n}\n' + MANUAL
+PRODUCTION = CONTROLLER + VOICE + FINALIZE + '\nasync function productionPause(current){' + PAUSE + '\n}\n' + MANUAL
 
 
 def check(script):
@@ -73,7 +75,7 @@ class VoiceControlTests(unittest.TestCase):
  stopGate=deferred();listeners[0]({top:'go',go:.99});await flush();
  assert(current.recorder.resumes===0,'Go waits for listener shutdown');
  stopGate.resolve();await flush();
- assert(current.recorder.resumes===1&&!commandActive,'Go resumes original recorder after shutdown');
+ assert(current.recorder.resumes===1&&!voiceController.active,'Go resumes original recorder after shutdown');
  listeners[0]({top:'stop',stop:.99});await flush();
  assert(current.recorder.stops===0,'closed-window callback cannot act');
 """)
@@ -81,7 +83,7 @@ class VoiceControlTests(unittest.TestCase):
     def test_paused_wake_and_nonwake_manual_silence_pauses(self):
         check(r"""
  const current=seed('manual','recording');recordButton.click();await current.pauseTask;
- assert(loads===0&&listeners.length===0&&!commandActive&&prompts.join(',')==='pause','manual pause never enters recognition');
+ assert(loads===0&&listeners.length===0&&!voiceController.active&&prompts.join(',')==='pause','manual pause never enters recognition');
  assert(arms.includes('manual')&&beeps===1,'manual pause retains wake rearming and reminder');
  const silent=seed('silence','recording');silent.pauseReason='silence';silent.recorder.pause();await silent.pauseTask;
  assert(loads===0&&listeners.length===0&&status.textContent.includes('automatically'),'silence pause stays separate from command entry');
@@ -106,11 +108,11 @@ class VoiceControlTests(unittest.TestCase):
  confirmation({top:'yes',yes:.99});assert(current.recorder.stops===1,'duplicate Yes cannot finalize twice');
 """ if answer == 'yes' else r"""
  confirmation({top:'no',no:.99});await flush();
- assert(current.recorder.state==='paused'&&current.recorder.stops===0&&!commandActive,'No preserves paused capture');
+ assert(current.recorder.state==='paused'&&current.recorder.stops===0&&!voiceController.active,'No preserves paused capture');
  assert(arms.includes(current.id),'No rearms wake detector');
 """ if answer == 'no' else r"""
  clock=6000;for(const tick of [...intervals.values()])tick();await flush();
- assert(current.recorder.state==='paused'&&current.recorder.stops===0&&!commandActive,'confirmation timeout preserves paused capture');
+ assert(current.recorder.state==='paused'&&current.recorder.stops===0&&!voiceController.active,'confirmation timeout preserves paused capture');
  confirmation({top:'yes',yes:.99});assert(current.recorder.stops===0,'expired confirmation cannot stop later');
 """))
 
@@ -120,7 +122,7 @@ class VoiceControlTests(unittest.TestCase):
  listeners[0]({top:'go',go:.79});listeners[0]({top:'stop',stop:.79});await flush();
  assert(current.recorder.resumes===0&&current.recorder.stops===0&&listeners.length===1,'below-threshold commands do nothing');
  clock=6000;for(const tick of [...intervals.values()])tick();await flush();
- assert(!commandActive&&intervals.size===0&&current.recorder.state==='paused'&&arms.includes(current.id),'command timeout closes listener and rearms wake without resuming');
+ assert(!voiceController.active&&intervals.size===0&&current.recorder.state==='paused'&&arms.includes(current.id),'command timeout closes listener and rearms wake without resuming');
 """)
 
     def test_manual_stop_during_startup_and_stale_session_callbacks(self):
@@ -133,11 +135,11 @@ class VoiceControlTests(unittest.TestCase):
  const opening=handleWakeDetected(old);await flush();
  if(phase==='confirmation'){await opening;listeners[0]({top:'stop',stop:.99});await flush();assert(listeners.length===2,'confirmation is active');}
  const stale=[...listeners];pauseButton.click();
- assert(old.recorder.stops===1&&old.stopIntent==='stop-button'&&!commandActive,'manual Stop finalizes immediately without spoken confirmation');
+ assert(old.recorder.stops===1&&old.stopIntent==='stop-button'&&!voiceController.active,'manual Stop finalizes immediately without spoken confirmation');
  const next=seed('next','recording');loadGate?.resolve();startGate?.resolve();await opening;await flush();
  for(const callback of stale){callback({top:'yes',yes:.99});callback({top:'go',go:.99});callback({top:'stop',stop:.99});}await flush();
  assert(next.recorder.stops===0&&next.recorder.pauses===0&&next.recorder.resumes===0,'old callbacks cannot affect replacement session');
- assert(!commandActive&&intervals.size===0,'late startup cannot reopen command window');
+ assert(!voiceController.active&&intervals.size===0,'late startup cannot reopen command window');
 """)
 
     def test_voice_failures_preserve_manual_control(self):
@@ -146,9 +148,9 @@ class VoiceControlTests(unittest.TestCase):
                 check("const failure=" + repr(failure) + r""";
  const current=seed('failure');
  if(failure==='load'){loadError=Error('model failed');await handleWakeDetected(current);}
- if(failure==='prompt'){await handleWakeDetected(current);promptOK=false;await confirmVoiceStop(current);assert(listeners.length===1,'failed confirmation prompt never opens Yes/No listener');}
+ if(failure==='prompt'){await handleWakeDetected(current);promptOK=false;listeners[0]({top:'stop',stop:.99});await flush();assert(listeners.length===1,'failed confirmation prompt never opens Yes/No listener');}
  if(failure==='shutdown'){await handleWakeDetected(current);stopError=Error('shutdown failed');await resumeAfterCommandShutdown(current);assert(current.recorder.resumes===0,'failed shutdown cannot resume capture');}
- assert(current.recorder.state==='paused'&&current.recorder.stops===0&&!commandActive,'voice subsystem failure leaves original audio paused');
+ assert(current.recorder.state==='paused'&&current.recorder.stops===0&&!voiceController.active,'voice subsystem failure leaves original audio paused');
  pauseButton.click();assert(current.recorder.stops===1&&current.stopIntent==='stop-button','manual Stop still works after voice failure');
 """)
 
@@ -162,13 +164,38 @@ class VoiceControlTests(unittest.TestCase):
     def test_disabled_wake_and_cancellation_during_prompt_or_resume(self):
         check(r"""
  const old=seed('old');settings.audioCommands=false;await handleWakeDetected(old);
- assert(!commandActive&&prompts.length===0&&loads===0,'disabled voice controls cannot enter command mode');
+ assert(!voiceController.active&&prompts.length===0&&loads===0,'disabled voice controls cannot enter command mode');
  settings.audioCommands=true;promptGate=deferred();const opening=handleWakeDetected(old);await flush();
  pauseButton.click();const next=seed('next','recording');promptGate.resolve();await opening;
  assert(loads===0&&listeners.length===0&&next.recorder.state==='recording','cancelled acknowledgement cannot start recognition for replacement session');
  promptGate=null;const paused=seed('paused');stopGate=deferred();const resuming=resumeAfterCommandShutdown(paused);await flush();
  pauseButton.click();const replacement=seed('replacement','recording');stopGate.resolve();await resuming;
  assert(paused.recorder.resumes===0&&replacement.recorder.resumes===0,'pending Resume cannot run after manual Stop or session replacement');
+""")
+
+    def test_recorder_session_capabilities_stay_current_and_narrow(self):
+        check(r"""
+ const first=seed('first');const view=getVoiceSession(first);
+ assert(view===getVoiceSession(first)&&getVoiceSession(null)===null,'session capability identity remains stable');
+ assert(!('recorder' in view)&&!('metadata' in view)&&!('pendingChunks' in view)&&!('recordingLease' in view),'controller cannot access recording storage or lifecycle internals');
+ assert(view.state==='paused'&&view.isCurrent&&view.stream===first.stream,'borrowed state and stream reflect original session');
+ first.metadata.state='finalizing';assert(view.finalizing,'finalization state is observed without exposing metadata');
+ await resumeAfterCommandShutdown(first);assert(first.recorder.resumes===0,'finalizing recorder cannot resume');
+ const second=seed('second','recording');assert(!view.isCurrent,'old view observes session replacement');
+ view.finalize('old-callback');assert(second.recorder.stops===0&&first.recorder.stops===0,'old finalization capability cannot stop replacement session');
+""")
+
+    def test_existing_listener_deadline_semantics_are_preserved(self):
+        check(r"""
+ const current=seed('deadlines');startGate=deferred();
+ const opening=handleWakeDetected(current);await flush();assert(listeners.length===1,'Go/Stop listener startup is pending');
+ clock=6000;startGate.resolve();await opening;listeners[0]({top:'go',go:.99});await flush();
+ assert(current.recorder.resumes===0,'Go/Stop expiry includes time awaiting listener startup');
+ for(const tick of [...intervals.values()])tick();await flush();
+ startGate=null;await handleWakeDetected(current);startGate=deferred();listeners.at(-1)({top:'stop',stop:.99});await flush();
+ const confirm=listeners.at(-1);clock=12000;startGate.resolve();await flush();
+ confirm({top:'no',no:.99});await flush();
+ assert(!voiceController.active&&status.wake==='Stop cancelled. Recording paused.','Yes/No expiry begins after listener startup');
 """)
 
     def test_adapter_clone_startup_cancellation_and_failure_cleanup(self):

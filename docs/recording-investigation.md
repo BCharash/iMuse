@@ -2,7 +2,7 @@
 
 Updated 3 November 2026. This is the current recording reference. The four preservation stages and interface cleanup are implemented; no further stage is underway. The [roadmap](iMuse%20next%20steps.md) owns future priorities. Detailed experiment/stage history is [archived](Archive/recording-investigation-stages-2026-11-03.md).
 
-## Code ownership after three refactoring steps
+## Current code ownership
 
 [recording-library.js](../js/recording-library.js) now owns the Saved/Recently Deleted lists, selection and confirmation controls, saved-player dialog and its object URL. It receives callbacks for reading sessions, recovery/export, deletion/restore, diagnostics and pausing current playback. Constructing it does not acquire a microphone, open a database, or render the page.
 
@@ -10,11 +10,11 @@ Updated 3 November 2026. This is the current recording reference. The four prese
 
 [recording-recovery.js](../js/recording-recovery.js) now owns retained emergency assemblies, bounded reads, the finalization watchdog, chunk assembly/checks, saved recovery/export and finalization outcome decisions. It receives storage and presentation callbacks, and imports the existing integrity rules. Its constructor has no storage, timer or DOM effects. It does not own the microphone, audio elements, pending-write queue or writer lease.
 
-[recorder.js](../js/recorder.js) retains capture, recording transitions, pending chunks, voice logic and the top player. It creates the three modules and delegates through their interfaces. It updates counters only after a store commit, performs microphone cleanup through a callback when finalization is delayed, and releases the writer lease only after recovery/finalization processing settles. The recovery service marks finalization finished/clears its watchdog at that boundary. Recovery/initialization keep the existing explicitly owned metadata-write path inside the coordinator, avoiding a nested queue. Settings' read-only diagnostics remain separate.
+[recorder.js](../js/recorder.js) retains capture, recording transitions, pending chunks, wake/silence analysis and the top player. The approved `voice-controller.js` extraction now owns command coordination, countdown presentation and Go/Stop/Yes/No sequencing through recorder-owned session capabilities; [voice-controller acceptance](voice-control-refactor.md) is pending on devices. It creates the three modules and delegates through their interfaces. It updates counters only after a store commit, performs microphone cleanup through a callback when finalization is delayed, and releases the writer lease only after recovery/finalization processing settles. The recovery service marks finalization finished/clears its watchdog at that boundary. Recovery/initialization keep the existing explicitly owned metadata-write path inside the coordinator, avoiding a nested queue. Settings' read-only diagnostics remain separate.
 
 These are approved extractions, not a storage redesign or an implementation of strict durability/OPFS. No schema migration or audio format change was added. The user reported all three extractions and the confirmed Discard correction worked, including on iPhone. The simulated failure's extra memory tail was about one word plus a fraction, consistent with rapid protective stopping; this does not measure a prolonged real storage stall. Broader acceptance limits remain below.
 
-After discussing voice-extraction risks, the user approved a lower-risk unused-code cleanup instead. Removed the uncalled startup capture probe, readiness-tone helpers, audio-context closer and saved-playback alias used only by tests. Ordinary cues, pause reminders and live capture/voice/lifecycle logic remain unchanged. No new module was added by this cleanup; eight controlled tests pass. Export/diagnostic/test-interface extractions and the voice-controller extraction remain unapproved.
+After discussing voice-extraction risks, the user approved a lower-risk unused-code cleanup instead. Removed the uncalled startup capture probe, readiness-tone helpers, audio-context closer and saved-playback alias used only by tests. Ordinary cues, pause reminders and live capture/voice/lifecycle logic remain unchanged. No new module was added by this cleanup; eight controlled tests pass. Export/diagnostic/test-interface extractions remain separate possible work. The subsequently approved command-controller extraction is described in the current ownership paragraph and voice-control plan.
 
 ## Current behavior
 
