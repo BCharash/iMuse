@@ -32,6 +32,17 @@ export function filenameKeywords(text) {
 export function filename(prefix,suffix,extension) {const clean=filenameSuffix(suffix);return `${prefix}${clean?'_'+clean:''}.${extension}`;}
 export function audioExtension(mime='') {return mime.includes('mp4')?'m4a':mime.includes('webm')?'webm':mime.includes('ogg')?'ogg':'audio';}
 export function rmsDb(samples) {let sum=0;for(const v of samples)sum+=v*v;return sum>0?10*Math.log10(sum/samples.length):-Infinity;}
+// Silero v5 expects 64 preceding audio samples plus each new 512-sample block.
+// https://github.com/snakers4/silero-vad/blob/v5.1/src/silero_vad/utils_vad.py
+export class SileroV5Context {
+ constructor(){this.reset();}
+ reset(){this.samples=new Float32Array(64);}
+ prepend(frame){
+  if(frame.length!==512)throw Error('Silero v5 requires 512 new samples at 16 kHz');
+  const input=new Float32Array(576);input.set(this.samples);input.set(frame,64);
+  this.samples=frame.slice(-64);return input;
+ }
+}
 export function evaluateSpeechGate(history,end,{enabled=true,threshold=.6,minimumDb=null,inputDb=-Infinity}={}) {
  const recent=history.filter(frame=>frame.end<=end&&end-frame.end<=SAMPLE_RATE);
  const positive=recent.filter(frame=>frame.prob>=threshold);

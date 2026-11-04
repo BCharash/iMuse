@@ -8,7 +8,7 @@ const $=id=>document.getElementById(id),store=createLabStore(),records=new Map()
 let current=null,preparing=false,preparingCleanup=null,maintenance=false,generation=0,temporaryStream=null,playerUrl=null,whisper=null,whisperReady=false,whisperLoading=null,whisperSerial=0;
 let logEpoch=0;
 let events=[],displayStart=0,titleRequests=new Map(),offlinePreparing=false;
-const LAB_BUILD='2026-11-04.12';$('build').textContent='Lab build '+LAB_BUILD;
+const LAB_BUILD='2026-11-04.13';$('build').textContent='Lab build '+LAB_BUILD;
 const status=text=>$('status').textContent=text;
 const modelStatus=text=>$('modelStatus').textContent=text;
 const settings=()=>({verifyWake:$('verifyWake').checked&&$('liveAnalysis').checked&&$('labMode').value==='wake'&&$('engine').value!=='off',autoName:$('autoName').checked,nearThreshold:Number($('nearThreshold').value),formatPreference:$('format').value,liveAnalysis:$('liveAnalysis').checked,engine:$('engine').value,threshold:Number($('wakeThreshold').value),requireSpeech:$('speechGate').checked,speechThreshold:Number($('speechThreshold').value),minimumDb:$('levelGate').checked?Number($('minimumDb').value):null});

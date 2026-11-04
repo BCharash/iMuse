@@ -1,7 +1,7 @@
 {
   "version": 1,
   "cache": "imuse-simple-lab-v1",
-  "bytes": 82557802,
+  "bytes": 82558873,
   "assets": [
     {
       "path": "js/heed/filter-coeffs.js",
@@ -30,13 +30,13 @@
     },
     {
       "path": "js/lab/SOURCES.md",
-      "bytes": 2400,
-      "sha256": "a42df52c69cfe5e431538f65e9e3d8ed5e0eab684358c79f1dcbffcc7a4eda8a"
+      "bytes": 2836,
+      "sha256": "b37cd5987a47e76015128e500684f2392a8d99c5df94b218b128ba093c7c88c2"
     },
     {
       "path": "js/lab/app.js",
       "bytes": 37599,
-      "sha256": "1980a2acfa9c17a551b5485a3403ed94cea1bbacffa95b0328676cd718d5ff86"
+      "sha256": "aba9c572db34827f1e5010b7cbd5ffb8f0065628f6c4e68ce1cc3e3b44086f2f"
     },
     {
       "path": "js/lab/capture.js",
@@ -45,13 +45,13 @@
     },
     {
       "path": "js/lab/core.js",
-      "bytes": 5259,
-      "sha256": "0009dc88f5fdbe3c1135a95c31eac84676c5578269ec2180bdc5458f43bd3e72"
+      "bytes": 5759,
+      "sha256": "2d7e517970348550abf442c77cb44152090442c4fa2471641fff6ee3985ebc3c"
     },
     {
       "path": "js/lab/detection-worker.js",
-      "bytes": 7503,
-      "sha256": "99cb3480d0e07a3b5174ce5ee9ad07f87c3e63f646fac708873829fb23efab8d"
+      "bytes": 7638,
+      "sha256": "38c71865d18d3b877c53563c35bb625be1742cb636af8ddd8317921b6900f2b8"
     },
     {
       "path": "js/lab/input-worklet.js",

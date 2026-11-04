@@ -1,12 +1,13 @@
 import { ReviewBuffer } from './review.js';
 import * as ort from './vendor/ort.min.mjs';
 import { WakeWordDetector } from '../heed/wakeword.js';
-import { StreamingResampler, SAMPLE_RATE, evaluateSpeechGate, rmsDb, joinFloat } from './core.js';
+import { StreamingResampler, SileroV5Context, SAMPLE_RATE, evaluateSpeechGate, rmsDb, joinFloat } from './core.js';
 globalThis.ort=ort;globalThis.window=globalThis;
 ort.env.wasm.numThreads=1;ort.env.wasm.proxy=false;ort.env.wasm.wasmPaths=new URL('./vendor/',import.meta.url).href;
 let engineName='heed',options={},vadSession,heed,voicute,resampler,state,buffer=new Float32Array(0),wakePending=new Float32Array(0);
 let rolling=new Float32Array(0),history=[],position=0,lastWakeEnd=0,serial=Promise.resolve(),title=[],titleCount=0,titleStarted=false,titlePre=[],runGeneration=0;
 const send=data=>self.postMessage(data);
+const vadContext=new SileroV5Context();
 let clips=null,reviewSerial=0,lastNear=-Infinity;
 function markReview(metadata) {
  const event={...metadata,eventId:`${runGeneration}-${++reviewSerial}`,at:new Date().toISOString()};
@@ -16,7 +17,7 @@ function markReview(metadata) {
  }
  else send({type:'gap',generation:runGeneration,reason:'Review clip queue full; event audio unavailable'});
 }
-function resetSignal() {state=new ort.Tensor('float32',new Float32Array(256),[2,1,128]);buffer=new Float32Array(0);wakePending=new Float32Array(0);rolling=new Float32Array(0);history=[];heed?.reset();voicute?.reset();lastWakeEnd=position;}
+function resetSignal() {vadContext.reset();state=new ort.Tensor('float32',new Float32Array(256),[2,1,128]);buffer=new Float32Array(0);wakePending=new Float32Array(0);rolling=new Float32Array(0);history=[];heed?.reset();voicute?.reset();lastWakeEnd=position;}
 async function prepare(message) {
  options=message.options;engineName=options.engine;reviewSerial=0;lastNear=-Infinity;
  clips=new ReviewBuffer({onReady:(entry,samples)=>self.postMessage({type:'review-clip',generation:runGeneration,entry,samples},[samples.buffer])});
@@ -51,7 +52,8 @@ async function consume(message) {
  const pcm=resampler.push(message.pcm);buffer=joinFloat([buffer,pcm]);
  while(buffer.length>=512) {
   const frame=buffer.slice(0,512);buffer=buffer.slice(512);position+=512;if(engineName!=='off')clips.ingest(frame);
-  const result=await vadSession.run({input:new ort.Tensor('float32',frame,[1,512]),state,sr:new ort.Tensor('int64',BigInt64Array.from([16000n]),[])});
+  const vadInput=vadContext.prepend(frame);
+  const result=await vadSession.run({input:new ort.Tensor('float32',vadInput,[1,vadInput.length]),state,sr:new ort.Tensor('int64',BigInt64Array.from([16000n]),[])});
   state=result.stateN;const speech=Number(result.output.data[0]);history.push({end:position,prob:speech});while(history.length&&history[0].end<position-SAMPLE_RATE)history.shift();
   collectTitle(frame,speech,message.recording);
   rolling=joinFloat([rolling,frame]);if(rolling.length>32000)rolling=rolling.slice(-32000);

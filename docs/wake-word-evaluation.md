@@ -18,9 +18,27 @@ The 2,121.5-second run had ten labeled false activations, about 17 per captured 
 
 Later Tiny verification showed ASR errors and experimental limitations: strict matching rejects alternate spellings, checks see only preceding audio, and near-trigger inference can occupy the single lane before actual wakes. Warmed three-second checks took roughly 2.2–2.5 seconds in reviewed runs/checks. The user rejected that delay. Base accuracy/performance on iPhone remains untested.
 
+### Build 11: user-reported genuine wake rejected by speech gate
+
+The supplied diagnostics/review exports identify **2026-11-04 17:38:20.259 UTC**, event `1-4` in recording `05262e61-ec83-4672-bff9-164be24189e2`, at analysis time **22.208 s**. Heed scored **0.908794** (wake threshold **0.8**), but the preceding second's highest Silero score was **0.258482**, with zero blocks reaching the run's speech threshold **0.7**. The current block scored **0.004604**. The level gate was off; input level was **−22.34 dBFS**, transport lag **3 ms**, and no analysis gaps were logged. This would also fail the default 0.6 speech threshold. The user identifies the phrase as a clear genuine Hey Doc; treat the rejection as a false negative for the speech gate, not an incorrect Heed activation.
+
+The review archive contains a complete **5 s**, mono **16 kHz** WAV with the event at **3 s**. An isolated Chrome/WASM replay using the same bundled model/runtime and the lab's unchanged **512-sample** input/state handling, starting with fresh recurrent state and aligned to the original frame boundaries, reached **0.948844** in the second before the trigger, with **10 blocks ≥ 0.7**. It therefore passed the same gate on the extracted clip. Local Tiny.en also transcribed the three seconds preceding the event as “Hey, Doc.”, corroborating phrase presence before the detector decision. This does **not** reproduce the live state: the clip begins 19.208 seconds into the run and omits the preceding audio. It rules out the claim that this clip necessarily needs a lower speech threshold, but does not establish the cause of the live rejection. Do not attribute it to an early trigger, a short phrase, or a broken integration without further evidence.
+
+The older `@ricky0123/vad-web@0.0.27` wrapper omits the 64-sample audio context required by the [official Silero v5.1 wrapper](https://github.com/snakers4/silero-vad/blob/v5.1/src/silero_vad/utils_vad.py). An initial fresh-state 576-sample replay peaked at **0.996975**, with **26 blocks ≥ 0.7**. That isolated replay alone did not establish the cause because the unchanged method also passed when started from fresh state.
+
+The subsequently supplied **42.858 s M4A** allowed full-sequence replay with the same bundled ONNX model/runtime. Decode at 48 kHz, apply the lab's resampler, and align the compressed audio to the original analysis clip (normalized waveform correlation **0.999961**, analysis start offset **0.238 s**). AAC audio is not bit-identical to the original analysis PCM, but the old path closely reproduces the live failure:
+
+| Input at every 32 ms step | Peak speech score in second before original trigger | Blocks ≥ 0.7 | Gate result |
+| --- | --- | --- | --- |
+| Original live build .11 | 0.258482 | 0 | Rejected |
+| Full-recording replay, old 512-only input | 0.259321 | 0 | Rejected |
+| Full-recording replay, preceding 64 + new 512 samples | 0.997824 | 25 | Passed |
+
+**Lab build .13 fixes this input-context omission.** Retain the trailing 64 samples separately from the recurrent `[2,1,128]` state and prefix them to each new 512-sample block. Reset both at recording starts, rate configuration and analysis gaps. The 64 samples are historical audio, so this adds no wait for future audio and does not advance clip timestamps. Model/runtime assets, wake threshold, speech threshold, gate decision rule and production code remain unchanged. Reevaluate both false accepts and false rejects on fresh runs; earlier lab gate results used the incorrect input contract and cannot establish performance of the corrected integration. This single example is not device-wide certification. Private audio and raw exports remain outside the repository.
+
 ## Current lab
 
-Hosted **lab.html**, build **2026-11-04.12**, is separate from production recording. No API key/cloud inference is used.
+Hosted **lab.html**, build **2026-11-04.13**, is separate from production recording. No API key/cloud inference is used.
 
 | Mode/control | Purpose |
 | --- | --- |

@@ -51,6 +51,19 @@ assert(!evaluateSpeechGate(history,11000,{minimumDb:-40,inputDb:-50}).pass,'opti
 globalThis.testResult='PASS';
 """)
 
+    def test_silero_audio_context_and_reset(self):
+        evaluate(CORE + r"""
+const assert=(value,message)=>{if(!value)throw Error(message);};
+const context=new SileroV5Context(),first=Float32Array.from({length:512},(_,i)=>i/1024),copy=first.slice();
+const a=context.prepend(first);assert(a.length===576&&a.slice(0,64).every(x=>x===0),'first inference has zero audio context plus 512 new samples');
+assert(a.slice(64).every((x,i)=>x===copy[i]),'all new input samples retain their order');
+first.fill(1);const b=context.prepend(new Float32Array(512));
+assert(b.slice(0,64).every((x,i)=>x===copy[448+i]),'next block carries an owned copy of the preceding 64 samples');
+context.reset();const c=context.prepend(new Float32Array(512));assert(c.every(x=>x===0),'reset discards audio context');
+let threw=false;try{context.prepend(new Float32Array(576));}catch(error){threw=true;}assert(threw,'reject incorrect fresh-frame sizes');
+globalThis.testResult='PASS';
+""")
+
     def test_wake_mode_visibility_and_browser_restore(self):
         app=(ROOT/'js/lab/app.js').read_text()
         mode=app[app.index('function selectLabMode()'):app.index("$('engine').onchange=")]
@@ -158,7 +171,11 @@ const assert=(value,message)=>{if(!value)throw Error(message);};
 const messages=[];const self={postMessage:message=>messages.push(message)};
 const performance={now:()=>0};class URL {constructor(path){this.href=path;}}
 const fetch=async()=>({json:async()=>({})});
-const ort={env:{wasm:{}},Tensor:class {constructor(type,data,dims){this.data=data;}},InferenceSession:{create:async()=>({run:async()=>({stateN:{},output:{data:[.9]}})})}};
+let vadCalls=0;const vadInputs=[];
+const ort={env:{wasm:{}},Tensor:class {constructor(type,data,dims){this.data=data;this.dims=dims;}},InferenceSession:{create:async()=>({run:async feeds=>{
+ if(feeds.input){assert(feeds.input.dims[1]===576&&feeds.input.data.length===576,'worker actually passes audio context to ONNX');vadInputs.push(feeds.input.data.slice());vadCalls++;}
+ return {stateN:{},output:{data:[.9]}};
+}})}};
 class WakeWordDetector {constructor(){this.calls=0;}reset(){}async step(){this.calls++;return {prob:this.calls===40?.99:.1,triggered:this.calls===40};}}
 """ + worker + r"""
 (async()=>{
@@ -172,6 +189,8 @@ class WakeWordDetector {constructor(){this.calls=0;}reset(){}async step(){this.c
  assert(verification.eventId===event.event.eventId&&verification.samples.length===48000,'verification receives exactly preceding three seconds');
  assert(messages.indexOf(verification)<messages.indexOf(clip),'verification dispatch never waits for two-second post-roll');
  assert(title.length===0,'wake-only session does not collect filename audio');
+ assert(vadCalls>2&&vadInputs[0].slice(0,64).every(x=>x===0)&&vadInputs[1].slice(0,64).every(x=>Math.abs(x-.1)<1e-6),'worker carries previous audio and zero-initializes context');
+ resetSignal();assert(vadContext.samples.every(x=>x===0),'worker reset clears context with recurrent state');
  self.onmessage({data:{type:'mark-review',generation:7,kind:'missed-wake'}});await serial;
  self.onmessage({data:{type:'finish',generation:7}});await serial;
  const manual=messages.filter(item=>item.type==='review-clip').at(-1);
