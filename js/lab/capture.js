@@ -38,7 +38,7 @@ export function createLabCapture({recorder,record,store,fallbacks=[],onStartFail
   throw Error('No audio format could start recording. '+record.formatAttempts.map(item=>`${item.mime}: ${item.message}`).join('; '));
  };
  capture.stop=()=>{if(capture.stopping)return;capture.stopping=true;capture.timer=setTimer(()=>{void finish(true);onStopped(capture);},5000);
-  try{if(recorder.state!=='inactive')recorder.stop();else void finish(false);}catch(error){record.captureError=String(error);void finish(true);}
+  try{if(recorder.state!=='inactive')recorder.stop();else if(!capture.started)void finish(false);}catch(error){record.captureError=String(error);void finish(true);}
   onStopped(capture);};
  return capture;
 }

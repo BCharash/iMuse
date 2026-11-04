@@ -27,15 +27,15 @@ The four false-negative clips include overlapping audio. They do not establish f
 
 Open the hosted **`lab.html`** address. It provides:
 
-- Record, Pause/Resume and Stop, native browser compressed audio, playback and download.
+- Record, Pause/Resume and Stop, native browser compressed audio, playback and download. **Lab build 2026-11-04.4** is shown below the heading so cached versions can be identified.
 - Per-recording titles and a date/time prefix that filename suggestions cannot replace.
 - Local Whisper **tiny.en** transcription of up to 15 seconds beginning near detected speech, executed after Stop. The suggestion uses up to seven sanitized transcript words, not a generative summary. A user must click **Use suggested name** to apply it.
-- Heed / Voicute / Off, with **Require speech** enabled by default. Silero v5 evaluates 512-sample 16 kHz blocks; a candidate needs at least two above-threshold speech blocks in the preceding second. Speech gating filters acceptance, while continuous wake-model ingestion is preserved.
+- **Live speech/wake analysis** can be unchecked for a recorder-only comparison: no detector worker or analysis AudioContext is opened for that recording, and titles are manual. With it checked, choose Heed / Voicute / Wake off (speech analysis stays on), with **Require speech** enabled by default. Silero v5 evaluates 512-sample 16 kHz blocks; a candidate needs at least two above-threshold speech blocks in the preceding second. Speech gating filters acceptance, while continuous wake-model ingestion is preserved.
 - An optional minimum input-level gate using a one-second window; disabled initially. It may help with faint conversation, but it is not speaker identification.
 - Raw candidate/accepted/rejected counts and event rows. Default wake action is **Mark detection**; **Pause / resume recording** is an explicit alternative. No spoken acknowledgement or command-model startup is inserted.
 - Full per-prediction diagnostic export with speech history, scores, input level, analysis/transport timing, gate results and recording settings. This supports comparison; it does not select optimal parameters automatically.
 
-Audio first uses the browser’s default MediaRecorder format and its matching extension. If actual start fails before any data or active capture, it tries supported AAC/MP4, WebM and Ogg alternatives. An advertised MIME type is not treated as proof that the encoder can start. Failed never-started attempts are labeled failed, rather than completed recordings. Format attempts and microphone state are included in diagnostics. The new path does not route recording audio through the previous custom PCM-to-MP3 encoder. This is an isolation step, not a claim that the old encoder caused the whine. The analysis branch explicitly outputs silence to its audio sink.
+Audio first uses the browser’s default MediaRecorder format and its matching extension. If actual start fails before any data or active capture, it tries supported AAC/MP4, WebM and Ogg alternatives. An advertised MIME type is not treated as proof that the encoder can start. Failed never-started attempts are labeled failed, rather than completed recordings. Format attempts and microphone state are included in diagnostics. The new path does not route recording audio through the previous custom PCM-to-MP3 encoder. This is an isolation step, not a claim that the old encoder caused the whine. The AudioWorklet analysis tap transfers 1024-sample mono packets and explicitly outputs silence to its audio sink. ScriptProcessor has been removed from the active lab. The analysis context uses the microphone’s reported input rate when available; its actual rate still configures resampling.
 
 The live analysis branch uses a continuous windowed-sinc resampler with anti-aliasing rather than dropping/interpolating samples independently at callback boundaries. Its queue is bounded; delayed analysis is dropped/reset and reported instead of allowing a growing queue of old wake audio. Recording remains on the independent native MediaRecorder branch. Whisper runs in a separate worker after Stop. Starting another recording while transcription finishes is allowed, so CPU contention remains a device test.
 
@@ -57,9 +57,20 @@ Bump the lab cache version when changing pinned vendor/model files.
 
 ## Preservation and cleanup
 
-The new lab uses only **`imuse-simple-recorder-lab`** IndexedDB stores `recordings` and `chunks`. Native 250 ms chunks are journaled while recording; Stop assembles the full available memory copy and saves it atomically before removing that recording's journal chunks. Chunk-write failure does not discard the memory tail. Failed final saving keeps downloadable in-memory audio; leaving then loses that memory-only copy. A delayed Stop produces an interrupted available copy, and a late final event can upgrade it. Abruptly interrupted encoded chunks may not be fully playable.
+The new lab uses only **`imuse-simple-recorder-lab`** IndexedDB stores `recordings` and `chunks`. Native 250 ms chunks are journaled while recording; Stop assembles the full available memory copy and saves it atomically before removing that recording's journal chunks. Chunk-write failure does not discard the memory tail. Failed final saving keeps downloadable in-memory audio; leaving then loses that memory-only copy. An inactive recorder that previously started is allowed to deliver its final data and stop events; it is not finalized immediately merely because its state became inactive. A delayed Stop produces an interrupted available copy after the watchdog, and a late final event can upgrade it. Empty interruptions explicitly say that no audio was captured. Abruptly interrupted encoded chunks may not be fully playable.
 
 New recordings retain previous recordings. Reload recovers available journal chunks with an interrupted label. Per-recording deletion and **Clear all lab recordings…** require confirmation, and operate only on this lab's storage. Pending finalization protects that recording from deletion; late filename results cannot recreate a deleted record. Production iMuse storage and the older review database are separate.
+
+## Safari microphone-ended comparison
+
+The latest reported row is **interrupted · 0.0 KB · Microphone ended**. It establishes that the input track ended, but not why. The reported 404 was the favicon, unrelated to model loading; the lab now supplies an inline icon. No claim is made that AudioWorklet or matching the context rate cures the Safari interruption.
+
+After deployment, verify **Lab build 2026-11-04.4** below the heading:
+
+1. Uncheck **Live speech/wake analysis**. Record approximately ten seconds, Stop, and play it. This is the native-recorder baseline, with manual titles.
+2. Check **Live speech/wake analysis** and repeat. If only this run fails, export diagnostics; the last analysis stage, input/context rates and interruption reason are recorded.
+
+The current status shows the actual interruption reason and distinguishes available audio from a genuinely empty recording. Recordings are listed newest first. A separate stop-order bug was found: when a track ended and the native recorder was already inactive, early finalization could miss its queued final data. The fix waits for that data/stop sequence or the existing watchdog. This fixes a preservation race, not the underlying Safari track ending.
 
 ## First device check
 
@@ -71,7 +82,7 @@ New recordings retain previous recordings. Reload recovers available journal chu
 
 After Safari reported that the microphone ended during preparation, startup was reordered: model initialization completes without a microphone or AudioContext; only then is a fresh stream acquired and the native recorder started. The analysis AudioContext is created afterward and its actual sample rate is sent to the prepared worker. An analysis setup failure leaves native recording running. Cancellation before model readiness never acquires the microphone, and a permission grant arriving after cancellation is immediately released.
 
-The Safari startup follow-up also makes AudioContext cleanup idempotent: failed startup and normal Stop share a single close operation. ScriptProcessor remains in this experimental analysis branch and is deprecated; its warning alone does not establish the cause of a MediaRecorder startup failure. Native Safari retesting is required.
+The Safari startup follow-up also makes AudioContext cleanup idempotent: failed startup and normal Stop share a single close operation. The earlier ScriptProcessor warning was not evidence of the startup cause. Subsequent code replaces it with AudioWorklet and adds an explicit recorder-only comparison. Native Safari retesting is required.
 
 Desktop controlled tests and isolated headless Chrome verify filename/DSP/gate helpers, recorder recovery/late tail, script parsing and offline asset hashes. Real-model browser checks additionally cover both wake engines, Silero inference, compressed recording, pause/resume, Whisper transcription, scoped caching and offline reload. Device-specific performance, the reported whine, true/false wake rates and iPhone installed-app background microphone loss still require user testing. No wake engine fixes an OS-suspended microphone source.
 

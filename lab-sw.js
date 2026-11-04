@@ -1,7 +1,7 @@
 // Registered only for lab.html and js/lab/ URL prefixes; production iMuse pages are outside both scopes.
 const CACHE='imuse-simple-lab-v1';
 const root=new URL('./',self.location.href);
-const core=['lab.html','lab-sw.js','js/lab/app.js','js/lab/core.js','js/lab/store.js','js/lab/capture.js','js/lab/media.js','js/lab/detection-worker.js','js/lab/whisper-worker.js','js/lab/style.css','js/lab/manifest.json','js/heed/wakeword.js','js/heed/preprocessing.js','js/heed/filter-coeffs.js'];
+const core=['lab.html','lab-sw.js','js/lab/app.js','js/lab/core.js','js/lab/store.js','js/lab/capture.js','js/lab/media.js','js/lab/detection-worker.js','js/lab/input-worklet.js','js/lab/whisper-worker.js','js/lab/style.css','js/lab/manifest.json','js/heed/wakeword.js','js/heed/preprocessing.js','js/heed/filter-coeffs.js'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{const cache=await caches.open(CACHE);await cache.addAll(core.map(path=>new URL(path,root).href));await self.skipWaiting();})()));
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',event=>{

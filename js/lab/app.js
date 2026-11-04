@@ -1,13 +1,14 @@
-import { datePrefix, filename, filenameSuffix, audioExtension, diagnosticEvent } from './core.js';
+import { datePrefix, filename, filenameSuffix, audioExtension, diagnosticEvent, interruptedMessage } from './core.js';
 import { createLabStore } from './store.js';
 import { createLabCapture } from './capture.js';
 import { createLabRecorderChoice, closeLabAudioContext, acquireLabMicrophoneAfterPreparation } from './media.js';
 const $=id=>document.getElementById(id),store=createLabStore(),records=new Map(),rows=new Map(),pendingCaptures=new Set(),deleting=new Set();
 let current=null,preparing=false,preparingCleanup=null,maintenance=false,generation=0,temporaryStream=null,playerUrl=null,whisper=null,whisperReady=false,whisperLoading=null,whisperSerial=0;
 let events=[],displayStart=0,candidates=0,accepted=0,rejected=0,titleRequests=new Map(),offlinePreparing=false;
+const LAB_BUILD='2026-11-04.4';$('build').textContent='Lab build '+LAB_BUILD;
 const status=text=>$('status').textContent=text;
 const modelStatus=text=>$('modelStatus').textContent=text;
-const settings=()=>({engine:$('engine').value,threshold:Number($('wakeThreshold').value),requireSpeech:$('speechGate').checked,speechThreshold:Number($('speechThreshold').value),minimumDb:$('levelGate').checked?Number($('minimumDb').value):null});
+const settings=()=>({liveAnalysis:$('liveAnalysis').checked,engine:$('engine').value,threshold:Number($('wakeThreshold').value),requireSpeech:$('speechGate').checked,speechThreshold:Number($('speechThreshold').value),minimumDb:$('levelGate').checked?Number($('minimumDb').value):null});
 function log(type,data={}) {events.push(diagnosticEvent(type,data));if(type==='wake')renderEvents();}
 function renderEvents() {
  $('events').replaceChildren();for(const event of events.slice(displayStart).filter(event=>event.type==='wake').slice(-100).reverse()){
@@ -20,7 +21,7 @@ function controls() {
  const busy=preparing||!!current;
  $('record').disabled=busy||offlinePreparing||maintenance;$('stop').disabled=!busy;$('pause').disabled=!current||current.stopping;
  $('prepare').disabled=busy||offlinePreparing||maintenance;$('clearRecordings').disabled=busy||maintenance||pendingCaptures.size>0||records.size===0;$('pause').textContent=current?.recorder.state==='paused'?'Resume':'Pause';
- for(const id of ['engine','wakeThreshold','wakeAction','speechGate','speechThreshold','agc','noise','echo','levelGate','minimumDb'])$(id).disabled=busy;
+ for(const id of ['liveAnalysis','engine','wakeThreshold','wakeAction','speechGate','speechThreshold','agc','noise','echo','levelGate','minimumDb'])$(id).disabled=busy;
  for(const record of records.values())renderRecord(record);
 }
 function showPlayer(record) {
@@ -43,13 +44,13 @@ function renderRecord(record) {
   actions.append(play,save,use,remove);box.append(name,description,suffix,suggestion,actions);$('recordings').prepend(box);row={box,name,description,suffix,suggestion,play,save,use,remove};rows.set(record.id,row);
  }
  row.name.textContent=filename(record.prefix,record.suffix,audioExtension(record.mime));if(document.activeElement!==row.suffix)row.suffix.value=record.suffix||'';
- row.description.textContent=`${record.state} · ${((record.audio?.size||record.bytes||0)/1024).toFixed(1)} KB · ${['recording','paused','starting'].includes(record.state)?(record.storageError?'Memory only':'Saving chunks locally'):(record.saved?'Saved locally':'Memory only')}`+(record.storageError?' · Storage error; download before leaving.':'')+(record.captureError?' · '+record.captureError:'');
+ row.description.textContent=`${record.state} · ${((record.audio?.size||record.bytes||0)/1024).toFixed(1)} KB · ${['recording','paused','starting'].includes(record.state)?(record.storageError?'Memory only':'Saving chunks locally'):(record.audio?.size===0?'No audio captured':record.saved?'Saved locally':'Memory only')}`+(record.storageError?' · Storage error; download before leaving.':'')+(record.captureError?' · '+record.captureError:'');
  row.suggestion.textContent=record.namingStatus||'Filename suggestion pending.';
  row.play.disabled=!!current||preparing||!record.audio?.size;row.save.disabled=!record.audio?.size;row.remove.disabled=pendingCaptures.has(record.id)||maintenance;row.suffix.disabled=pendingCaptures.has(record.id)||maintenance;
  row.use.disabled=!record.suggestedSuffix||pendingCaptures.has(record.id)||maintenance;
 }
 async function loadLibrary() {
- try{for(const record of await store.list()){
+ try{for(const record of (await store.list()).sort((a,b)=>(Date.parse(a.startedAt)||0)-(Date.parse(b.startedAt)||0))){
   if(!record.audio){const chunks=(await store.chunks(record.id)).sort((a,b)=>a.sequence-b.sequence);const contiguous=chunks.every((chunk,index)=>chunk.sequence===index);
    record.audio=new Blob(chunks.map(chunk=>chunk.audio),{type:record.mime});record.state='interrupted';record.namingStatus='Recovered available recording data. Playback may be incomplete.';if(!contiguous)record.captureError='Saved chunks have gaps.';}
   record.saved=true;records.set(record.id,record);renderRecord(record);
@@ -96,7 +97,7 @@ function prepareWhisper() {
  });return whisperLoading;
 }
 async function suggestName(capture) {
- const record=capture.record;if(!records.has(record.id)||deleting.has(record.id)||record.state==='failed')return;if(!$('autoName').checked){record.namingStatus='Automatic filename suggestions are off.';renderRecord(record);return;}
+ const record=capture.record;if(!records.has(record.id)||deleting.has(record.id)||record.state==='failed')return;if(record.settings?.liveAnalysis===false){record.namingStatus='Recorder-only mode: enter a title manually.';renderRecord(record);return;}if(!$('autoName').checked){record.namingStatus='Automatic filename suggestions are off.';renderRecord(record);return;}
  record.namingStatus='Preparing filename suggestion…';renderRecord(record);
  try{
   const samples=await Promise.race([capture.titleAudio,new Promise(resolve=>setTimeout(()=>resolve(null),4000))]);
@@ -110,7 +111,7 @@ async function suggestName(capture) {
 }
 function stopAnalysis(capture) {
  if(capture.analysisStopped)return;capture.analysisStopped=true;
- capture.processor?.disconnect();capture.source?.disconnect();capture.silent?.disconnect();if(capture.processor)capture.processor.onaudioprocess=null;
+ capture.processor?.disconnect();capture.source?.disconnect();capture.silent?.disconnect();if(capture.processor?.port){capture.processor.port.onmessage=null;capture.processor.port.close();}
  void closeLabAudioContext(capture.context,error=>log('context-cleanup-error',{message:error.message}));capture.stream?.getTracks().forEach(track=>track.stop());
  if(capture.detectorReady)capture.worker.postMessage({type:'finish'});else capture.resolveTitle(null);
  setTimeout(()=>{capture.worker?.terminate();capture.resolveTitle(null);},4500);
@@ -124,10 +125,10 @@ async function start() {
  preparing=true;const run=++generation;controls();$('player').pause();status('Preparing speech and wake models before opening the microphone…');
  let stream,context,capture,worker;
  try {
-  worker=new Worker(new URL('./detection-worker.js',import.meta.url),{type:'module'});
-  const config=settings();let readyResolve,readyReject;const ready=new Promise((resolve,reject)=>{readyResolve=resolve;readyReject=reject;});
+  const config=settings();if(config.liveAnalysis)worker=new Worker(new URL('./detection-worker.js',import.meta.url),{type:'module'});
+  let readyResolve,readyReject;const ready=new Promise((resolve,reject)=>{readyResolve=resolve;readyReject=reject;});
   let resolveTitle;const titleAudio=new Promise(resolve=>resolveTitle=resolve);const pending=new Set();let packet=0,resetNext=false;
-  worker.onmessage=event=>{
+  if(worker){worker.onmessage=event=>{
    const message=event.data;if(message.generation!==run)return;
    if(message.type==='ready')readyResolve();
    else if(message.type==='error'){readyReject(Error(message.message));if(capture){capture.detectorReady=false;worker.terminate();resolveTitle(null);}$('detectionStatus').textContent='Detection unavailable: '+message.message;log('detection-error',{id:capture?.record.id,message:message.message});}
@@ -141,41 +142,50 @@ async function start() {
      if(message.accepted&&$('wakeAction').value==='toggle'&&current===capture&&!capture.stopping)togglePause();}
    }
   };
-  worker.onerror=event=>{readyReject(Error(event.message||'Detection worker failed'));if(capture){capture.detectorReady=false;worker.terminate();resolveTitle(null);}$('detectionStatus').textContent='Detection worker failed; audio recording remains available.';};
-  preparingCleanup=()=>{readyReject(Error('Preparation cancelled'));worker.terminate();void closeLabAudioContext(context,error=>log('context-cleanup-error',{message:error.message}));stream?.getTracks().forEach(track=>track.stop());};
-  worker.postMessage({type:'prepare',options:config,generation:run});
-  let detectorReady=true;
+  worker.onerror=event=>{readyReject(Error(event.message||'Detection worker failed'));if(capture){capture.detectorReady=false;worker.terminate();resolveTitle(null);}$('detectionStatus').textContent='Detection worker failed; audio recording remains available.';};}
+  preparingCleanup=()=>{readyReject(Error('Preparation cancelled'));worker?.terminate();void closeLabAudioContext(context,error=>log('context-cleanup-error',{message:error.message}));stream?.getTracks().forEach(track=>track.stop());};
+  if(worker)worker.postMessage({type:'prepare',options:config,generation:run});else{readyResolve();resolveTitle(null);}
+  let detectorReady=config.liveAnalysis;
   const preparation=Promise.race([ready,new Promise((_,reject)=>setTimeout(()=>reject(Error('Model preparation timed out')),45000))])
-   .then(()=>{if(run===generation)$('detectionStatus').textContent='Speech detector ready · '+(config.engine==='off'?'wake detector off':config.engine+' ready');})
-   .catch(error=>{detectorReady=false;worker.terminate();resolveTitle(null);if(run===generation)$('detectionStatus').textContent='Recording without detection: '+error.message;});
+   .then(()=>{if(run===generation)$('detectionStatus').textContent=config.liveAnalysis?'Speech detector ready · '+(config.engine==='off'?'wake detector off':config.engine+' ready'):'Recorder only: live analysis is off.';})
+   .catch(error=>{detectorReady=false;worker?.terminate();resolveTitle(null);if(run===generation)$('detectionStatus').textContent='Recording without detection: '+error.message;});
   stream=await acquireLabMicrophoneAfterPreparation(preparation,()=>{
    status('Opening microphone…');return navigator.mediaDevices.getUserMedia({audio:{channelCount:{ideal:1},autoGainControl:{ideal:$('agc').checked},noiseSuppression:{ideal:$('noise').checked},echoCancellation:{ideal:$('echo').checked}}});
   },()=>run===generation);
-  if(!stream){worker.terminate();return;}temporaryStream=stream;
+  if(!stream){worker?.terminate();return;}temporaryStream=stream;
   if(!stream.active||!stream.getAudioTracks().some(track=>track.readyState==='live'))throw Error('The microphone ended before recording could start.');
   const choice=createLabRecorderChoice(stream,MediaRecorder,attempt=>log('recorder-construction-failed',attempt));
   const recorder=choice.recorder;
-  const record={id:crypto.randomUUID(),prefix:datePrefix(),startedAt:new Date().toISOString(),suffix:'',mime:recorder.mimeType||choice.requestedMime,state:'starting',saved:false,settings:config,microphone:stream.getAudioTracks()[0].getSettings(),namingStatus:'Opening speech will be used after Stop.'};
-  capture=createLabCapture({recorder,record,store,fallbacks:choice.fallbacks,onStartFailure:attempt=>log('recorder-start-attempt-failed',attempt),onUpdate:c=>{renderRecord(c.record);if(c.record.state==='interrupted'&&current===c){current=null;preparing=false;controls();status('Recording interrupted. Available audio was retained.');}},
+  const record={build:LAB_BUILD,id:crypto.randomUUID(),prefix:datePrefix(),startedAt:new Date().toISOString(),suffix:'',mime:recorder.mimeType||choice.requestedMime,state:'starting',saved:false,settings:config,microphone:stream.getAudioTracks()[0].getSettings(),namingStatus:'Opening speech will be used after Stop.'};
+  capture=createLabCapture({recorder,record,store,fallbacks:choice.fallbacks,onStartFailure:attempt=>log('recorder-start-attempt-failed',attempt),onUpdate:c=>{renderRecord(c.record);if(c.record.state==='interrupted'&&current===c){current=null;preparing=false;controls();status(interruptedMessage(c.record));}},
    onStopped:c=>stopAnalysis(c),onFinalized:c=>{pendingCaptures.delete(c.record.id);if(current===c){current=null;preparing=false;status(c.record.state==='failed'?'Could not start recording: '+(c.record.captureError||'No audio was acquired.'):'Stopped. Recording retained.');}controls();void suggestName(c);}});
   Object.assign(capture,{stream,context,worker,titleAudio,resolveTitle,detectorReady});
   records.set(record.id,record);pendingCaptures.add(record.id);current=capture;
 
   const began=await capture.start();preparingCleanup=null;if(!began)return;preparing=false;temporaryStream=null;controls();status('Recording. Say the subject near the beginning for a filename suggestion.');log('recording-started',{id:record.id,settings:config,microphone:record.microphone});
-  stream.getAudioTracks()[0].addEventListener('ended',()=>{if(current===capture&&!capture.stopping){record.captureError='Microphone ended';capture.stop();}});
+  capture.analysisStage='native-recording';
+  stream.getAudioTracks()[0].addEventListener('ended',()=>{if(current===capture&&!capture.stopping){record.captureError='Microphone ended';record.interruptionStage=capture.analysisStage;status('Microphone ended; finishing available audio…');controls();log('microphone-ended',{id:record.id,stage:capture.analysisStage,contextState:capture.context?.state,elapsedMs:Date.now()-Date.parse(record.startedAt)});capture.stop();}});
   $('microphone').textContent=stream.getAudioTracks()[0].label+' · Browser reports '+JSON.stringify(record.microphone);
   if(capture.detectorReady)try{
-   context=new AudioContext();capture.context=context;
+   capture.analysisStage='creating-context';log('analysis-stage',{id:record.id,stage:capture.analysisStage});
+   const inputRate=stream.getAudioTracks()[0].getSettings().sampleRate;
+   context=new AudioContext(Number.isFinite(inputRate)?{sampleRate:inputRate}:undefined);capture.context=context;
+   capture.analysisStage='resuming-context';
    await Promise.race([context.resume(),new Promise((_,reject)=>setTimeout(()=>reject(Error('Audio analysis could not resume')),3000))]);
    if(current!==capture||capture.stopping){await closeLabAudioContext(context);return;}
    worker.postMessage({type:'configure-rate',generation:run,sampleRate:context.sampleRate});
-   capture.source=context.createMediaStreamSource(stream);capture.processor=context.createScriptProcessor(1024,1,1);capture.silent=context.createGain();capture.silent.gain.value=0;
-   capture.source.connect(capture.processor);capture.processor.connect(capture.silent);capture.silent.connect(context.destination);
-   capture.processor.onaudioprocess=event=>{event.outputBuffer.getChannelData(0).fill(0);if(current!==capture||capture.stopping||!capture.detectorReady)return;
+   capture.analysisStage='loading-worklet';log('analysis-stage',{id:record.id,stage:capture.analysisStage,sampleRate:context.sampleRate,inputRate});
+   if(!context.audioWorklet)throw Error('AudioWorklet is unavailable in this browser');
+   await context.audioWorklet.addModule(new URL('./input-worklet.js',import.meta.url));
+   if(current!==capture||capture.stopping){await closeLabAudioContext(context);return;}
+   capture.analysisStage='connecting-worklet';
+   capture.source=context.createMediaStreamSource(stream);capture.processor=new AudioWorkletNode(context,'imuse-lab-input',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1]});capture.silent=context.createGain();capture.silent.gain.value=0;
+   capture.processor.port.onmessage=event=>{if(current!==capture||capture.stopping||!capture.detectorReady)return;
     if(pending.size>=8){resetNext=true;log('analysis-gap',{id:record.id,reason:'Analysis queue limit reached'});return;}
-    const pcm=event.inputBuffer.getChannelData(0).slice(),id=++packet;pending.add(id);
+    const pcm=event.data,id=++packet;pending.add(id);
     worker.postMessage({type:'audio',pcm,id,generation:run,sentAt:Date.now(),sampleRate:context.sampleRate,recording:capture.recorder.state==='recording',reset:resetNext},[pcm.buffer]);resetNext=false;
    };
+   capture.source.connect(capture.processor);capture.processor.connect(capture.silent);capture.silent.connect(context.destination);capture.analysisStage='running';log('analysis-stage',{id:record.id,stage:capture.analysisStage});
   }catch(error){capture.detectorReady=false;worker.terminate();resolveTitle(null);await closeLabAudioContext(context,cleanup=>log('context-cleanup-error',{message:cleanup.message}));if(current===capture){$('detectionStatus').textContent='Audio recording continues without analysis: '+error.message;log('analysis-start-failed',{id:record.id,message:error.message});}}
  }catch(error){
   log('recording-start-failed',{name:error.name,message:error.message,streamActive:stream?.active,tracks:stream?.getAudioTracks().map(track=>({state:track.readyState,muted:track.muted,enabled:track.enabled,settings:track.getSettings()})),formatAttempts:capture?.record.formatAttempts});
@@ -194,6 +204,6 @@ $('clearRecordings').onclick=async()=>{
  catch(error){ids.forEach(id=>deleting.delete(id));status('Could not clear recordings; loaded audio was kept: '+error.message);}finally{maintenance=false;controls();}
 };
 $('clearLog').onclick=()=>{displayStart=events.length;renderEvents();};
-$('exportLog').onclick=()=>download('RecorderLab-diagnostics-'+Date.now()+'.json',new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),events,recordings:[...records.values()].map(({audio,...record})=>record)},null,2)],{type:'application/json'}));
+$('exportLog').onclick=()=>download('RecorderLab-diagnostics-'+Date.now()+'.json',new Blob([JSON.stringify({version:1,build:LAB_BUILD,exportedAt:new Date().toISOString(),events,recordings:[...records.values()].map(({audio,...record})=>record)},null,2)],{type:'application/json'}));
 setInterval(()=>{if(!current)return;const seconds=Math.floor((Date.now()-Date.parse(current.record.startedAt))/1000);$('elapsed').textContent=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;},500);
 globalThis.recorderLab={records,events,settings,prepareWhisper,start,get current(){return current;}};

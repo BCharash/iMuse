@@ -1,6 +1,10 @@
 // Pure helpers for the standalone lab. No microphone, model, or production storage access.
 export const SAMPLE_RATE = 16000;
 export function diagnosticEvent(type,data={},at=new Date().toISOString()) {return {...data,at,type};}
+export function interruptedMessage(record) {
+ const reason=record.captureError||'The recorder did not finish normally';const bytes=record.audio?.size??record.bytes??0;
+ return `Recording interrupted: ${reason}. ${bytes?'Available audio was retained.':'No audio was captured.'}`;
+}
 export function datePrefix(date = new Date()) {
  const n=value=>String(value).padStart(2,'0');
  return `${date.getFullYear()}-${n(date.getMonth()+1)}-${n(date.getDate())}_${n(date.getHours())}-${n(date.getMinutes())}-${n(date.getSeconds())}`;

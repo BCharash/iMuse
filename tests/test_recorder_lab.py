@@ -20,6 +20,8 @@ const prefix=datePrefix(new Date(2026,10,4,9,5,2));
 assert(prefix==='2026-11-04_09-05-02','local date and time always lead filename');
 assert(filename(prefix,'Title: Garden irrigation, plans!','m4a')===prefix+'_Garden-irrigation-plans.m4a','title marker and unsafe punctuation are removed');
 assert(filename(prefix,'','webm')===prefix+'.webm','empty recognition preserves usable date-only name');
+assert(interruptedMessage({captureError:'Microphone ended',audio:{size:0}}).includes('No audio was captured'),'zero-byte interruption is reported honestly');
+assert(interruptedMessage({captureError:'Microphone ended',audio:{size:20}}).includes('Available audio'),'retained data is distinguished from empty metadata');
 assert(audioExtension('audio/webm;codecs=opus')==='webm'&&audioExtension('audio/mp4')==='m4a','extension follows actual recorder encoding');
 const samples=Float32Array.from({length:48000},(_,i)=>.1*Math.sin(2*Math.PI*1000*i/48000));
 const continuous=new StreamingResampler(48000).push(samples),split=new StreamingResampler(48000),parts=[];
@@ -156,6 +158,47 @@ const assert=(value,message)=>{if(!value)throw Error(message);};
  valid=true;let grant;const permissionPending=acquireLabMicrophoneAfterPreparation(Promise.resolve(),()=>new Promise(resolve=>grant=resolve),()=>valid);await Promise.resolve();valid=false;grant(stream);assert(await permissionPending===null&&stopped===1,'late microphone permission is released after cancellation');
  let rejected=false;try{await acquireLabMicrophoneAfterPreparation(Promise.reject(Error('not ready')),async()=>{acquired++;return stream;});}catch(error){rejected=true;}
  assert(rejected&&acquired===1,'unhandled preparation failure cannot open a microphone');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
+""")
+
+
+    def test_worklet_packets_and_silent_output(self):
+        worklet=(ROOT/'js/lab/input-worklet.js').read_text()
+        evaluate(r"""
+const assert=(value,message)=>{if(!value)throw Error(message);};
+let Processor;const messages=[];
+class AudioWorkletProcessor {constructor(){this.port={postMessage:(pcm,transfer)=>{assert(transfer[0]===pcm.buffer,'PCM ownership is transferred');messages.push(pcm);}};}}
+function registerProcessor(name,ctor){assert(name==='imuse-lab-input','expected processor is registered');Processor=ctor;}
+""" + worklet + r"""
+const processor=new Processor();
+for(let block=0;block<16;block++){
+ const input=Float32Array.from({length:128},(_,i)=>(block*128+i)/10000),copy=input.slice(),output=new Float32Array(128).fill(1);
+ assert(processor.process([[input]],[[output]])===true,'processor remains active');
+ assert(output.every(value=>value===0),'analysis never monitors microphone through speakers');
+ assert(input.every((value,i)=>value===copy[i]),'native recorder input is not modified');
+}
+assert(messages.length===2&&messages[0].length===1024,'render quanta produce bounded 1024-sample packets');
+assert(messages[0].buffer!==messages[1].buffer&&Math.abs(messages[1][0]-.1024)<1e-6,'new packets cannot overwrite prior transferred audio');
+const silence=new Float32Array(128).fill(1);processor.process([],[[silence]]);assert(silence.every(value=>value===0),'missing input also outputs silence');
+globalThis.testResult='PASS';
+""")
+
+    def test_inactive_recorder_waits_for_final_data(self):
+        evaluate(CAPTURE + r"""
+globalThis.testResult='pending';
+const assert=(value,message)=>{if(!value)throw Error(message);};
+class Blob {constructor(parts,{type}){this.size=parts.reduce((n,p)=>n+p.size,0);this.type=type;}}
+const finalized=[];const store={put:async()=>{},append:async()=>{},finalize:async record=>finalized.push(record.audio.size)};
+const recorder={mimeType:'audio/mp4',state:'inactive',start(){this.state='recording';},stop(){this.state='inactive';}};
+const capture=createLabCapture({recorder,record:{id:'ended'},store,setTimer:()=>1,clearTimer:()=>{}});
+(async()=>{
+ await capture.start();recorder.ondataavailable({data:{size:70}});await capture.pending;
+ recorder.state='inactive';capture.record.captureError='Microphone ended';capture.stop();
+ for(let i=0;i<10;i++)await Promise.resolve();
+ assert(finalized.length===0&&!capture.fullFinished,'inactive native recorder must still deliver its final data and stop events');
+ recorder.ondataavailable({data:{size:30}});recorder.onstop();for(let i=0;i<12;i++)await Promise.resolve();
+ assert(finalized.length===1&&finalized[0]===100&&capture.record.state==='interrupted','interruption retains the complete final tail');
  globalThis.testResult='PASS';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
 """)
