@@ -14,6 +14,10 @@ export function createLabStore(factory=globalThis.indexedDB) {
   open,
   list:()=>all('recordings'),
   clear:()=>write(['recordings','chunks'],tx=>{tx.objectStore('recordings').clear();tx.objectStore('chunks').clear();}),
+  clearLogs:()=>write(['recordings'],tx=>{
+   const request=tx.objectStore('recordings').openCursor();
+   request.onsuccess=()=>{const cursor=request.result;if(cursor){cursor.update({...cursor.value,reviews:[]});cursor.continue();}};
+  }),
   chunks:id=>all('chunks','recording',id),
   put:record=>write(['recordings'],tx=>tx.objectStore('recordings').put(record)),
   append:(id,sequence,audio)=>write(['chunks'],tx=>tx.objectStore('chunks').put({id,sequence,audio})),

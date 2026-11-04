@@ -1,7 +1,7 @@
 {
   "version": 1,
   "cache": "imuse-simple-lab-v1",
-  "bytes": 82555867,
+  "bytes": 82557802,
   "assets": [
     {
       "path": "js/heed/filter-coeffs.js",
@@ -35,8 +35,8 @@
     },
     {
       "path": "js/lab/app.js",
-      "bytes": 36169,
-      "sha256": "bd2c136440f533ce9558e5e8b9e6dc2e790bf7bf09bbfacbf5fdf68a2b78f26b"
+      "bytes": 37599,
+      "sha256": "1980a2acfa9c17a551b5485a3403ed94cea1bbacffa95b0328676cd718d5ff86"
     },
     {
       "path": "js/lab/capture.js",
@@ -145,8 +145,8 @@
     },
     {
       "path": "js/lab/store.js",
-      "bytes": 2519,
-      "sha256": "4aecda92024395332d60e96afd3a81bfbf03706c8280622fe4ed0bf89bcab12f"
+      "bytes": 2759,
+      "sha256": "35605b8644d5ffe9fc59645703d33a4564238c5dcffd7735716b1bd3988947f2"
     },
     {
       "path": "js/lab/style.css",
@@ -240,8 +240,8 @@
     },
     {
       "path": "lab.html",
-      "bytes": 8424,
-      "sha256": "bf976060f32b5b6d339b1763d994bb1b14e4b309b57c2ace3186b430849cf02a"
+      "bytes": 8689,
+      "sha256": "fa0c38d844e1931e3f2dfec7796516275eec943096abf45d251274a7392827a1"
     }
   ]
 }

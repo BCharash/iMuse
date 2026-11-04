@@ -75,6 +75,52 @@ current={};$('filenameMode').onclick();assert($('labMode').value==='wake','mode 
 globalThis.testResult='PASS';
 """)
 
+    def test_clear_all_logs_preserves_recordings_and_handles_failure(self):
+        app=(ROOT/'js/lab/app.js').read_text()
+        clear=app[app.index('async function clearAllLogs()'):app.index("$('clearAllLogs').onclick=")]
+        evaluate(r"""
+globalThis.testResult='pending';
+const assert=(value,message)=>{if(!value)throw Error(message);};
+const elements=new Map(),$=id=>{if(!elements.has(id))elements.set(id,{textContent:'',pause(){},removeAttribute(){},load(){}});return elements.get(id);};
+let current=null,preparing=false,maintenance=false,logEpoch=0,displayStart=1,playerUrl='blob:review',events=[{type:'wake'}],confirmed=false,failed=false,calls=0;
+const audio={size:200},record={id:'kept',audio,suffix:'garden',transcript:'Garden',suggestedSuffix:'Garden',reviews:[{review:'false positive',audio:{size:10},verification:{status:'checking'}}]},records=new Map([['kept',record]]),pendingCaptures=new Set();
+const libraryReady=Promise.resolve();let reviewWrites=Promise.resolve();
+const store={clearLogs:async()=>{calls++;if(failed)throw Error('disk error');}};
+const confirm=()=>confirmed,status=text=>$('status').textContent=text,controls=()=>{},URL={revokeObjectURL:()=>{}};
+""" + clear + r"""
+(async()=>{
+ await clearAllLogs();assert(calls===0&&record.reviews.length===1,'cancel keeps logs');
+ confirmed=true;current={};await clearAllLogs();assert(calls===0,'active capture cannot clear logs');current=null;
+ pendingCaptures.add('kept');await clearAllLogs();assert(calls===0,'pending finalization blocks clearing');pendingCaptures.clear();
+ failed=true;await clearAllLogs();assert(events.length===1&&record.reviews.length===1&&logEpoch===0&&!maintenance,'storage failure preserves memory results and unlocks controls');
+ failed=false;await clearAllLogs();assert(events.length===0&&record.reviews.length===0&&displayStart===0&&logEpoch===1,'success removes logs and invalidates late worker results');
+ assert(records.get('kept')===record&&record.audio===audio&&record.suffix==='garden'&&record.transcript==='Garden'&&record.suggestedSuffix==='Garden','full recording and naming data survive');
+ assert(playerUrl===null&&$('player').hidden,'review player releases cleared clip');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
+""")
+
+    def test_store_clear_logs_updates_only_reviews(self):
+        store=(ROOT/'js/lab/store.js').read_text().replace('export ', '')
+        evaluate(r"""
+globalThis.testResult='pending';
+const assert=(value,message)=>{if(!value)throw Error(message);};
+const audio={size:123},original=[{id:'first',audio,suffix:'title',reviews:[{review:'true positive'}]},{id:'second',audio,transcript:'words',reviews:[]}];
+let saved=original,scopes=[];
+const db={transaction(names,mode){scopes.push(names);assert(mode==='readwrite','clear uses write transaction');const staged=saved.map(record=>({...record}));let index=0;
+ const tx={objectStore(name){assert(name==='recordings','chunks are untouched');return {openCursor(){const request={};const advance=()=>{request.result=index<staged.length?{value:staged[index],update:value=>{staged[index]=value;},continue:()=>{index++;Promise.resolve().then(advance);}}:null;request.onsuccess();if(!request.result){saved=staged;tx.oncomplete();}};Promise.resolve().then(advance);return request;}};}};return tx;}};
+const factory={open(){const request={result:db};Promise.resolve().then(()=>request.onsuccess());return request;}};
+""" + store + r"""
+(async()=>{
+ await createLabStore(factory).clearLogs();
+ assert(scopes.length===1&&scopes[0].length===1,'all records clear in one transaction');
+ assert(saved.every(record=>record.reviews.length===0),'saved reviews are removed from every recording');
+ assert(saved[0].audio===audio&&saved[0].suffix==='title'&&saved[1].transcript==='words','audio and filename fields are preserved');
+ assert(original[0].reviews.length===1,'cursor update does not mutate previously loaded record on failure');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
+""")
+
     def test_review_clip_boundaries_and_classification(self):
         review=(ROOT/'js/lab/review.js').read_text().replace('export ', '')
         evaluate(review + r"""
