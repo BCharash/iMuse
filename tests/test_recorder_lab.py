@@ -92,12 +92,15 @@ const ort={env:{wasm:{}},Tensor:class {constructor(type,data,dims){this.data=dat
 class WakeWordDetector {constructor(){this.calls=0;}reset(){}async step(){this.calls++;return {prob:this.calls===40?.99:.1,triggered:this.calls===40};}}
 """ + worker + r"""
 (async()=>{
- await prepare({generation:7,options:{engine:'heed',threshold:.7,speechThreshold:.6,requireSpeech:true,nearThreshold:.5,autoName:false}});
+ await prepare({generation:7,options:{engine:'heed',threshold:.7,speechThreshold:.6,requireSpeech:true,nearThreshold:.5,autoName:false,verifyWake:true}});
  resampler={push:pcm=>pcm};
  for(let i=0;i<65;i++)await consume({generation:7,sentAt:Date.now(),sampleRate:16000,pcm:new Float32Array(1600).fill(.1),recording:true});
  const event=messages.find(item=>item.type==='review-event');const clip=messages.find(item=>item.type==='review-clip');
  assert(event?.event.type==='wake'&&event.event.accepted,'real worker candidate becomes review event after speech gate');
  assert(clip?.entry.eventId===event.event.eventId&&clip.samples.length===80000,'worker matches five-second audio to candidate');
+ const verification=messages.find(item=>item.type==='verify-audio');
+ assert(verification.eventId===event.event.eventId&&verification.samples.length===48000,'verification receives exactly preceding three seconds');
+ assert(messages.indexOf(verification)<messages.indexOf(clip),'verification dispatch never waits for two-second post-roll');
  assert(title.length===0,'wake-only session does not collect filename audio');
  self.onmessage({data:{type:'mark-review',generation:7,kind:'missed-wake'}});await serial;
  self.onmessage({data:{type:'finish',generation:7}});await serial;
@@ -132,6 +135,59 @@ const urls=[];const URL={createObjectURL:audio=>{urls.push(audio);return 'blob:t
  pendingCaptures.add('record');persistReview(event);await reviewWrites;assert(puts===1,'active capture defers review writes to capture finalization');
  pendingCaptures.clear();deleting.add('record');persistReview(event);await reviewWrites;assert(puts===1,'review updates cannot resurrect deleted recordings');
  const metadata=reviewMetadata(event);assert(!('audio' in metadata)&&metadata.review==='false positive','diagnostics omit binary audio and retain labels');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
+""")
+
+    def test_whisper_worker_warmup_and_request_limits(self):
+        worker=(ROOT/'js/lab/whisper-worker.js').read_text()
+        worker=re.sub(r'^import .*?;\s*$', '', worker, flags=re.M).replace('import.meta.url', "'http://localhost/js/lab/'")
+        evaluate(r"""
+globalThis.testResult='pending';
+const assert=(value,message)=>{if(!value)throw Error(message);};
+const env={backends:{onnx:{wasm:{}}}},messages=[],calls=[];
+const self={postMessage:message=>messages.push(message)},performance={now:(()=>{let clock=0;return ()=>++clock;})()};
+class URL {constructor(path){this.href=path;}}
+let loads=0;const pipeline=async()=>{loads++;return async(samples,options)=>{calls.push({length:samples.length,...options});return {text:'Hey Doc.'};};};
+""" + worker + r"""
+(async()=>{
+ self.onmessage({data:{type:'prepare'}});await serial;
+ self.onmessage({data:{type:'prepare'}});await serial;
+ assert(loads===1&&calls.length===1&&calls[0].length===16000&&calls[0].max_new_tokens===1,'one real warm-up inference precedes readiness and is reused');
+ assert(messages.filter(m=>m.type==='ready').length===2,'repeated preparation resolves each caller');
+ self.onmessage({data:{type:'transcribe',purpose:'verify',id:1,samples:new Float32Array(48000)}});await serial;
+ self.onmessage({data:{type:'transcribe',id:2,samples:new Float32Array(240000)}});await serial;
+ assert(calls[1].max_new_tokens===24&&calls[2].max_new_tokens===64,'short verification does not change filename transcription limits');
+ assert(!calls[1].initial_prompt&&!calls[1].prompt_ids,'verifier does not prompt the model to invent its expected phrase');
+ assert(messages.at(-1).id===2&&messages.at(-1).inferenceMs>0&&messages.at(-1).text==='Hey Doc.','responses carry request identity, transcript and inference timing');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
+""")
+
+    def test_whisper_shadow_verifier(self):
+        source=(ROOT/'js/lab/verification.js').read_text().replace('export ', '')
+        evaluate(source + r"""
+globalThis.testResult='pending';
+const assert=(value,message)=>{if(!value)throw Error(message);};
+assert(wakePhrasePresent('Hey, Doc! This is a note.','heed'),'phrase tolerates case and punctuation');
+assert(wakePhrasePresent('hey-friday','voicute'),'Voicute expected phrase');
+assert(!wakePhrasePresent('hey dock','heed')&&!wakePhrasePresent('hey doctor','heed')&&!wakePhrasePresent('Hey Doc','off'),'strict matching avoids forced or fuzzy acceptance');
+const updates=[];let clock=0,resolve,reject,deadline,calls=0;
+const verifier=createWakeVerifier({transcribe:samples=>{calls++;assert(samples.length===48000,'bounded input');return new Promise((yes,no)=>{resolve=yes;reject=no;});},onUpdate:(event,result)=>updates.push({event,...result}),now:()=>clock,setTimer:callback=>{deadline=callback;return 1;},clearTimer:()=>{}});
+(async()=>{
+ const first=verifier.submit('first',new Float32Array(48000),{engine:'heed',transportMs:20});
+ await verifier.submit('busy',new Float32Array(48000),{engine:'heed'});
+ assert(calls===1&&updates.at(-1).status==='skipped-busy','live work never builds a queue');
+ clock=300;resolve({text:'Hey Doc.',inferenceMs:280});await first;
+ assert(updates.at(-1).phrasePresent&&updates.at(-1).totalMs===320&&updates.at(-1).withinBudget,'timing includes transport and complete inference response');
+ const slow=verifier.submit('slow',new Float32Array(48000),{engine:'voicute',shortPreRoll:true});
+ clock=16000;deadline();assert(verifier.busy&&updates.at(-1).status==='timed-out','deadline reports failure while retaining worker ownership');
+ await verifier.submit('still-busy',new Float32Array(48000));assert(calls===2,'timeout cannot enqueue more work onto hung inference');
+ resolve({text:'ordinary conversation',inferenceMs:15500});await slow;
+ assert(updates.at(-1).status==='late-result'&&!updates.at(-1).phrasePresent&&!updates.at(-1).withinBudget&&updates.at(-1).shortPreRoll,'late negative result is explicit');
+ const failing=verifier.submit('error',new Float32Array(48000));reject(Error('Worker stopped'));await failing;
+ assert(updates.at(-1).status==='error'&&!verifier.busy,'worker failure releases lane and is not a negative verdict');
+ await verifier.submit('empty',new Float32Array(0));assert(updates.at(-1).status==='no-audio','empty input is not transcribed');
  globalThis.testResult='PASS';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
 """)

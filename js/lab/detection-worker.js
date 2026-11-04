@@ -10,7 +10,10 @@ const send=data=>self.postMessage(data);
 let clips=null,reviewSerial=0,lastNear=-Infinity;
 function markReview(metadata) {
  const event={...metadata,eventId:`${runGeneration}-${++reviewSerial}`,at:new Date().toISOString()};
- if(clips?.mark(event))send({type:'review-event',generation:runGeneration,event});
+ if(clips?.mark(event)){
+  send({type:'review-event',generation:runGeneration,event});
+  if(options.verifyWake){const {samples,shortPreRoll}=clips.preceding();self.postMessage({type:'verify-audio',generation:runGeneration,eventId:event.eventId,samples,shortPreRoll,sentAt:Date.now()},[samples.buffer]);}
+ }
  else send({type:'gap',generation:runGeneration,reason:'Review clip queue full; event audio unavailable'});
 }
 function resetSignal() {state=new ort.Tensor('float32',new Float32Array(256),[2,1,128]);buffer=new Float32Array(0);wakePending=new Float32Array(0);rolling=new Float32Array(0);history=[];heed?.reset();voicute?.reset();lastWakeEnd=position;}

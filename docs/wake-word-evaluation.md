@@ -25,11 +25,11 @@ The four false-negative clips include overlapping audio. They do not establish f
 
 ## Current lab
 
-Open the hosted **`lab.html`** address. Choose **Filename suggestions** (default, wake detector off) or **Speech-gated wake testing** (automatic naming off) before recording. The two tasks share recording storage and offline assets. Wake detection currently uses Heed or Voicute; Whisper is used for naming, not wake verification. Rebooting resolved the reported device problem; the user reports two spoken “Hey Doc” phrases were detected.
+Open the hosted **`lab.html`** address. Choose **Filename suggestions** (default, wake detector off) or **Speech-gated wake testing** (automatic naming off) before recording. The two tasks share recording storage and offline assets. Wake detection uses Heed or Voicute; optional Whisper verification supplies a measured second opinion without changing wake actions. Rebooting resolved the reported device problem; the user reports two spoken “Hey Doc” phrases were detected.
 
 It provides:
 
-- Record, Pause/Resume and Stop, native browser compressed audio, playback and download. **Lab build 2026-11-04.9** is shown below the heading so cached versions can be identified.
+- Record, Pause/Resume and Stop, native browser compressed audio, playback and download. **Lab build 2026-11-04.10** is shown below the heading so cached versions can be identified.
 - Per-recording titles and a date/time prefix that filename suggestions cannot replace.
 - Local Whisper **tiny.en** transcription of up to 15 seconds beginning near detected speech, executed after Stop. The suggestion considers only the first two sentences and uses a short phrase from the first useful one, preserving word order and removing common English words, filler and repeated words, while retaining negations and numbers (up to six words / 48 characters). It does not rank words from later topics or load a semantic model. A user must click **Use suggested name** to apply it.
 - **Live speech/wake analysis** can be unchecked for a recorder-only comparison: no detector worker or analysis AudioContext is opened for that recording, and titles are manual. With it checked, choose Heed / Voicute / Wake off (speech analysis stays on), with **Require speech** enabled by default. Silero v5 evaluates 512-sample 16 kHz blocks; a candidate needs at least two above-threshold speech blocks in the preceding second. Speech gating filters acceptance, while continuous wake-model ingestion is preserved.
@@ -41,6 +41,32 @@ It provides:
 Audio now prefers AAC/M4A, matching production iMuse. The preferred-format selector also offers Browser default and WebM/Opus for controlled comparisons; unsupported choices fall back to supported alternatives. The filename extension follows the actual encoder, and requested preference and format attempts are exported. If actual start fails before any data or active capture, alternate encoders are tried. A track that ends after startup is not silently restarted or switched to another format. An advertised MIME type is not treated as proof that the encoder can start. Failed never-started attempts are labeled failed, rather than completed recordings. Format attempts and microphone state are included in diagnostics. The new path does not route recording audio through the previous custom PCM-to-MP3 encoder. This is an isolation step, not a claim that the old encoder caused the whine. The AudioWorklet analysis tap transfers 1024-sample mono packets and explicitly outputs silence to its audio sink. ScriptProcessor has been removed from the active lab. The analysis context uses the microphone’s reported input rate when available; its actual rate still configures resampling.
 
 The live analysis branch uses a continuous windowed-sinc resampler with anti-aliasing rather than dropping/interpolating samples independently at callback boundaries. Its queue is bounded; delayed analysis is dropped/reset and reported instead of allowing a growing queue of old wake audio. Recording remains on the independent native MediaRecorder branch. Whisper runs in a separate worker after Stop. Starting another recording while transcription finishes is allowed, so CPU contention remains a device test.
+
+## Experimental Whisper wake verification
+
+In **Speech-gated wake testing**, enable **Compare with Whisper verification** before Record. Tiny loads and performs a warm-up inference before microphone acquisition. When a trigger, sampled near-trigger, manual miss or manual negative is marked, the detection worker copies the preceding three seconds of normalized 16 kHz audio from its existing review buffer. It sends that copy immediately; verification does not wait for the review clip’s two-second post-roll, open another microphone, or create another AudioContext.
+
+Whisper runs in its separate existing worker, with a 24-token limit for verification and no prompt containing the expected phrase. A normalized whole-word match checks “Hey Doc” for Heed and “Hey Friday” for Voicute. “Hey dock” is not treated as a match. A missing phrase can reflect ASR error or incomplete input; it is not ground truth. Background speech containing the phrase can still match. Verification is **shadow-only**: existing speech/level acceptance and selected wake actions remain authoritative. Leave **On accepted wake → Mark detection** during evaluation.
+
+Only one live check runs at a time. Busy samples are explicitly skipped, including when an older filename transcription owns the worker. A check taking more than 15 seconds is labeled timed-out, and keeps ownership until its worker reply/error arrives; it cannot create an unbounded inference queue. Failed preparation leaves native recording and detector testing available, with verification marked unavailable. Disabling verification avoids Whisper loading for the wake session.
+
+The review table shows recognized text, phrase presence, added elapsed milliseconds and whether the proposed **500 ms** budget was met. Hover text and exports include worker inference time, input duration, short input, input transport time and state. Added delay includes transport to the page and the request round trip; it does **not** measure end-of-phrase to wake-detector latency. Summary median/95th-percentile values include saved completed checks; busy/error/timeout cases remain separately visible. Paired speech-gate counts continue to describe the original detector, not hypothetical Whisper-controlled actions.
+
+Results are saved with each review, survive reload, and travel in diagnostic/review exports. Results arriving after Stop still save to their original recording; deleted recordings are not recreated. A reloaded in-progress check is labeled interrupted. The current review player retains its existing three-second pre-roll plus two-second post-roll; Whisper sees only the pre-roll.
+
+**Focused device check:**
+
+1. Confirm build **2026-11-04.10**. Select Speech-gated wake testing, Mark detection, and Whisper verification.
+2. Record several “Hey Doc” attempts with quiet intervals and ordinary conversation. Also mark a missed phrase and a negative sample.
+3. Stop, play the clips, label what was actually spoken, and compare the Whisper column and delay summary. Repeat with verification disabled to compare recording/analysis stability and with Voicute/“Hey Friday” if desired.
+4. Export review audio + labels and diagnostics. Reload and confirm labels, clips and completed verification results remain.
+5. Repeat on iPhone. Desktop timing is not an iPhone performance guarantee; capture gaps and skipped checks matter alongside completed-check latency.
+
+An initial isolated headless Chrome check with synthetic input took about **2.4 seconds** for a warmed three-second verification, over the target. It verified one microphone acquisition and saved/reloaded results, not real wake accuracy or acceptable device latency. Production iMuse is unchanged.
+
+## Planned post-recording wake-phrase cleanup
+
+The agreed direction is to scan the **entire finished recording**, locate wake phrases using timestamped transcription, and offer cleaned transcript/audio copies while preserving the originals. This is separate from the live verifier and is not implemented by this change. Estimated word timestamps need boundary validation and playback preview before audio edits; they do not guarantee exact cuts. Cleanup timestamps should refer to the decoded saved recording, rather than the live analysis clock, which also advances during recorder pauses. Full-recording scanning can find phrases that the live detector missed.
 
 ## Offline preparation and distribution
 
@@ -68,7 +94,7 @@ New recordings retain previous recordings. Reload recovers available journal chu
 
 The user reports **interrupted · 0.0 KB · Microphone ended** with live analysis enabled. The following recorder-only comparison also displayed recording for about nine seconds before the same result; no other tab or app was using the microphone. This establishes that the input track ended, but not why; analysis alone does not explain both failures. Previous files used WebM. Build 2026-11-04.7 prefers AAC/M4A, matching production iMuse, to test this format difference without claiming a codec defect. The reported 404 was the favicon, unrelated to model loading; the lab now supplies an inline icon. No claim is made that AudioWorklet or matching the context rate cures the Safari interruption.
 
-After deployment, verify **Lab build 2026-11-04.9** below the heading:
+After deployment, verify **Lab build 2026-11-04.10** below the heading:
 
 1. Uncheck **Live speech/wake analysis** and select **AAC / M4A**. Record speech for 15 seconds, Stop, and play it. Check that the filename ends in .m4a. This is the native-recorder baseline, with manual titles.
 2. Only if that succeeds, check **Live speech/wake analysis** and repeat with AAC/M4A unchanged.
