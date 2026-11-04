@@ -51,6 +51,30 @@ assert(!evaluateSpeechGate(history,11000,{minimumDb:-40,inputDb:-50}).pass,'opti
 globalThis.testResult='PASS';
 """)
 
+    def test_wake_mode_visibility_and_browser_restore(self):
+        app=(ROOT/'js/lab/app.js').read_text()
+        mode=app[app.index('function selectLabMode()'):app.index("$('engine').onchange=")]
+        html=(ROOT/'lab.html').read_text()
+        tracking=html[html.index('<section aria-label="Detection status">'):html.index('<section><h2>Record</h2>')]
+        self.assertNotIn('hidden><h2>Wake tracking',tracking)
+        self.assertIn('<section id="wakeEvents">',html)
+        for element in ['trackingMode','detectionStatus','levels','counts']:
+            self.assertIn('id="'+element+'"',tracking)
+        evaluate(r"""
+const assert=(value,message)=>{if(!value)throw Error(message);};
+const elements=new Map(),$=id=>{if(!elements.has(id))elements.set(id,{value:'',hidden:false,textContent:''});return elements.get(id);};
+let current=null,preparing=false;const renderEvents=()=>{},controls=()=>{},status=()=>{};
+const listeners={};globalThis.addEventListener=(name,handler)=>listeners[name]=handler;
+$('labMode').value='filename';
+""" + mode + r"""
+assert($('trackingMode').textContent.includes('OFF')&&$('wakePanel').hidden&&!$('wakeEvents').hidden,'filename mode explains absent tracking while trigger review remains visible');
+$('wakeMode').onclick();assert($('labMode').value==='wake'&&!$('wakePanel').hidden&&!$('wakeEvents').hidden&&!$('reviewLink').hidden,'direct wake button exposes scores configuration and review');
+assert($('engine').value==='heed'&&$('liveAnalysis').checked,'wake mode activates detector settings');
+$('filenameMode').onclick();$('labMode').value='wake';listeners.pageshow();assert(!$('wakePanel').hidden,'restored selector reconciles hidden panels');
+current={};$('filenameMode').onclick();assert($('labMode').value==='wake','mode buttons cannot change active recording');
+globalThis.testResult='PASS';
+""")
+
     def test_review_clip_boundaries_and_classification(self):
         review=(ROOT/'js/lab/review.js').read_text().replace('export ', '')
         evaluate(review + r"""

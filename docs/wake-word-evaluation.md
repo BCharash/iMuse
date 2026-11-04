@@ -20,7 +20,7 @@ Later Tiny verification showed ASR errors and experimental limitations: strict m
 
 ## Current lab
 
-Hosted **lab.html**, build **2026-11-04.10**, is separate from production recording. No API key/cloud inference is used.
+Hosted **lab.html**, build **2026-11-04.11**, is separate from production recording. No API key/cloud inference is used.
 
 | Mode/control | Purpose |
 | --- | --- |
@@ -57,3 +57,5 @@ Compare Base/Tiny for post-recording naming/transcription. Whole-file wake clean
 Dependencies/licenses: [lab sources](../js/lab/SOURCES.md). The service worker scopes cover only lab.html and js/lab/. After lab code/assets change, run `python3 scripts/build-lab-manifest.py`; bump cache versions for pinned asset changes. Documentation-only edits need no regeneration.
 
 The [previous comparison lab](Archive/wake-word-comparison-lab-2026-11-04.html) and [instructions](Archive/wake-word-review-notes-2026-11-04.md) preserve access to separate **imuse-wake-review-lab** storage. Keep its regression tests while retaining the tool. Private audio/Desktop JSON exports are not committed.
+
+The **Wake tracking** panel and trigger review table are always visible, including in Filename mode, which explicitly reports that wake tracking is off. Choose **Use wake detector lab**, then **Record**; the panel reports active tracking once the analysis graph is connected. **Review trigger clips and classifications** jumps to the event table. Browsers restoring the task selector on navigation are reconciled with the panel visibility.

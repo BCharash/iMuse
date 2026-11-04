@@ -7,7 +7,7 @@ import { createLabRecorderChoice, closeLabAudioContext, acquireLabMicrophoneAfte
 const $=id=>document.getElementById(id),store=createLabStore(),records=new Map(),rows=new Map(),pendingCaptures=new Set(),deleting=new Set();
 let current=null,preparing=false,preparingCleanup=null,maintenance=false,generation=0,temporaryStream=null,playerUrl=null,whisper=null,whisperReady=false,whisperLoading=null,whisperSerial=0;
 let events=[],displayStart=0,titleRequests=new Map(),offlinePreparing=false;
-const LAB_BUILD='2026-11-04.10';$('build').textContent='Lab build '+LAB_BUILD;
+const LAB_BUILD='2026-11-04.11';$('build').textContent='Lab build '+LAB_BUILD;
 const status=text=>$('status').textContent=text;
 const modelStatus=text=>$('modelStatus').textContent=text;
 const settings=()=>({verifyWake:$('verifyWake').checked&&$('liveAnalysis').checked&&$('labMode').value==='wake'&&$('engine').value!=='off',autoName:$('autoName').checked,nearThreshold:Number($('nearThreshold').value),formatPreference:$('format').value,liveAnalysis:$('liveAnalysis').checked,engine:$('engine').value,threshold:Number($('wakeThreshold').value),requireSpeech:$('speechGate').checked,speechThreshold:Number($('speechThreshold').value),minimumDb:$('levelGate').checked?Number($('minimumDb').value):null});
@@ -64,7 +64,7 @@ function controls() {
  $('prepare').disabled=busy||offlinePreparing||maintenance;$('clearRecordings').disabled=busy||maintenance||pendingCaptures.size>0||records.size===0;$('pause').textContent=current?.recorder.state==='paused'?'Resume':'Pause';
  $('missedWake').disabled=!current?.detectorReady||current?.stopping||$('engine').value==='off';$('markNegative').disabled=$('missedWake').disabled;
  renderEvents();
- for(const id of ['verifyWake','nearThreshold','labMode','format','liveAnalysis','engine','wakeThreshold','wakeAction','speechGate','speechThreshold','agc','noise','echo','levelGate','minimumDb'])$(id).disabled=busy;
+ for(const id of ['filenameMode','wakeMode','verifyWake','nearThreshold','labMode','format','liveAnalysis','engine','wakeThreshold','wakeAction','speechGate','speechThreshold','agc','noise','echo','levelGate','minimumDb'])$(id).disabled=busy;
  for(const record of records.values())renderRecord(record);
 }
 function showPlayer(record) {
@@ -254,7 +254,7 @@ async function start() {
     const pcm=event.data,id=++packet;pending.add(id);
     worker.postMessage({type:'audio',pcm,id,generation:run,sentAt:Date.now(),sampleRate:context.sampleRate,recording:capture.recorder.state==='recording',reset:resetNext},[pcm.buffer]);resetNext=false;
    };
-   capture.source.connect(capture.processor);capture.processor.connect(capture.silent);capture.silent.connect(context.destination);capture.analysisStage='running';log('analysis-stage',{id:record.id,stage:capture.analysisStage});
+   capture.source.connect(capture.processor);capture.processor.connect(capture.silent);capture.silent.connect(context.destination);capture.analysisStage='running';$('trackingMode').textContent=config.engine==='off'?'Wake tracking OFF — recording filename audio only.':`Wake tracking ACTIVE — ${config.engine==='heed'?'Hey Doc':'Hey Friday'} · ${config.requireSpeech?'speech gate on':'speech gate off'}. Scores update below; triggers appear in Review.`;log('analysis-stage',{id:record.id,stage:capture.analysisStage});
   }catch(error){capture.detectorReady=false;worker.terminate();resolveTitle(null);await closeLabAudioContext(context,cleanup=>log('context-cleanup-error',{message:cleanup.message}));if(current===capture){$('detectionStatus').textContent='Audio recording continues without analysis: '+error.message;log('analysis-start-failed',{id:record.id,message:error.message});}}
  }catch(error){
   log('recording-start-failed',{name:error.name,message:error.message,streamActive:stream?.active,tracks:stream?.getAudioTracks().map(track=>({state:track.readyState,muted:track.muted,enabled:track.enabled,settings:track.getSettings()})),formatAttempts:capture?.record.formatAttempts});
@@ -267,12 +267,19 @@ $('record').onclick=start;$('pause').onclick=togglePause;$('stop').onclick=()=>{
 function selectLabMode() {
  const naming=$('labMode').value==='filename';
  $('liveAnalysis').checked=true;$('autoName').checked=naming;$('engine').value=naming?'off':'heed';$('wakeThreshold').value=.7;
- $('wakePanel').hidden=naming;$('wakeEvents').hidden=naming;$('filenameOptions').hidden=!naming;
+ $('wakePanel').hidden=naming;$('wakeEvents').hidden=false;$('filenameOptions').hidden=!naming;
  $('sessionTitle').textContent=naming?'Filename lab':'Speech-gate comparison lab';
+ $('trackingMode').textContent=naming?'Wake tracking OFF — Filename mode does not run a wake detector. Choose Use wake detector lab to track triggers.':'Wake tracking selected — press Record to start listening. Live scores appear here; trigger clips appear under Review below.';
+ $('detectionStatus').textContent=naming?'Speech detection is used only to find opening audio for naming.':'Wake detector has not started.';
+ $('levels').textContent='Wake score — · Speech score — · Input — dBFS';$('reviewLink').hidden=false;
  renderEvents();
  status(naming?'Filename session: record opening speech, then Stop for a keyword suggestion.':'Wake session: speech-gated detection; automatic filename suggestions are off.');
 }
-$('labMode').onchange=selectLabMode;selectLabMode();
+$('labMode').onchange=selectLabMode;
+for(const [id,mode] of [['filenameMode','filename'],['wakeMode','wake']])$(id).onclick=()=>{if(current||preparing)return;$('labMode').value=mode;selectLabMode();controls();};
+// Reconcile controls if the browser restores the select value after navigation.
+globalThis.addEventListener('pageshow',()=>{if(!current&&!preparing)selectLabMode();});
+selectLabMode();
 $('engine').onchange=()=>{$('wakeThreshold').value=$('engine').value==='voicute'?.9:.7;};
 $('clearRecordings').onclick=async()=>{
  if(current||preparing||maintenance||pendingCaptures.size)return;
