@@ -1,5 +1,5 @@
 import { datePrefix, filename, filenameSuffix, filenameKeywords, audioExtension, diagnosticEvent, interruptedMessage } from './core.js';
-import { reviewWav, reviewClassification } from './review.js';
+import { reviewWav, reviewClassification, linkedNearTriggers, reviewChoices } from './review.js';
 import { createWakeVerifier } from './verification.js';
 import { createLabStore } from './store.js';
 import { createLabCapture } from './capture.js';
@@ -8,7 +8,7 @@ const $=id=>document.getElementById(id),store=createLabStore(),records=new Map()
 let current=null,preparing=false,preparingCleanup=null,maintenance=false,generation=0,temporaryStream=null,playerUrl=null,whisper=null,whisperReady=false,whisperLoading=null,whisperSerial=0;
 let logEpoch=0;
 let events=[],displayStart=0,titleRequests=new Map(),offlinePreparing=false;
-const LAB_BUILD='2026-11-04.14';$('build').textContent='Lab build '+LAB_BUILD;
+const LAB_BUILD='2026-11-04.15';$('build').textContent='Lab build '+LAB_BUILD;
 const status=text=>$('status').textContent=text;
 const modelStatus=text=>$('modelStatus').textContent=text;
 const settings=()=>({verifyWake:$('verifyWake').checked&&$('liveAnalysis').checked&&$('labMode').value==='wake'&&$('engine').value!=='off',autoName:$('autoName').checked,nearThreshold:Number($('nearThreshold').value),formatPreference:$('format').value,liveAnalysis:$('liveAnalysis').checked,engine:$('engine').value,threshold:Number($('wakeThreshold').value),requireSpeech:$('speechGate').checked,speechThreshold:Number($('speechThreshold').value),minimumDb:$('levelGate').checked?Number($('minimumDb').value):null});
@@ -27,24 +27,39 @@ function persistReview(event) {
 function reviewMetadata(event) {const {audio,...metadata}=event;return metadata;}
 function renderEvents() {
  $('events').replaceChildren();
- for(const event of events.slice(displayStart).filter(event=>reviewTypes.has(event.type)).slice(-100).reverse()){
-  const row=document.createElement('tr');
+ const links=linkedNearTriggers(events),showLinked=$('showLinkedNear').checked;
+ const visible=events.slice(displayStart).filter(event=>reviewTypes.has(event.type)&&(showLinked||!links.has(event))).slice(-100).reverse();
+ for(const event of visible){
+  const card=document.createElement('article');card.className='review-card';
   const result=event.type==='wake'?(event.accepted?'Accepted':!event.levelPass?'Rejected: level':'Rejected: speech'):event.type==='near-wake'?'Near trigger':event.type==='missed-wake'?'Manual miss':'Manual negative';
-  for(const value of [new Date(event.at).toLocaleTimeString(),result,event.prob?.toFixed(3)??'—',event.speechMax?.toFixed(3)??'—',event.inputDb?.toFixed(1)??'—',Number.isFinite(event.analysisMs)?event.analysisMs.toFixed(1):'—',Number.isFinite(event.transportMs)?event.transportMs.toFixed(1):'—']){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}
-  const playback=document.createElement('td'),play=document.createElement('button');play.textContent=event.audio?'▶ Play clip':'Awaiting clip';play.disabled=!!current||preparing||!event.audio?.size;play.onclick=()=>playReview(event);playback.append(play);
-  const info=document.createElement('p');info.textContent=event.duration===undefined?'':`${event.duration.toFixed(1)} s · event at ${event.eventOffset.toFixed(1)} s${event.shortPreRoll?' · short pre-roll':''}${event.shortPostRoll?' · short post-roll':''}`;playback.append(info);row.append(playback);
-  const review=document.createElement('td'),choice=document.createElement('select');
-  for(const label of ['unreviewed','true positive','false positive','true negative','false negative']){const option=document.createElement('option');option.value=label;option.textContent=label;choice.append(option);}
-  choice.disabled=maintenance;choice.value=event.review||'unreviewed';choice.onchange=()=>{event.review=choice.value;persistReview(event);renderEvents();};review.append(choice);row.append(review);
-  const notesCell=document.createElement('td'),notes=document.createElement('input');notes.disabled=maintenance;notes.type='text';notes.placeholder='Background / pronunciation / notes';notes.value=event.notes||'';notes.setAttribute('aria-label','Review notes');notes.oninput=()=>{event.notes=notes.value;};notes.onchange=()=>persistReview(event);notesCell.append(notes);row.append(notesCell);
-  const verification=document.createElement('td'),v=event.verification;
-  verification.textContent=!v?'Off / not tested':v.status==='complete'||v.status==='late-result'?`${v.phrasePresent?'Phrase found':'Phrase not found'} · ${Math.round(v.totalMs)} ms${v.withinBudget?'':' · over 500 ms'}${v.status==='late-result'?' · late result':''}${v.shortPreRoll?' · short input':''} · “${v.text||''}”`:v.status+(v.message?' · '+v.message:'');
+  const heading=document.createElement('strong');heading.textContent=`${new Date(event.at).toLocaleTimeString()} · ${result}`;card.append(heading);
+  const actions=document.createElement('div');actions.className='review-actions';
+  const play=document.createElement('button');play.textContent=event.audio?'▶ Play clip':'Awaiting clip';play.disabled=!!current||preparing||!event.audio?.size;play.onclick=()=>playReview(event);actions.append(play);
+  const label=document.createElement('label');label.textContent='Classification ';
+  const choice=document.createElement('select'),choices=reviewChoices(event);
+  for(const value of choices){const option=document.createElement('option');option.value=value;option.textContent=value;choice.append(option);}
+  choice.setAttribute('aria-label','Classification for '+new Date(event.at).toLocaleTimeString());choice.disabled=maintenance;choice.value=choices.includes(event.review)?event.review:'unreviewed';choice.onchange=()=>{event.review=choice.value;persistReview(event);renderEvents();};label.append(choice);actions.append(label);card.append(actions);
+  const info=document.createElement('p');info.className='review-meta';
+  info.textContent=event.duration===undefined?'':`${event.duration.toFixed(1)} s · event at ${event.eventOffset.toFixed(1)} s${event.shortPreRoll?' · short pre-roll':''}${event.shortPostRoll?' · short post-roll':''}`;
+  const preceding=[...links].filter(([,wake])=>wake===event).map(([near])=>near);
+  if(preceding.length)info.textContent+=` · ${preceding.length} preceding near trigger${preceding.length===1?'':'s'} grouped here (retained in export)`;
+  if(links.has(event))info.textContent+=' · Linked to actual trigger at '+new Date(links.get(event).at).toLocaleTimeString()+'; excluded from comparison counts';
+  if(event.review&&event.review!=='unreviewed'&&!choices.includes(event.review))info.textContent+=' · Previous label: '+event.review+'; choose a label matching this result';
+  card.append(info);
+  const notes=document.createElement('input');notes.disabled=maintenance;notes.type='text';notes.placeholder='Background / pronunciation / notes';notes.value=event.notes||'';notes.setAttribute('aria-label','Review notes');notes.oninput=()=>{event.notes=notes.value;};notes.onchange=()=>persistReview(event);card.append(notes);
+  const metrics=document.createElement('dl');metrics.className='review-metrics';
+  for(const [name,value] of [['Wake score',event.prob?.toFixed(3)??'—'],['Speech score',event.speechMax?.toFixed(3)??'—'],['Input dBFS',event.inputDb?.toFixed(1)??'—'],['Processing ms',Number.isFinite(event.analysisMs)?event.analysisMs.toFixed(1):'—'],['Packet → result ms',Number.isFinite(event.transportMs)?event.transportMs.toFixed(1):'—']]){
+   const item=document.createElement('div'),term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=name;detail.textContent=value;item.append(term,detail);metrics.append(item);
+  }
+  card.append(metrics);
+  const verification=document.createElement('p'),v=event.verification;verification.className='review-meta';
+  verification.textContent='Whisper: '+(!v?'Off / not tested':v.status==='complete'||v.status==='late-result'?`${v.phrasePresent?'Phrase found':'Phrase not found'} · ${Math.round(v.totalMs)} ms${v.withinBudget?'':' · over 500 ms'}${v.status==='late-result'?' · late result':''}${v.shortPreRoll?' · short input':''} · “${v.text||''}”`:v.status+(v.message?' · '+v.message:''));
   if(v?.inferenceMs!==undefined)verification.title=`Whisper inference ${Math.round(v.inferenceMs)} ms; input ${v.sampleSeconds.toFixed(2)} s; shadow verdict only`;
-  row.append(verification);$('events').append(row);
+  card.append(verification);$('events').append(card);
  }
- const reviewed=events.filter(event=>reviewTypes.has(event.type));
+ const reviewed=events.filter(event=>reviewTypes.has(event.type)&&!links.has(event));
  const describe=gate=>{const totals={'true positive':0,'false positive':0,'true negative':0,'false negative':0,unreviewed:0};for(const event of reviewed)totals[reviewClassification(event,gate)]++;return `${totals['true positive']} TP · ${totals['false positive']} FP · ${totals['true negative']} TN · ${totals['false negative']} FN · ${totals.unreviewed} unreviewed`;};
- $('comparison').textContent=`Same sampled events: without speech gate: ${describe(false)}. With speech gate: ${describe(true)}. Level gate stays equal. Near triggers and manual marks are sampled negatives; these are not whole-session accuracy rates. Counts include saved reviews and cleared rows.`;
+ $('comparison').textContent=`Same sampled events: without speech gate: ${describe(false)}. With speech gate: ${describe(true)}. Level gate stays equal. ${links.size} preceding near triggers are linked to actual candidates and excluded from these counts. Other near/manual negatives are sampled examples, not whole-session accuracy rates. Counts include saved reviews and cleared cards.`;
  const verdicts=reviewed.map(event=>event.verification).filter(Boolean),completed=verdicts.filter(v=>['complete','late-result'].includes(v.status)),times=completed.map(v=>v.totalMs).sort((a,b)=>a-b);
  const percentile=p=>Math.round(times[Math.max(0,Math.ceil(times.length*p)-1)]);
  $('verificationSummary').textContent=verdicts.length?`Whisper: ${completed.length} completed · ${verdicts.filter(v=>v.status==='skipped-busy').length} skipped busy${times.length?` · median ${percentile(.5)} ms · 95th percentile ${percentile(.95)} ms · ${completed.filter(v=>v.withinBudget).length}/${completed.length} within 500 ms`:''}. Includes saved reviews; this is added verification delay, not phrase-end response time.`:'Whisper verification is optional; results never change wake actions.';
@@ -324,6 +339,7 @@ async function clearAllLogs() {
  finally{maintenance=false;controls();}
 }
 $('clearAllLogs').onclick=clearAllLogs;
+$('showLinkedNear').onchange=renderEvents;
 $('clearLog').onclick=()=>{displayStart=events.length;renderEvents();};
 $('exportLog').onclick=()=>download('RecorderLab-diagnostics-'+Date.now()+'.json',new Blob([JSON.stringify({version:1,build:LAB_BUILD,exportedAt:new Date().toISOString(),events:events.map(reviewMetadata),recordings:[...records.values()].map(({audio,reviews,...record})=>record)},null,2)],{type:'application/json'}));
 setInterval(()=>{if(!current)return;const seconds=Math.floor((Date.now()-Date.parse(current.record.startedAt))/1000);$('elapsed').textContent=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;},500);

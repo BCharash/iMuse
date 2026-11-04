@@ -36,9 +36,45 @@ The subsequently supplied **42.858 s M4A** allowed full-sequence replay with the
 
 **Lab build .13 fixes this input-context omission.** Retain the trailing 64 samples separately from the recurrent `[2,1,128]` state and prefix them to each new 512-sample block. Reset both at recording starts, rate configuration and analysis gaps. The 64 samples are historical audio, so this adds no wait for future audio and does not advance clip timestamps. Model/runtime assets, wake threshold, speech threshold, gate decision rule and production code remain unchanged. Reevaluate both false accepts and false rejects on fresh runs; earlier lab gate results used the incorrect input contract and cannot establish performance of the corrected integration. This single example is not device-wide certification. Private audio and raw exports remain outside the repository.
 
+### Build 14: genuine wake rejected with background music
+
+The user supplied the full **105.834 s** recording and matching diagnostics/review exports for **2026-11-04 18:09:56.981 UTC**, event `1-6`, at analysis time **44.224 s**. This run used wake threshold **0.7**, speech threshold **0.6**, no level gate, and Whisper verification off. Heed scored **0.872094**; peak speech score **0.386257** left zero blocks above the speech threshold. Input level was **−21.47 dBFS**, processing **3.8 ms**, packet-to-result **4 ms**. The user reports a genuine Hey Doc with music playing in the background.
+
+Full-recording Chrome/WASM replay with the corrected 64-sample context reproduced rejection: peak **0.378957**, zero blocks ≥ 0.6. The decoded/resampled M4A was aligned to the original analysis clip with normalized waveform correlation **0.999977** and analysis start offset **0.064 s**. The older incorrect 512-only input instead peaked at **0.683152** with two qualifying blocks, which supports that this exported run follows the corrected path rather than a stale older worker. Lossy audio replay is not bit-identical to the original live PCM.
+
+Resetting recurrent state at the beginning of the same saved pre-trigger audio produced a peak of **0.994174**, with **16 blocks ≥ 0.6**. Thus the prior sequence/state materially affects the result; this survives the build .13 context fix. Music is a plausible contributing condition, but no music-removed comparison establishes it as the sole cause. No threshold, model or runtime change is justified solely from this example. Local Tiny transcribed the preceding audio as “Hey dogs”, further illustrating why strict ASR phrase matching is not a reliable substitute here.
+
+An exploratory fresh-state recheck of the preceding three seconds, using existing 16 kHz analysis PCM and the bundled model in isolated local Chrome, passed on all 11 repetitions. First check: **48.74 ms**. Ten warmed repetitions: median **37.69 ms**, 95th percentile / maximum **42.90 ms**, minimum **36.60 ms**. These numbers measure the local replay loop, exclude dispatch/queueing and concurrent live capture/model contention, and do not certify end-to-end response time or other devices. A rejected-candidate fresh-state fallback is a possible **lab experiment**, not implemented behavior; compare false accepts as well as rescued genuine phrases before adopting it. Production remains unchanged. Raw audio/exports remain outside the repository.
+
+### Offline speech-threshold comparison on the corrected build 14 run
+
+Compared all **five actual wake candidates** in the 18:09:12 recording, holding the exported one-second history, two qualifying blocks and level-gate result fixed. Review and diagnostic exports contain identical histories. All 15 clip labels are still unreviewed; only the genuine phrase at **18:09:56.981** is established by the user's report. The other four candidates have unknown truth labels. Older build .11 scores are excluded because they used the incorrect input contract. Forty-five decisions across nine thresholds were cross-checked against the lab's actual `evaluateSpeechGate` helper.
+
+| Speech threshold | Accepted candidates | Rejected candidates | Confirmed genuine phrase accepted? | Other decisions changed from 0.6 |
+| --- | --- | --- | --- | --- |
+| 0.6 | 3 | 2 | No | 0 |
+| 0.5 | 3 | 2 | No | 0 |
+| 0.4 | 3 | 2 | No | 0 |
+| 0.35 | 3 | 2 | No | 0 |
+| 0.3 | 4 | 1 | Yes | 0 |
+| 0.25 | 4 | 1 | Yes | 0 |
+| 0.2 | 5 | 0 | Yes | 1 |
+
+The confirmed phrase has two-block support **0.340847** (the second-highest speech score), so 0.35 still fails despite the peak of 0.386257. The other rejected candidate at **18:09:20.182** has two-block support **0.210504**; 0.3 keeps it rejected while 0.2 accepts it. Its correctness is unknown. The three already accepted candidates have support above 0.92 and remain accepted throughout this sweep.
+
+**Next focused experiment:** manually try speech threshold **0.3**, leaving the wake threshold, two-block rule and lookback unchanged, and label every actual candidate as well as intentional misses. This rescues the one confirmed false rejection without changing any other decision in this small sample, but does not establish false-positive rates or an optimal production threshold. Lowering the decision threshold requires no additional inference or audio wait. No default, runtime behavior or fresh-state fallback was changed by this offline comparison.
+
+### Labeled export and overlapping near-trigger review
+
+The later diagnostic export `RecorderLab-diagnostics-1793816807994.json` contains **all 15 review labels** for the same build .14 run. Its five actual candidates are **3 TP, 1 TN, 1 FN** under the original 0.6 gate. This supplies the previously missing ground truth; it supersedes the initial unreviewed-label limitation above. At speech threshold 0.3, those same candidates become **4 TP, 1 TN, 0 FP, 0 FN**. At 0.2 the correctly rejected candidate at 18:09:20 becomes an FP. Keep the one-second history and two-block rule fixed. This is one labeled run, not production validation.
+
+Each actual candidate has a preceding near trigger **0.096–0.320 s** earlier, so their five-second clips substantially overlap. Four near triggers labeled FN lead to an eventual actual trigger containing the same phrase; those rows should not be counted as separate misses in the comparison. A standalone near trigger at **18:10:22.069** is labeled FN despite strong speech evidence; lowering the speech threshold cannot rescue an attempt that never produced a wake candidate. Across ten observations after linking the five preceding near triggers, the original gate yields **3 TP / 0 FP / 5 TN / 2 FN**; threshold 0.3 yields **4 TP / 0 FP / 5 TN / 1 FN**. Sampled TN observations are not continuous-time negatives.
+
+Build .15 presents review cards with Play and classification together, wrapping scores/timing beneath them to avoid per-clip horizontal scrolling. Accepted candidates offer unreviewed/TP/FP; rejected candidates and other non-accepted samples offer unreviewed/TN/FN. Existing incompatible labels are retained, with a prompt to choose a result-appropriate label. Near triggers within one second before an actual candidate in the same recording are linked by sample time (analysis seconds fallback), hidden by default and excluded from comparison counts. **Show near triggers linked to actual triggers** reveals the raw rows for review; exports and saved audio/labels retain all events. This is a temporal grouping heuristic, not a claim that every overlapping clip is the same utterance. No trigger threshold, model or detector behavior changed.
+
 ## Current lab
 
-Hosted **lab.html**, build **2026-11-04.14**, is separate from production recording. No API key/cloud inference is used.
+Hosted **lab.html**, build **2026-11-04.15**, is separate from production recording. No API key/cloud inference is used.
 
 | Mode/control | Purpose |
 | --- | --- |

@@ -26,6 +26,21 @@ export class ReviewBuffer {
  }
  gap() {this.flush(true);this.blocks=[];}
 }
+// Link a sampled near trigger to the next actual candidate in the same recording,
+// at most one second later. Preserve both raw events and their annotations.
+export function linkedNearTriggers(events) {
+ const position=event=>Number.isFinite(event.eventSample)?event.eventSample/(event.sampleRate||16000):Number.isFinite(event.seconds)?event.seconds:null;
+ const wakes=events.filter(event=>event.type==='wake'&&position(event)!==null),links=new Map();
+ for(const near of events.filter(event=>event.type==='near-wake')){
+  const at=position(near);if(at===null||!near.id)continue;
+  const next=wakes.filter(wake=>wake.id===near.id&&position(wake)>=at&&position(wake)-at<=1).sort((a,b)=>position(a)-position(b))[0];
+  if(next)links.set(near,next);
+ }
+ return links;
+}
+export function reviewChoices(event) {
+ return event.type==='wake'&&event.accepted?['unreviewed','true positive','false positive']:['unreviewed','true negative','false negative'];
+}
 export function reviewClassification(event,requireSpeech=false) {
  const truth=['true positive','false negative','wake'].includes(event.review)?true:['false positive','true negative','speech','noise'].includes(event.review)?false:null;
  if(truth===null)return 'unreviewed';

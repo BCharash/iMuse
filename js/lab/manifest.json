@@ -1,7 +1,7 @@
 {
   "version": 1,
   "cache": "imuse-simple-lab-v1",
-  "bytes": 82559629,
+  "bytes": 82562810,
   "assets": [
     {
       "path": "js/heed/filter-coeffs.js",
@@ -35,8 +35,8 @@
     },
     {
       "path": "js/lab/app.js",
-      "bytes": 37712,
-      "sha256": "ddb1bf6c512b8c2073b90932fe49558038f4187b332058a7d352c604a40cf0db"
+      "bytes": 39270,
+      "sha256": "901c73fe778b97e6f7aca9d532d00878c23c281c08f7637c3a921ddf324bf6b4"
     },
     {
       "path": "js/lab/capture.js",
@@ -140,8 +140,8 @@
     },
     {
       "path": "js/lab/review.js",
-      "bytes": 3180,
-      "sha256": "7de70793e6f4e98eee4da273da27382ae813d649370965ab77446c6c82b69ef8"
+      "bytes": 4129,
+      "sha256": "32b66ff843d0b0c206099cbd487f89512ef0b0edd7d41491d1b47d1b6cb9a159"
     },
     {
       "path": "js/lab/store.js",
@@ -150,8 +150,8 @@
     },
     {
       "path": "js/lab/style.css",
-      "bytes": 1429,
-      "sha256": "00a164d75c6da2067f9b9e234bd6d7ea430914d8eba29cb01003dedf8202d5ae"
+      "bytes": 2116,
+      "sha256": "0e17f3d62c45c700d30d0556f0dffe439a20f15236f22a336921121aa7c3c481"
     },
     {
       "path": "js/lab/vendor/licenses/heed-Apache-2.0.txt",
@@ -240,8 +240,8 @@
     },
     {
       "path": "lab.html",
-      "bytes": 9332,
-      "sha256": "cbfe74fb4cf7c20c0ceadcbc015ed3cfaf521c9dff68e3ceb9a105a462d36871"
+      "bytes": 9319,
+      "sha256": "c339f0b1989a9c8ee5ea7a41b2a1dad87ae3cb29fc2965a1f76156664486e1ef"
     }
   ]
 }

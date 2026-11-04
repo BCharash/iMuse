@@ -134,6 +134,23 @@ const factory={open(){const request={result:db};Promise.resolve().then(()=>reque
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
 """)
 
+    def test_near_trigger_linking_and_classification_choices(self):
+        review=(ROOT/'js/lab/review.js').read_text().replace('export ', '')
+        evaluate(review + r"""
+const assert=(value,message)=>{if(!value)throw Error(message);};
+const near={id:'run1',type:'near-wake',eventId:'near',seconds:10,review:'false negative'},wake={id:'run1',type:'wake',eventId:'wake',seconds:10.32,accepted:true,review:'true positive'};
+const independent={id:'run1',type:'near-wake',seconds:7},otherRun={id:'run2',type:'near-wake',seconds:10},after={id:'run1',type:'near-wake',seconds:10.5};
+const events=[near,wake,independent,otherRun,after];const links=linkedNearTriggers(events);
+assert(links.size===1&&links.get(near)===wake,'near trigger links only to the next candidate within one second in the same recording');
+assert(near.review==='false negative'&&wake.review==='true positive'&&events.length===5,'linking preserves raw events and independent saved labels');
+const sampledNear={id:'sample',type:'near-wake',eventSample:160000,sampleRate:16000},sampledWake={id:'sample',type:'wake',eventSample:168000,sampleRate:16000,accepted:false};
+assert(linkedNearTriggers([sampledNear,sampledWake]).get(sampledNear)===sampledWake,'sample positions link rejected candidates too');
+assert(reviewChoices(wake).join(',')==='unreviewed,true positive,false positive','accepted candidates offer only positive labels');
+assert(reviewChoices(sampledWake).join(',')==='unreviewed,true negative,false negative','rejected candidates offer only negative labels');
+assert(reviewChoices(near).join(',')==='unreviewed,true negative,false negative','near triggers are non-accepted observations');
+globalThis.testResult='PASS';
+""")
+
     def test_review_clip_boundaries_and_classification(self):
         review=(ROOT/'js/lab/review.js').read_text().replace('export ', '')
         evaluate(review + r"""
@@ -215,16 +232,16 @@ const urls=[];const URL={createObjectURL:audio=>{urls.push(audio);return 'blob:t
 (async()=>{
  const event={id:'record',eventId:'event',type:'wake',at:new Date().toISOString(),accepted:true,levelPass:true,speechPass:false,prob:.9,speechMax:.1,analysisMs:3.19999999995,transportMs:3,audio:{size:160044},duration:5,eventOffset:3};
  records.set('record',{id:'record',reviews:[event]});events.push(event);renderEvents();
- let row=$('events').children[0];assert(row.children[5].textContent==='3.2'&&row.children[6].textContent==='3.0','processing and overlapping packet latency are shown separately');assert(row.children[7].children[0].disabled===false,'completed audio can be played');
- current={};renderEvents();row=$('events').children[0];assert(row.children[7].children[0].disabled,'review playback disabled during recording');playReview(event);assert(urls.length===0,'playback guard also protects direct calls');
- current=null;renderEvents();row=$('events').children[0];row.children[7].children[0].onclick();assert($('player').played&&urls[0]===event.audio,'clip audio is passed to native player');
- const select=row.children[8].children[0];select.value='false positive';select.onchange();await reviewWrites;
+ let row=$('events').children[0];assert(row.children[4].children[3].children[1].textContent==='3.2'&&row.children[4].children[4].children[1].textContent==='3.0','processing and overlapping packet latency are shown separately');assert(row.children[1].children[0].disabled===false,'completed audio can be played');
+ current={};renderEvents();row=$('events').children[0];assert(row.children[1].children[0].disabled,'review playback disabled during recording');playReview(event);assert(urls.length===0,'playback guard also protects direct calls');
+ current=null;renderEvents();row=$('events').children[0];row.children[1].children[0].onclick();assert($('player').played&&urls[0]===event.audio,'clip audio is passed to native player');
+ const select=row.children[1].children[1].children[0];assert(select.children.map(option=>option.value).join(',')==='unreviewed,true positive,false positive','accepted card only offers positive-result classifications');select.value='false positive';select.onchange();await reviewWrites;
  assert(puts===1&&event.review==='false positive','classification is persisted');
  assert($('comparison').textContent.includes('1 FP')&&$('comparison').textContent.includes('1 TN'),'summary compares identical reviewed event with gate on and off');
  pendingCaptures.add('record');persistReview(event);await reviewWrites;assert(puts===1,'active capture defers review writes to capture finalization');
  pendingCaptures.clear();deleting.add('record');persistReview(event);await reviewWrites;assert(puts===1,'review updates cannot resurrect deleted recordings');
  const metadata=reviewMetadata(event);assert(!('audio' in metadata)&&metadata.review==='false positive','diagnostics omit binary audio and retain labels');
- delete event.analysisMs;delete event.transportMs;renderEvents();row=$('events').children[0];assert(row.children[5].textContent==='—'&&row.children[6].textContent==='—','missing timing is not reported as zero latency');
+ delete event.analysisMs;delete event.transportMs;renderEvents();row=$('events').children[0];assert(row.children[4].children[3].children[1].textContent==='—'&&row.children[4].children[4].children[1].textContent==='—','missing timing is not reported as zero latency');
  globalThis.testResult='PASS';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
 """)
