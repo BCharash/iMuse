@@ -17,9 +17,11 @@ export function filenameSuffix(text) {
 export function filenameKeywords(text) {
  const stop=new Set(('a an the and or but for nor so yet as at by from in into of on onto to with without about after before between through during over under is am are was were be been being have has had do does did can could will would shall should may might must i me my mine we us our ours you your yours he him his she her hers it its they them their theirs this that these those there here then than very really just also please okay ok hello hi hey doc docs friday today now want wanted going gonna talk talking discuss discussing record recording let lets title filename subject').split(' '));
  const words=String(text||'').replace(/<\|[^>]+\|>/g,'').replace(/[’']/g,'').match(/[\p{L}\p{N}]+/gu)||[];
- const seen=new Set(),selected=[];
- for(const word of words){const key=word.toLowerCase();if(stop.has(key)||seen.has(key)||key.length<2)continue;seen.add(key);selected.push(word);if(selected.length===4)break;}
- return selected.join('-').slice(0,40).replace(/-+$/,'');
+ const counts=new Map();
+ words.forEach((word,index)=>{const key=word.toLowerCase();if(stop.has(key)||key.length<2)return;const item=counts.get(key);if(item)item.count++;else counts.set(key,{word,index,count:1});});
+ // Rank the whole opening transcript, rewarding repeated topic words and specificity.
+ const selected=[...counts.values()].sort((a,b)=>(b.count*3+Math.min(b.word.length,12)/3)-(a.count*3+Math.min(a.word.length,12)/3)||a.index-b.index).slice(0,4).sort((a,b)=>a.index-b.index);
+ return selected.map(item=>item.word).join('-').slice(0,40).replace(/-+$/,'');
 }
 export function filename(prefix,suffix,extension) {const clean=filenameSuffix(suffix);return `${prefix}${clean?'_'+clean:''}.${extension}`;}
 export function audioExtension(mime='') {return mime.includes('mp4')?'m4a':mime.includes('webm')?'webm':mime.includes('ogg')?'ogg':'audio';}

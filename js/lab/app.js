@@ -5,15 +5,21 @@ import { createLabRecorderChoice, closeLabAudioContext, acquireLabMicrophoneAfte
 const $=id=>document.getElementById(id),store=createLabStore(),records=new Map(),rows=new Map(),pendingCaptures=new Set(),deleting=new Set();
 let current=null,preparing=false,preparingCleanup=null,maintenance=false,generation=0,temporaryStream=null,playerUrl=null,whisper=null,whisperReady=false,whisperLoading=null,whisperSerial=0;
 let events=[],displayStart=0,candidates=0,accepted=0,rejected=0,titleRequests=new Map(),offlinePreparing=false;
-const LAB_BUILD='2026-11-04.6';$('build').textContent='Lab build '+LAB_BUILD;
+const LAB_BUILD='2026-11-04.7';$('build').textContent='Lab build '+LAB_BUILD;
 const status=text=>$('status').textContent=text;
 const modelStatus=text=>$('modelStatus').textContent=text;
 const settings=()=>({formatPreference:$('format').value,liveAnalysis:$('liveAnalysis').checked,engine:$('engine').value,threshold:Number($('wakeThreshold').value),requireSpeech:$('speechGate').checked,speechThreshold:Number($('speechThreshold').value),minimumDb:$('levelGate').checked?Number($('minimumDb').value):null});
-function log(type,data={}) {events.push(diagnosticEvent(type,data));if(type==='wake')renderEvents();}
+function log(type,data={}) {events.push(diagnosticEvent(type,data));if(type==='wake'||type==='missed-wake')renderEvents();}
 function renderEvents() {
  $('events').replaceChildren();for(const event of events.slice(displayStart).filter(event=>event.type==='wake').slice(-100).reverse()){
-  const row=document.createElement('tr');for(const value of [new Date(event.at).toLocaleTimeString(),event.accepted?'Accepted':event.speechPass?'Rejected: level':'Rejected: speech',event.prob?.toFixed(3),event.speechMax?.toFixed(3),event.inputDb?.toFixed(1)??'−∞',event.transportMs]){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}$('events').append(row);
+  const row=document.createElement('tr');for(const value of [new Date(event.at).toLocaleTimeString(),event.accepted?'Accepted':!event.levelPass?'Rejected: level':'Rejected: speech',event.prob?.toFixed(3),event.speechMax?.toFixed(3),event.inputDb?.toFixed(1)??'−∞',event.transportMs]){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}const review=document.createElement('td'),choice=document.createElement('select');
+  for(const [value,label] of [['','Unreviewed'],['wake','Wake phrase spoken'],['speech','Other speech / TV'],['noise','Noise / silence']]){const option=document.createElement('option');option.value=value;option.textContent=label;choice.append(option);}
+  choice.value=event.review||'';choice.onchange=()=>{event.review=choice.value;renderEvents();};review.append(choice);row.append(review);$('events').append(row);
  }
+ const wakes=events.filter(event=>event.type==='wake');
+ const baseline=wakes.filter(event=>event.levelPass),gated=baseline.filter(event=>event.speechPass);
+ const describe=list=>`${list.length} triggers: ${list.filter(event=>event.review==='wake').length} true, ${list.filter(event=>['speech','noise'].includes(event.review)).length} false, ${list.filter(event=>!event.review).length} unreviewed`;
+ $('comparison').textContent=`Same detector candidates, same audio. Without speech gate: ${describe(baseline)}. With speech gate: ${describe(gated)}. Spoken misses marked: ${events.filter(event=>event.type==='missed-wake').length}. Other settings, including the level gate, stay equal. These counts include this page session, including cleared rows.`;
  $('counts').textContent=`${candidates} candidates · ${accepted} accepted · ${rejected} rejected`;
 }
 function download(name,blob) {const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
@@ -199,6 +205,8 @@ function selectLabMode() {
  const naming=$('labMode').value==='filename';
  $('liveAnalysis').checked=true;$('autoName').checked=naming;$('engine').value=naming?'off':'heed';$('wakeThreshold').value=.7;
  $('wakePanel').hidden=naming;$('wakeEvents').hidden=naming;$('filenameOptions').hidden=!naming;
+ $('sessionTitle').textContent=naming?'Filename lab':'Speech-gate comparison lab';
+ renderEvents();
  status(naming?'Filename session: record opening speech, then Stop for a keyword suggestion.':'Wake session: speech-gated detection; automatic filename suggestions are off.');
 }
 $('labMode').onchange=selectLabMode;selectLabMode();
@@ -210,6 +218,7 @@ $('clearRecordings').onclick=async()=>{
  try{await store.clear();$('player').pause();$('player').removeAttribute('src');$('player').load();$('player').hidden=true;$('playing').textContent='';if(playerUrl)URL.revokeObjectURL(playerUrl);playerUrl=null;records.clear();rows.clear();$('recordings').replaceChildren();status('Lab recordings cleared.');}
  catch(error){ids.forEach(id=>deleting.delete(id));status('Could not clear recordings; loaded audio was kept: '+error.message);}finally{maintenance=false;controls();}
 };
+$('missedWake').onclick=()=>{log('missed-wake',{id:current?.record.id,note:'User marked a spoken wake phrase with no accepted event; tap time is approximate.'});};
 $('clearLog').onclick=()=>{displayStart=events.length;renderEvents();};
 $('exportLog').onclick=()=>download('RecorderLab-diagnostics-'+Date.now()+'.json',new Blob([JSON.stringify({version:1,build:LAB_BUILD,exportedAt:new Date().toISOString(),events,recordings:[...records.values()].map(({audio,...record})=>record)},null,2)],{type:'application/json'}));
 setInterval(()=>{if(!current)return;const seconds=Math.floor((Date.now()-Date.parse(current.record.startedAt))/1000);$('elapsed').textContent=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;},500);

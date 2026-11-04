@@ -29,7 +29,7 @@ Open the hosted **`lab.html`** address. Choose **Filename suggestions** (default
 
 It provides:
 
-- Record, Pause/Resume and Stop, native browser compressed audio, playback and download. **Lab build 2026-11-04.6** is shown below the heading so cached versions can be identified.
+- Record, Pause/Resume and Stop, native browser compressed audio, playback and download. **Lab build 2026-11-04.7** is shown below the heading so cached versions can be identified.
 - Per-recording titles and a date/time prefix that filename suggestions cannot replace.
 - Local Whisper **tiny.en** transcription of up to 15 seconds beginning near detected speech, executed after Stop. The suggestion extracts up to four distinct keywords (40 characters), removing common English filler and wake phrases; this is a local heuristic, not a generative summary. A user must click **Use suggested name** to apply it.
 - **Live speech/wake analysis** can be unchecked for a recorder-only comparison: no detector worker or analysis AudioContext is opened for that recording, and titles are manual. With it checked, choose Heed / Voicute / Wake off (speech analysis stays on), with **Require speech** enabled by default. Silero v5 evaluates 512-sample 16 kHz blocks; a candidate needs at least two above-threshold speech blocks in the preceding second. Speech gating filters acceptance, while continuous wake-model ingestion is preserved.
@@ -65,9 +65,9 @@ New recordings retain previous recordings. Reload recovers available journal chu
 
 ## Safari microphone-ended comparison
 
-The user reports **interrupted · 0.0 KB · Microphone ended** with live analysis enabled. The following recorder-only comparison also displayed recording for about nine seconds before the same result; no other tab or app was using the microphone. This establishes that the input track ended, but not why; analysis alone does not explain both failures. Previous files used WebM. Build 2026-11-04.6 prefers AAC/M4A, matching production iMuse, to test this format difference without claiming a codec defect. The reported 404 was the favicon, unrelated to model loading; the lab now supplies an inline icon. No claim is made that AudioWorklet or matching the context rate cures the Safari interruption.
+The user reports **interrupted · 0.0 KB · Microphone ended** with live analysis enabled. The following recorder-only comparison also displayed recording for about nine seconds before the same result; no other tab or app was using the microphone. This establishes that the input track ended, but not why; analysis alone does not explain both failures. Previous files used WebM. Build 2026-11-04.7 prefers AAC/M4A, matching production iMuse, to test this format difference without claiming a codec defect. The reported 404 was the favicon, unrelated to model loading; the lab now supplies an inline icon. No claim is made that AudioWorklet or matching the context rate cures the Safari interruption.
 
-After deployment, verify **Lab build 2026-11-04.6** below the heading:
+After deployment, verify **Lab build 2026-11-04.7** below the heading:
 
 1. Uncheck **Live speech/wake analysis** and select **AAC / M4A**. Record speech for 15 seconds, Stop, and play it. Check that the filename ends in .m4a. This is the native-recorder baseline, with manual titles.
 2. Only if that succeeds, check **Live speech/wake analysis** and repeat with AAC/M4A unchanged.
@@ -92,3 +92,7 @@ Desktop controlled tests and isolated headless Chrome verify filename/DSP/gate h
 ## Previous lab
 
 The comparison/review lab is preserved at [archived comparison lab](Archive/wake-word-comparison-lab-2026-11-04.html). It still uses the separate `imuse-wake-review-lab` database, so previously saved clips remain accessible from the same site/browser context. Its [archived instructions](Archive/wake-word-review-notes-2026-11-04.md) describe MP3 review clips, labels, portable archives and raw/encoded comparison. Private recordings and the supplied JSON were not committed.
+
+### Comparing the speech gate
+
+Build 2026-11-04.7 shows a distinct Speech-gate comparison lab heading. Each wake event can be reviewed as wake phrase spoken, other speech/TV, or noise/silence. The comparison counts the same candidates with and without the speech gate, holding the level gate equal. This avoids requiring two different ambient recordings. Reviews and approximate spoken-miss markers are included in exported diagnostics; they last only for the current page session until exported. Miss markers are manual observations, not automatic acoustic ground truth. For an initial comparison keep Mark detection selected so gate-dependent pause/resume does not alter the session. Speech gating cannot identify the speaker or verify the words; Whisper still only transcribes filename audio. Filename keywords now rank the whole opening transcript by repetition and word length rather than taking the first four non-filler words.
