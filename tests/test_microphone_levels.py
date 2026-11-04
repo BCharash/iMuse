@@ -10,6 +10,7 @@ METER = between('function publishLiveMicrophoneLevel()', 'function microphoneChe
 
 MOCKS = r"""
 const assert=(value,message)=>{if(!value)throw Error(message);};
+let meterClock=0;const performance={now:()=>meterClock};
 class Target {
     constructor(){this.listeners=new Map();this.hidden=true;this.textContent='';this.attributes={};}
     setAttribute(name,value){this.attributes[name]=value;}
@@ -28,7 +29,8 @@ const document=new Target();document.visibilityState='visible';
 const panel=new Target(),button=new Target(),levels=new Target(),toggle=new Target();
 const level=new Target(),dial=new Target(),needle=new Target();
 const quietButton=new Target(),noisyButton=new Target(),quietMarker=new Target(),noisyMarker=new Target(),quietValue=new Target(),noisyValue=new Target();
-const elements={microphoneLevelLive:level,microphoneLevelDial:dial,microphoneLevelNeedle:needle,
+const checkButton=new Target(),checkStatus=new Target();
+const elements={checkMicrophoneLevel:checkButton,microphoneCheckStatus:checkStatus,microphoneLevelLive:level,microphoneLevelDial:dial,microphoneLevelNeedle:needle,
 markQuietRoom:quietButton,markNoisyRoom:noisyButton,quietRoomMarker:quietMarker,noisyRoomMarker:noisyMarker,
 quietRoomValue:quietValue,noisyRoomValue:noisyValue,microphoneLevelsDetail:levels,microphoneLevelsToggle:toggle};
 document.getElementById=id=>elements[id];
@@ -90,6 +92,12 @@ window.dispatchEvent(new Event('pagehide'));assert(intervals.size===0,'pagehide 
 window.dispatchEvent(new Event('pageshow'));assert(intervals.size===1,'pageshow resumes only visible levels');
 activeSession=null;tick();assert(level.textContent==='Microphone inactive','ending recording clears stale live reading');
 assert(quietMarker.getAttribute('transform')===markedQuiet,'reference marker stays fixed as input changes');
+window.dispatchEvent(new CustomEvent('imuse-microphone-check-state',{detail:{phase:'checking',message:'Checking microphone levels…',recordingBusy:false,endsAtMs:10000}}));
+assert(checkStatus.textContent.includes('10 s remaining'),'countdown uses acquisition deadline');
+meterClock=1100;tick();assert(checkStatus.textContent.includes('9 s remaining'),'existing meter poll updates countdown without another interval');
+meterClock=4500;tick();assert(checkStatus.textContent.includes('6 s remaining')&&intervals.size===1,'delayed refresh uses elapsed time instead of counting timer ticks');
+window.dispatchEvent(new CustomEvent('imuse-microphone-check-state',{detail:{phase:'idle',message:'Microphone check finished.',recordingBusy:false}}));
+meterClock=6000;tick();assert(checkStatus.textContent==='Microphone check finished.','completed or cancelled check cannot retain a stale countdown');
 globalThis.testResult='PASS';
 """
 

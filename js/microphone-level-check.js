@@ -1,10 +1,10 @@
 // Temporary level-only capture. Never creates a recorder, model or stored audio.
-export function createMicrophoneLevelCheck({acquire,release,createContext,isRecordingBusy,publishProcessing=()=>{},onChange=()=>{},setTimer=setTimeout,clearTimer=clearTimeout,durationMs=10000}) {
-    let generation=0,resources=null,closing=null,timer=null;
+export function createMicrophoneLevelCheck({acquire,release,createContext,isRecordingBusy,publishProcessing=()=>{},onChange=()=>{},setTimer=setTimeout,clearTimer=clearTimeout,durationMs=10000,now=()=>performance.now()}) {
+    let generation=0,resources=null,closing=null,timer=null,endsAtMs=null;
     let state={phase:'idle',message:'Check input levels without making a recording.'};
-    function notify(phase,message){state={phase,message};onChange(state);}
+    function notify(phase,message){state={phase,message,endsAtMs};onChange(state);}
     function stop(message='Microphone check ended.') {
-        ++generation;clearTimer(timer);timer=null;
+        ++generation;clearTimer(timer);timer=null;endsAtMs=null;
         if(closing)return closing;
         const owned=resources;resources=null;
         if(!owned){notify('idle',message);return Promise.resolve();}
@@ -29,6 +29,7 @@ export function createMicrophoneLevelCheck({acquire,release,createContext,isReco
                 if(run!==generation||isRecordingBusy()){release(stream);return;}
                 const track=stream.getAudioTracks()[0];
                 resources={stream,checking:true};
+                endsAtMs=now()+durationMs;
                 // Bound microphone use even if resuming Web Audio never completes.
                 timer=setTimer(()=>{void stop('Microphone check finished.');},durationMs);
                 track?.addEventListener('ended',()=>{if(run===generation)void stop('Microphone disconnected.');});
@@ -40,7 +41,7 @@ export function createMicrophoneLevelCheck({acquire,release,createContext,isReco
                 analyser.fftSize=2048;source.connect(analyser);
                 Object.assign(resources,{audioSource:source,source,analyser});
                 publishProcessing(stream,true);
-                notify('checking','Checking microphone levels for 10 seconds…');
+                notify('checking','Checking microphone levels…');
             }catch(error){
                 if(run!==generation)return;
                 await stop('Microphone check unavailable: '+(error.message||error));

@@ -115,14 +115,23 @@ const quietRoomButton = document.getElementById("markQuietRoom");
 const noisyRoomButton = document.getElementById("markNoisyRoom");
 const microphoneCheckButton=document.getElementById('checkMicrophoneLevel');
 const microphoneCheckStatus=document.getElementById('microphoneCheckStatus');
+let microphoneCheckDeadline=null;
+function renderMicrophoneCheckCountdown(){
+    if(microphoneCheckDeadline===null||!microphoneCheckStatus)return;
+    const seconds=Math.max(0,Math.ceil((microphoneCheckDeadline-performance.now())/1000));
+    const text=`Checking microphone levels… ${seconds} s remaining`;
+    if(microphoneCheckStatus.textContent!==text)microphoneCheckStatus.textContent=text;
+}
 microphoneCheckButton?.addEventListener('click',()=>window.dispatchEvent(new Event('imuse-toggle-microphone-check')));
 window.addEventListener('imuse-microphone-check-state',event=>{
-    const {phase,message,recordingBusy,recordingLive}=event.detail;
+    const {phase,message,recordingBusy,recordingLive,endsAtMs}=event.detail;
+    microphoneCheckDeadline=phase==='checking'&&!recordingBusy&&Number.isFinite(endsAtMs)?endsAtMs:null;
     if(microphoneCheckButton){
         microphoneCheckButton.disabled=recordingBusy||phase==='closing';
         microphoneCheckButton.textContent=phase==='opening'||phase==='checking'?'Stop microphone check':'Check microphone level (10 s)';
     }
     if(microphoneCheckStatus)microphoneCheckStatus.textContent=recordingLive?'Using the recording microphone for levels.':recordingBusy?'Recording is preparing or finishing.':message;
+    renderMicrophoneCheckCountdown();
 });
 let lastLiveDbfs = null;
 let smoothedLiveDbfs = null;
@@ -167,6 +176,7 @@ function renderLiveMicrophoneLevel(detail = {}) {
     setMicrophoneDial(displayedDbfs, value);
 }
 function requestLiveMicrophoneLevel() {
+    renderMicrophoneCheckCountdown();
     window.dispatchEvent(new Event("imuse-request-microphone-level"));
 }
 function stopLiveMicrophoneLevel() {

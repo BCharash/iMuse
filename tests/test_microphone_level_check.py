@@ -13,7 +13,7 @@ const states=[],released=[],contexts=[],processing=[];let busy=false,acquisition
 const timers=new Map();let serial=0;
 function makeStream(id){const track={readyState:'live',stops:0,handlers:{},stop(){this.stops++;this.readyState='ended';},addEventListener(type,fn){this.handlers[type]=fn;}};return {id,track,getAudioTracks:()=>[track],getTracks:()=>[track]};}
 function createContext(){const context={state:'running',closes:0,disconnects:0,resume:()=>resumeGate?resumeGate.promise:Promise.resolve(),createMediaStreamSource:()=>({connect(){},disconnect(){context.disconnects++;}}),createAnalyser:()=>({}),close(){this.closes++;this.state='closed';return closeGate?closeGate.promise:Promise.resolve();}};contexts.push(context);return context;}
-function createCheck(){return createMicrophoneLevelCheck({acquire:async current=>{acquisitions++;return acquisitionGate?await acquisitionGate.promise:makeStream('stream-'+acquisitions);},release:stream=>{released.push(stream.id);stream.getTracks().forEach(t=>t.stop());},createContext,isRecordingBusy:()=>busy,publishProcessing:(stream,live)=>processing.push({id:stream.id,live}),onChange:state=>states.push(state),setTimer:(fn,ms)=>{assert(ms===10000,'measurement deadline is ten seconds');const id=++serial;timers.set(id,fn);return id;},clearTimer:id=>timers.delete(id)});}
+function createCheck(){return createMicrophoneLevelCheck({acquire:async current=>{acquisitions++;return acquisitionGate?await acquisitionGate.promise:makeStream('stream-'+acquisitions);},release:stream=>{released.push(stream.id);stream.getTracks().forEach(t=>t.stop());},createContext,now:()=>0,isRecordingBusy:()=>busy,publishProcessing:(stream,live)=>processing.push({id:stream.id,live}),onChange:state=>states.push(state),setTimer:(fn,ms)=>{assert(ms===10000,'measurement deadline is ten seconds');const id=++serial;timers.set(id,fn);return id;},clearTimer:id=>timers.delete(id)});}
 """
 
 def check(script):
@@ -25,7 +25,7 @@ class MicrophoneLevelCheckTests(unittest.TestCase):
  const preview=createCheck();assert(acquisitions===0&&!preview.source,'no startup microphone acquisition');
  busy=true;await preview.start();assert(acquisitions===0,'active recording is left to existing meter without another acquisition');busy=false;
  await preview.start();const stream=preview.source.stream;
- assert(preview.state.phase==='checking'&&contexts.length===1&&preview.source.analyser.fftSize===2048,'explicit check creates one temporary analyser');
+ assert(preview.state.endsAtMs===10000&&preview.state.phase==='checking'&&contexts.length===1&&preview.source.analyser.fftSize===2048,'explicit check creates one temporary analyser');
  assert(processing[0].live&&processing[0].id===stream.id,'processing report identifies preview input');
  await preview.start();assert(acquisitions===1,'repeated start cannot duplicate capture');
  [...timers.values()][0]();await flush();
