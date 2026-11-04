@@ -1,7 +1,7 @@
 {
   "version": 1,
   "cache": "imuse-simple-lab-v1",
-  "bytes": 82531882,
+  "bytes": 82532534,
   "assets": [
     {
       "path": "js/heed/filter-coeffs.js",
@@ -35,8 +35,8 @@
     },
     {
       "path": "js/lab/app.js",
-      "bytes": 24456,
-      "sha256": "2380b33e3a2fcbc837175c40fc557ff7b8376ea9812c1043935fa3bf6b803c69"
+      "bytes": 24524,
+      "sha256": "cb71899a19d4aa67464eef0fc821d2da1e549f65e0e664d85ead5b7d0ef60ee6"
     },
     {
       "path": "js/lab/capture.js",
@@ -60,8 +60,8 @@
     },
     {
       "path": "js/lab/media.js",
-      "bytes": 1794,
-      "sha256": "c550fd4cd2d4c1b6690fb70434cede67b613de8e03707932dc3829c6d6d661ce"
+      "bytes": 2036,
+      "sha256": "91a1bf38477d7b1b8c1cd80e913eb0de4f8f97b6dae85a2bd8463da851250e50"
     },
     {
       "path": "js/lab/models/voicute/hey_friday.onnx",
@@ -230,8 +230,8 @@
     },
     {
       "path": "lab.html",
-      "bytes": 4629,
-      "sha256": "04069873e414654ebed9b57423b36f1e766256773fd6f257eee9b16f1004e530"
+      "bytes": 4971,
+      "sha256": "8bea79b93ddcc27a71c6d962978203bdbacc3a7a4be75d50836bade2c0e47187"
     }
   ]
 }

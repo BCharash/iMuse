@@ -5,10 +5,10 @@ import { createLabRecorderChoice, closeLabAudioContext, acquireLabMicrophoneAfte
 const $=id=>document.getElementById(id),store=createLabStore(),records=new Map(),rows=new Map(),pendingCaptures=new Set(),deleting=new Set();
 let current=null,preparing=false,preparingCleanup=null,maintenance=false,generation=0,temporaryStream=null,playerUrl=null,whisper=null,whisperReady=false,whisperLoading=null,whisperSerial=0;
 let events=[],displayStart=0,candidates=0,accepted=0,rejected=0,titleRequests=new Map(),offlinePreparing=false;
-const LAB_BUILD='2026-11-04.4';$('build').textContent='Lab build '+LAB_BUILD;
+const LAB_BUILD='2026-11-04.5';$('build').textContent='Lab build '+LAB_BUILD;
 const status=text=>$('status').textContent=text;
 const modelStatus=text=>$('modelStatus').textContent=text;
-const settings=()=>({liveAnalysis:$('liveAnalysis').checked,engine:$('engine').value,threshold:Number($('wakeThreshold').value),requireSpeech:$('speechGate').checked,speechThreshold:Number($('speechThreshold').value),minimumDb:$('levelGate').checked?Number($('minimumDb').value):null});
+const settings=()=>({formatPreference:$('format').value,liveAnalysis:$('liveAnalysis').checked,engine:$('engine').value,threshold:Number($('wakeThreshold').value),requireSpeech:$('speechGate').checked,speechThreshold:Number($('speechThreshold').value),minimumDb:$('levelGate').checked?Number($('minimumDb').value):null});
 function log(type,data={}) {events.push(diagnosticEvent(type,data));if(type==='wake')renderEvents();}
 function renderEvents() {
  $('events').replaceChildren();for(const event of events.slice(displayStart).filter(event=>event.type==='wake').slice(-100).reverse()){
@@ -21,7 +21,7 @@ function controls() {
  const busy=preparing||!!current;
  $('record').disabled=busy||offlinePreparing||maintenance;$('stop').disabled=!busy;$('pause').disabled=!current||current.stopping;
  $('prepare').disabled=busy||offlinePreparing||maintenance;$('clearRecordings').disabled=busy||maintenance||pendingCaptures.size>0||records.size===0;$('pause').textContent=current?.recorder.state==='paused'?'Resume':'Pause';
- for(const id of ['liveAnalysis','engine','wakeThreshold','wakeAction','speechGate','speechThreshold','agc','noise','echo','levelGate','minimumDb'])$(id).disabled=busy;
+ for(const id of ['format','liveAnalysis','engine','wakeThreshold','wakeAction','speechGate','speechThreshold','agc','noise','echo','levelGate','minimumDb'])$(id).disabled=busy;
  for(const record of records.values())renderRecord(record);
 }
 function showPlayer(record) {
@@ -154,7 +154,7 @@ async function start() {
   },()=>run===generation);
   if(!stream){worker?.terminate();return;}temporaryStream=stream;
   if(!stream.active||!stream.getAudioTracks().some(track=>track.readyState==='live'))throw Error('The microphone ended before recording could start.');
-  const choice=createLabRecorderChoice(stream,MediaRecorder,attempt=>log('recorder-construction-failed',attempt));
+  const choice=createLabRecorderChoice(stream,MediaRecorder,attempt=>log('recorder-construction-failed',attempt),config.formatPreference);
   const recorder=choice.recorder;
   const record={build:LAB_BUILD,id:crypto.randomUUID(),prefix:datePrefix(),startedAt:new Date().toISOString(),suffix:'',mime:recorder.mimeType||choice.requestedMime,state:'starting',saved:false,settings:config,microphone:stream.getAudioTracks()[0].getSettings(),namingStatus:'Opening speech will be used after Stop.'};
   capture=createLabCapture({recorder,record,store,fallbacks:choice.fallbacks,onStartFailure:attempt=>log('recorder-start-attempt-failed',attempt),onUpdate:c=>{renderRecord(c.record);if(c.record.state==='interrupted'&&current===c){current=null;preparing=false;controls();status(interruptedMessage(c.record));}},

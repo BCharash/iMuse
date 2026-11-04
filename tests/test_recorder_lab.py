@@ -108,7 +108,15 @@ function DOMException(message,name){this.message=message;this.name=name;}
 const store={put:async record=>saved.set(record.id,record),append:async()=>{},finalize:async record=>saved.set(record.id,record)};
 const settle=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 (async()=>{
- const choice=createLabRecorderChoice({},Recorder);
+ const preferred=createLabRecorderChoice({},Recorder);
+ assert(preferred.requestedMime==='audio/mp4;codecs=mp4a.40.2','default preference matches production AAC');
+ const webm=createLabRecorderChoice({},Recorder,()=>{},'webm');
+ assert(webm.requestedMime==='audio/webm;codecs=opus','WebM comparison prefers Opus');
+ class WebmOnly extends Recorder {static isTypeSupported(mime){return mime.includes('webm');}}
+ assert(createLabRecorderChoice({},WebmOnly).requestedMime==='audio/webm;codecs=opus','unsupported AAC is skipped');
+ class DefaultOnly extends Recorder {static isTypeSupported(){return false;}}
+ assert(createLabRecorderChoice({},DefaultOnly).requestedMime==='','browser default remains last-resort fallback');
+ const choice=createLabRecorderChoice({},Recorder,()=>{},'browser');
  assert(choice.requestedMime===''&&choice.recorder.mimeType==='','browser default is tried before explicit formats');
  const initial=choice.recorder,record={id:'fallback',mime:''},capture=createLabCapture({recorder:initial,record,store,fallbacks:choice.fallbacks,setTimer:()=>1,clearTimer:()=>{}});
  await capture.start();assert(attempts[0]==='default'&&attempts[1]==='audio/mp4;codecs=mp4a.40.2','start failure advances to AAC, even though support was advertised');
