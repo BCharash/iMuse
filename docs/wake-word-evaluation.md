@@ -25,11 +25,13 @@ The four false-negative clips include overlapping audio. They do not establish f
 
 ## Current lab
 
-Open the hosted **`lab.html`** address. It provides:
+Open the hosted **`lab.html`** address. Choose **Filename suggestions** (default, wake detector off) or **Speech-gated wake testing** (automatic naming off) before recording. The two tasks share recording storage and offline assets. Wake detection currently uses Heed or Voicute; Whisper is used for naming, not wake verification. Rebooting resolved the reported device problem; the user reports two spoken “Hey Doc” phrases were detected.
 
-- Record, Pause/Resume and Stop, native browser compressed audio, playback and download. **Lab build 2026-11-04.5** is shown below the heading so cached versions can be identified.
+It provides:
+
+- Record, Pause/Resume and Stop, native browser compressed audio, playback and download. **Lab build 2026-11-04.6** is shown below the heading so cached versions can be identified.
 - Per-recording titles and a date/time prefix that filename suggestions cannot replace.
-- Local Whisper **tiny.en** transcription of up to 15 seconds beginning near detected speech, executed after Stop. The suggestion uses up to seven sanitized transcript words, not a generative summary. A user must click **Use suggested name** to apply it.
+- Local Whisper **tiny.en** transcription of up to 15 seconds beginning near detected speech, executed after Stop. The suggestion extracts up to four distinct keywords (40 characters), removing common English filler and wake phrases; this is a local heuristic, not a generative summary. A user must click **Use suggested name** to apply it.
 - **Live speech/wake analysis** can be unchecked for a recorder-only comparison: no detector worker or analysis AudioContext is opened for that recording, and titles are manual. With it checked, choose Heed / Voicute / Wake off (speech analysis stays on), with **Require speech** enabled by default. Silero v5 evaluates 512-sample 16 kHz blocks; a candidate needs at least two above-threshold speech blocks in the preceding second. Speech gating filters acceptance, while continuous wake-model ingestion is preserved.
 - An optional minimum input-level gate using a one-second window; disabled initially. It may help with faint conversation, but it is not speaker identification.
 - Raw candidate/accepted/rejected counts and event rows. Default wake action is **Mark detection**; **Pause / resume recording** is an explicit alternative. No spoken acknowledgement or command-model startup is inserted.
@@ -63,9 +65,9 @@ New recordings retain previous recordings. Reload recovers available journal chu
 
 ## Safari microphone-ended comparison
 
-The user reports **interrupted · 0.0 KB · Microphone ended** with live analysis enabled. The following recorder-only comparison also displayed recording for about nine seconds before the same result; no other tab or app was using the microphone. This establishes that the input track ended, but not why; analysis alone does not explain both failures. Previous files used WebM. Build 2026-11-04.5 prefers AAC/M4A, matching production iMuse, to test this format difference without claiming a codec defect. The reported 404 was the favicon, unrelated to model loading; the lab now supplies an inline icon. No claim is made that AudioWorklet or matching the context rate cures the Safari interruption.
+The user reports **interrupted · 0.0 KB · Microphone ended** with live analysis enabled. The following recorder-only comparison also displayed recording for about nine seconds before the same result; no other tab or app was using the microphone. This establishes that the input track ended, but not why; analysis alone does not explain both failures. Previous files used WebM. Build 2026-11-04.6 prefers AAC/M4A, matching production iMuse, to test this format difference without claiming a codec defect. The reported 404 was the favicon, unrelated to model loading; the lab now supplies an inline icon. No claim is made that AudioWorklet or matching the context rate cures the Safari interruption.
 
-After deployment, verify **Lab build 2026-11-04.5** below the heading:
+After deployment, verify **Lab build 2026-11-04.6** below the heading:
 
 1. Uncheck **Live speech/wake analysis** and select **AAC / M4A**. Record speech for 15 seconds, Stop, and play it. Check that the filename ends in .m4a. This is the native-recorder baseline, with manual titles.
 2. Only if that succeeds, check **Live speech/wake analysis** and repeat with AAC/M4A unchanged.

@@ -1,11 +1,11 @@
-import { datePrefix, filename, filenameSuffix, audioExtension, diagnosticEvent, interruptedMessage } from './core.js';
+import { datePrefix, filename, filenameSuffix, filenameKeywords, audioExtension, diagnosticEvent, interruptedMessage } from './core.js';
 import { createLabStore } from './store.js';
 import { createLabCapture } from './capture.js';
 import { createLabRecorderChoice, closeLabAudioContext, acquireLabMicrophoneAfterPreparation } from './media.js';
 const $=id=>document.getElementById(id),store=createLabStore(),records=new Map(),rows=new Map(),pendingCaptures=new Set(),deleting=new Set();
 let current=null,preparing=false,preparingCleanup=null,maintenance=false,generation=0,temporaryStream=null,playerUrl=null,whisper=null,whisperReady=false,whisperLoading=null,whisperSerial=0;
 let events=[],displayStart=0,candidates=0,accepted=0,rejected=0,titleRequests=new Map(),offlinePreparing=false;
-const LAB_BUILD='2026-11-04.5';$('build').textContent='Lab build '+LAB_BUILD;
+const LAB_BUILD='2026-11-04.6';$('build').textContent='Lab build '+LAB_BUILD;
 const status=text=>$('status').textContent=text;
 const modelStatus=text=>$('modelStatus').textContent=text;
 const settings=()=>({formatPreference:$('format').value,liveAnalysis:$('liveAnalysis').checked,engine:$('engine').value,threshold:Number($('wakeThreshold').value),requireSpeech:$('speechGate').checked,speechThreshold:Number($('speechThreshold').value),minimumDb:$('levelGate').checked?Number($('minimumDb').value):null});
@@ -21,7 +21,7 @@ function controls() {
  const busy=preparing||!!current;
  $('record').disabled=busy||offlinePreparing||maintenance;$('stop').disabled=!busy;$('pause').disabled=!current||current.stopping;
  $('prepare').disabled=busy||offlinePreparing||maintenance;$('clearRecordings').disabled=busy||maintenance||pendingCaptures.size>0||records.size===0;$('pause').textContent=current?.recorder.state==='paused'?'Resume':'Pause';
- for(const id of ['format','liveAnalysis','engine','wakeThreshold','wakeAction','speechGate','speechThreshold','agc','noise','echo','levelGate','minimumDb'])$(id).disabled=busy;
+ for(const id of ['labMode','format','liveAnalysis','engine','wakeThreshold','wakeAction','speechGate','speechThreshold','agc','noise','echo','levelGate','minimumDb'])$(id).disabled=busy;
  for(const record of records.values())renderRecord(record);
 }
 function showPlayer(record) {
@@ -105,7 +105,7 @@ async function suggestName(capture) {
   await prepareWhisper();record.namingStatus='Transcribing opening speech locally…';renderRecord(record);
   const text=await new Promise((resolve,reject)=>{const id=++whisperSerial;const timer=setTimeout(()=>{titleRequests.delete(id);reject(Error('Transcription timed out'));},120000);
    titleRequests.set(id,{resolve:text=>{clearTimeout(timer);resolve(text);},reject:error=>{clearTimeout(timer);reject(error);}});whisper.postMessage({type:'transcribe',id,samples},[samples.buffer]);});
-  if(!records.has(record.id)||deleting.has(record.id))return;record.transcript=text;record.suggestedSuffix=filenameSuffix(text);record.namingStatus=record.suggestedSuffix?'Suggested: '+filename(record.prefix,record.suggestedSuffix,audioExtension(record.mime)):'No useful text found. You can enter a title.';
+  if(!records.has(record.id)||deleting.has(record.id))return;record.transcript=text;record.suggestedSuffix=filenameKeywords(text);record.namingStatus=record.suggestedSuffix?'Suggested: '+filename(record.prefix,record.suggestedSuffix,audioExtension(record.mime)):'No useful text found. You can enter a title.';
  }catch(error){record.namingStatus='Filename suggestion unavailable: '+error.message;}
  finally{if(records.has(record.id)&&!deleting.has(record.id)){try{if(!deleting.has(record.id))await store.put({...record});record.saved=true;}catch(error){record.saved=false;record.storageError=String(error);}renderRecord(record);}}
 }
@@ -195,6 +195,13 @@ async function start() {
  }
 }
 $('record').onclick=start;$('pause').onclick=togglePause;$('stop').onclick=()=>{if(preparing&&!current){generation++;preparingCleanup?.();preparingCleanup=null;preparing=false;temporaryStream?.getTracks().forEach(track=>track.stop());temporaryStream=null;controls();status('Preparation cancelled.');return;}if(current){current.stop();controls();status('Finishing recording…');}};
+function selectLabMode() {
+ const naming=$('labMode').value==='filename';
+ $('liveAnalysis').checked=true;$('autoName').checked=naming;$('engine').value=naming?'off':'heed';$('wakeThreshold').value=.7;
+ $('wakePanel').hidden=naming;$('wakeEvents').hidden=naming;$('filenameOptions').hidden=!naming;
+ status(naming?'Filename session: record opening speech, then Stop for a keyword suggestion.':'Wake session: speech-gated detection; automatic filename suggestions are off.');
+}
+$('labMode').onchange=selectLabMode;selectLabMode();
 $('engine').onchange=()=>{$('wakeThreshold').value=$('engine').value==='voicute'?.9:.7;};
 $('clearRecordings').onclick=async()=>{
  if(current||preparing||maintenance||pendingCaptures.size)return;

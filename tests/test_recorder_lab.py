@@ -19,6 +19,9 @@ assert(diagnosticEvent('wake',{type:'measurement',prob:.8}).type==='wake','engin
 const prefix=datePrefix(new Date(2026,10,4,9,5,2));
 assert(prefix==='2026-11-04_09-05-02','local date and time always lead filename');
 assert(filename(prefix,'Title: Garden irrigation, plans!','m4a')===prefix+'_Garden-irrigation-plans.m4a','title marker and unsafe punctuation are removed');
+assert(filenameKeywords('Today I want to talk about garden irrigation and plans for the garden')==='garden-irrigation-plans','extract content words rather than the opening sentence');
+assert(filenameKeywords('Hey Doc. Hey Doc. Please record this.')==='','wake phrases and filler do not become a title');
+assert(filenameKeywords('Architecture architecture budget schedule review extra').length<=40,'keyword suffix stays short');
 assert(filename(prefix,'','webm')===prefix+'.webm','empty recognition preserves usable date-only name');
 assert(interruptedMessage({captureError:'Microphone ended',audio:{size:0}}).includes('No audio was captured'),'zero-byte interruption is reported honestly');
 assert(interruptedMessage({captureError:'Microphone ended',audio:{size:20}}).includes('Available audio'),'retained data is distinguished from empty metadata');
