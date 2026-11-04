@@ -12,7 +12,7 @@ export function createLabCapture({recorder,record,store,fallbacks=[],onStartFail
   if(capture.fullFinished)return;if(!partial){capture.fullFinished=true;clearTimer(capture.timer);}
   await capture.pending;if(partial&&capture.fullFinished)return;
   record.audio=new Blob(capture.parts,{type:recorder.mimeType||record.mime});record.mime=record.audio.type;
-  record.state=partial?'interrupted':capture.started?'stopped':record.audio.size?'interrupted':'failed';record.endedAt=new Date().toISOString();record.bytes=record.audio.size;
+  record.state=partial?'interrupted':capture.started?(record.captureError?'interrupted':'stopped'):record.audio.size?'interrupted':'failed';record.endedAt=new Date().toISOString();record.bytes=record.audio.size;
   if(record.state==='failed')record.namingStatus='No audio was acquired.';
   try{await store.finalize({...record,saved:true,storageError:null});record.saved=true;record.storageError=null;}catch(error){record.saved=false;record.storageError=String(error);}
   onUpdate(capture);if(!partial)onFinalized(capture);return record;

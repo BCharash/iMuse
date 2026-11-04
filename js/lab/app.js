@@ -1,7 +1,7 @@
 import { datePrefix, filename, filenameSuffix, audioExtension, diagnosticEvent } from './core.js';
 import { createLabStore } from './store.js';
 import { createLabCapture } from './capture.js';
-import { createLabRecorderChoice, closeLabAudioContext } from './media.js';
+import { createLabRecorderChoice, closeLabAudioContext, acquireLabMicrophoneAfterPreparation } from './media.js';
 const $=id=>document.getElementById(id),store=createLabStore(),records=new Map(),rows=new Map(),pendingCaptures=new Set(),deleting=new Set();
 let current=null,preparing=false,preparingCleanup=null,maintenance=false,generation=0,temporaryStream=null,playerUrl=null,whisper=null,whisperReady=false,whisperLoading=null,whisperSerial=0;
 let events=[],displayStart=0,candidates=0,accepted=0,rejected=0,titleRequests=new Map(),offlinePreparing=false;
@@ -121,12 +121,10 @@ function togglePause() {
 }
 async function start() {
  if(current||preparing||offlinePreparing||maintenance)return;await libraryReady;if(current||preparing||offlinePreparing||maintenance)return;
- preparing=true;const run=++generation;controls();$('player').pause();status('Opening microphone and preparing speech detection…');
+ preparing=true;const run=++generation;controls();$('player').pause();status('Preparing speech and wake models before opening the microphone…');
  let stream,context,capture,worker;
  try {
-  stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:{ideal:1},autoGainControl:{ideal:$('agc').checked},noiseSuppression:{ideal:$('noise').checked},echoCancellation:{ideal:$('echo').checked}}});
-  if(run!==generation){stream.getTracks().forEach(track=>track.stop());return;}temporaryStream=stream;
-  context=new AudioContext();await context.resume();worker=new Worker(new URL('./detection-worker.js',import.meta.url),{type:'module'});
+  worker=new Worker(new URL('./detection-worker.js',import.meta.url),{type:'module'});
   const config=settings();let readyResolve,readyReject;const ready=new Promise((resolve,reject)=>{readyResolve=resolve;readyReject=reject;});
   let resolveTitle;const titleAudio=new Promise(resolve=>resolveTitle=resolve);const pending=new Set();let packet=0,resetNext=false;
   worker.onmessage=event=>{
@@ -144,12 +142,17 @@ async function start() {
    }
   };
   worker.onerror=event=>{readyReject(Error(event.message||'Detection worker failed'));if(capture){capture.detectorReady=false;worker.terminate();resolveTitle(null);}$('detectionStatus').textContent='Detection worker failed; audio recording remains available.';};
-  preparingCleanup=()=>{readyReject(Error('Preparation cancelled'));worker.terminate();void closeLabAudioContext(context,error=>log('context-cleanup-error',{message:error.message}));stream.getTracks().forEach(track=>track.stop());};
-  worker.postMessage({type:'prepare',options:config,sampleRate:context.sampleRate,generation:run});
-  let detectorReady=true;try{await Promise.race([ready,new Promise((_,reject)=>setTimeout(()=>reject(Error('Model preparation timed out')),45000))]);$('detectionStatus').textContent='Speech detector ready · '+(config.engine==='off'?'wake detector off':config.engine+' ready');}
-  catch(error){if(run!==generation)return;detectorReady=false;worker.terminate();resolveTitle(null);$('detectionStatus').textContent='Recording without detection: '+error.message;}
-  if(run!==generation){worker.terminate();await closeLabAudioContext(context,error=>log('context-cleanup-error',{message:error.message}));stream.getTracks().forEach(track=>track.stop());return;}
-  if(!stream.active||!stream.getAudioTracks().some(track=>track.readyState==='live'))throw Error('The microphone ended during preparation. Press Record to reacquire it.');
+  preparingCleanup=()=>{readyReject(Error('Preparation cancelled'));worker.terminate();void closeLabAudioContext(context,error=>log('context-cleanup-error',{message:error.message}));stream?.getTracks().forEach(track=>track.stop());};
+  worker.postMessage({type:'prepare',options:config,generation:run});
+  let detectorReady=true;
+  const preparation=Promise.race([ready,new Promise((_,reject)=>setTimeout(()=>reject(Error('Model preparation timed out')),45000))])
+   .then(()=>{if(run===generation)$('detectionStatus').textContent='Speech detector ready · '+(config.engine==='off'?'wake detector off':config.engine+' ready');})
+   .catch(error=>{detectorReady=false;worker.terminate();resolveTitle(null);if(run===generation)$('detectionStatus').textContent='Recording without detection: '+error.message;});
+  stream=await acquireLabMicrophoneAfterPreparation(preparation,()=>{
+   status('Opening microphone…');return navigator.mediaDevices.getUserMedia({audio:{channelCount:{ideal:1},autoGainControl:{ideal:$('agc').checked},noiseSuppression:{ideal:$('noise').checked},echoCancellation:{ideal:$('echo').checked}}});
+  },()=>run===generation);
+  if(!stream){worker.terminate();return;}temporaryStream=stream;
+  if(!stream.active||!stream.getAudioTracks().some(track=>track.readyState==='live'))throw Error('The microphone ended before recording could start.');
   const choice=createLabRecorderChoice(stream,MediaRecorder,attempt=>log('recorder-construction-failed',attempt));
   const recorder=choice.recorder;
   const record={id:crypto.randomUUID(),prefix:datePrefix(),startedAt:new Date().toISOString(),suffix:'',mime:recorder.mimeType||choice.requestedMime,state:'starting',saved:false,settings:config,microphone:stream.getAudioTracks()[0].getSettings(),namingStatus:'Opening speech will be used after Stop.'};
@@ -157,17 +160,23 @@ async function start() {
    onStopped:c=>stopAnalysis(c),onFinalized:c=>{pendingCaptures.delete(c.record.id);if(current===c){current=null;preparing=false;status(c.record.state==='failed'?'Could not start recording: '+(c.record.captureError||'No audio was acquired.'):'Stopped. Recording retained.');}controls();void suggestName(c);}});
   Object.assign(capture,{stream,context,worker,titleAudio,resolveTitle,detectorReady});
   records.set(record.id,record);pendingCaptures.add(record.id);current=capture;
-  if(detectorReady){capture.source=context.createMediaStreamSource(stream);capture.processor=context.createScriptProcessor(1024,1,1);capture.silent=context.createGain();capture.silent.gain.value=0;
+
+  const began=await capture.start();preparingCleanup=null;if(!began)return;preparing=false;temporaryStream=null;controls();status('Recording. Say the subject near the beginning for a filename suggestion.');log('recording-started',{id:record.id,settings:config,microphone:record.microphone});
+  stream.getAudioTracks()[0].addEventListener('ended',()=>{if(current===capture&&!capture.stopping){record.captureError='Microphone ended';capture.stop();}});
+  $('microphone').textContent=stream.getAudioTracks()[0].label+' · Browser reports '+JSON.stringify(record.microphone);
+  if(capture.detectorReady)try{
+   context=new AudioContext();capture.context=context;
+   await Promise.race([context.resume(),new Promise((_,reject)=>setTimeout(()=>reject(Error('Audio analysis could not resume')),3000))]);
+   if(current!==capture||capture.stopping){await closeLabAudioContext(context);return;}
+   worker.postMessage({type:'configure-rate',generation:run,sampleRate:context.sampleRate});
+   capture.source=context.createMediaStreamSource(stream);capture.processor=context.createScriptProcessor(1024,1,1);capture.silent=context.createGain();capture.silent.gain.value=0;
    capture.source.connect(capture.processor);capture.processor.connect(capture.silent);capture.silent.connect(context.destination);
    capture.processor.onaudioprocess=event=>{event.outputBuffer.getChannelData(0).fill(0);if(current!==capture||capture.stopping||!capture.detectorReady)return;
     if(pending.size>=8){resetNext=true;log('analysis-gap',{id:record.id,reason:'Analysis queue limit reached'});return;}
     const pcm=event.inputBuffer.getChannelData(0).slice(),id=++packet;pending.add(id);
     worker.postMessage({type:'audio',pcm,id,generation:run,sentAt:Date.now(),sampleRate:context.sampleRate,recording:capture.recorder.state==='recording',reset:resetNext},[pcm.buffer]);resetNext=false;
    };
-  }
-  const began=await capture.start();preparingCleanup=null;if(!began)return;preparing=false;temporaryStream=null;controls();status('Recording. Say the subject near the beginning for a filename suggestion.');log('recording-started',{id:record.id,settings:config,microphone:record.microphone});
-  stream.getAudioTracks()[0].addEventListener('ended',()=>{if(current===capture&&!capture.stopping){record.captureError='Microphone ended';capture.stop();}});
-  $('microphone').textContent=stream.getAudioTracks()[0].label+' · Browser reports '+JSON.stringify(record.microphone);
+  }catch(error){capture.detectorReady=false;worker.terminate();resolveTitle(null);await closeLabAudioContext(context,cleanup=>log('context-cleanup-error',{message:cleanup.message}));if(current===capture){$('detectionStatus').textContent='Audio recording continues without analysis: '+error.message;log('analysis-start-failed',{id:record.id,message:error.message});}}
  }catch(error){
   log('recording-start-failed',{name:error.name,message:error.message,streamActive:stream?.active,tracks:stream?.getAudioTracks().map(track=>({state:track.readyState,muted:track.muted,enabled:track.enabled,settings:track.getSettings()})),formatAttempts:capture?.record.formatAttempts});
   if(capture){capture.record.captureError=String(error);capture.stop();}

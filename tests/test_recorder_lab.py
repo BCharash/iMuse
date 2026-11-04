@@ -66,6 +66,7 @@ const settle=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
  failFinalize=true;const badRec=recorder(),bad=createLabCapture({recorder:badRec,record:{id:'third'},store,setTimer,clearTimer});
  await bad.start();badRec.ondataavailable({data:{size:50}});bad.stop();badRec.onstop();await settle();
  assert(bad.record.audio.size===50&&!bad.record.saved,'failed final save retains downloadable memory audio');
+ failFinalize=false;const endedRec=recorder(),ended=createLabCapture({recorder:endedRec,record:{id:'ended'},store,setTimer,clearTimer});await ended.start();endedRec.ondataavailable({data:{size:30}});ended.record.captureError='Microphone ended';ended.stop();endedRec.onstop();await settle();assert(ended.record.state==='interrupted'&&ended.record.audio.size===30,'microphone loss after startup retains audio with an interrupted label');
  const oldPut=store.put;let release;store.put=()=>new Promise(resolve=>release=resolve);const cancelledRec=recorder(),cancelled=createLabCapture({recorder:cancelledRec,record:{id:'cancelled'},store,setTimer,clearTimer});const starting=cancelled.start();cancelled.stop();release();assert(await starting===false&&cancelledRec.state==='inactive','Stop during metadata preparation cannot start recording afterward');store.put=oldPut;
  globalThis.testResult='PASS';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
@@ -135,6 +136,26 @@ const assert=(value,message)=>{if(!value)throw Error(message);};
  const closed={state:'closed',close(){throw Error('must not close twice');}};await closeLabAudioContext(closed);
  let reported=0;await closeLabAudioContext({state:'running',close(){return Promise.reject(Error('Hardware failure'));}},()=>reported++);
  assert(reported===1,'genuine cleanup failure is reported without an unhandled rejection');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
+""")
+
+
+    def test_models_finish_before_microphone_acquisition(self):
+        media=(ROOT/'js/lab/media.js').read_text().replace('export ', '')
+        evaluate(media + r"""
+globalThis.testResult='pending';
+const assert=(value,message)=>{if(!value)throw Error(message);};
+(async()=>{
+ let ready,acquired=0,stopped=0,valid=true;
+ const preparation=new Promise(resolve=>ready=resolve),stream={getTracks:()=>[{stop:()=>stopped++}]};
+ const pending=acquireLabMicrophoneAfterPreparation(preparation,async()=>{acquired++;return stream;},()=>valid);
+ await Promise.resolve();assert(acquired===0,'slow model preparation never holds a microphone');
+ ready();assert(await pending===stream&&acquired===1,'microphone opens only after models are ready');
+ let cancelReady;const cancelled=acquireLabMicrophoneAfterPreparation(new Promise(resolve=>cancelReady=resolve),async()=>{acquired++;return stream;},()=>valid);valid=false;cancelReady();assert(await cancelled===null&&acquired===1,'cancelling preparation never requests microphone access');
+ valid=true;let grant;const permissionPending=acquireLabMicrophoneAfterPreparation(Promise.resolve(),()=>new Promise(resolve=>grant=resolve),()=>valid);await Promise.resolve();valid=false;grant(stream);assert(await permissionPending===null&&stopped===1,'late microphone permission is released after cancellation');
+ let rejected=false;try{await acquireLabMicrophoneAfterPreparation(Promise.reject(Error('not ready')),async()=>{acquired++;return stream;});}catch(error){rejected=true;}
+ assert(rejected&&acquired===1,'unhandled preparation failure cannot open a microphone');
  globalThis.testResult='PASS';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
 """)

@@ -69,6 +69,8 @@ New recordings retain previous recordings. Reload recovers available journal chu
 4. Compare **Require speech** on/off in separate recordings. Ordinary background speech can still pass the speech gate.
 5. Reload offline in the same browser. Confirm saved playback, then a fresh recording with model loading. Try deletion only with disposable recordings.
 
+After Safari reported that the microphone ended during preparation, startup was reordered: model initialization completes without a microphone or AudioContext; only then is a fresh stream acquired and the native recorder started. The analysis AudioContext is created afterward and its actual sample rate is sent to the prepared worker. An analysis setup failure leaves native recording running. Cancellation before model readiness never acquires the microphone, and a permission grant arriving after cancellation is immediately released.
+
 The Safari startup follow-up also makes AudioContext cleanup idempotent: failed startup and normal Stop share a single close operation. ScriptProcessor remains in this experimental analysis branch and is deprecated; its warning alone does not establish the cause of a MediaRecorder startup failure. Native Safari retesting is required.
 
 Desktop controlled tests and isolated headless Chrome verify filename/DSP/gate helpers, recorder recovery/late tail, script parsing and offline asset hashes. Real-model browser checks additionally cover both wake engines, Silero inference, compressed recording, pause/resume, Whisper transcription, scoped caching and offline reload. Device-specific performance, the reported whine, true/false wake rates and iPhone installed-app background microphone loss still require user testing. No wake engine fixes an OS-suspended microphone source.

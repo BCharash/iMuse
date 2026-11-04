@@ -16,3 +16,12 @@ export function closeLabAudioContext(context,onError=()=>{}) {
  const closing=Promise.resolve().then(()=>context.state==='closed'?undefined:context.close()).catch(error=>{if(context.state!=='closed')onError(error);});
  closingContexts.set(context,closing);return closing;
 }
+
+// Model loading must not hold an idle microphone stream open in Safari.
+export async function acquireLabMicrophoneAfterPreparation(preparation,acquire,isCurrent=()=>true) {
+ await preparation;
+ if(!isCurrent())return null;
+ const stream=await acquire();
+ if(!isCurrent()){stream.getTracks().forEach(track=>track.stop());return null;}
+ return stream;
+}

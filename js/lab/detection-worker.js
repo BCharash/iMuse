@@ -9,7 +9,7 @@ const send=data=>self.postMessage(data);
 function resetSignal() {state=new ort.Tensor('float32',new Float32Array(256),[2,1,128]);buffer=new Float32Array(0);wakePending=new Float32Array(0);rolling=new Float32Array(0);history=[];heed?.reset();voicute?.reset();lastWakeEnd=position;}
 async function prepare(message) {
  options=message.options;engineName=options.engine;
- resampler=new StreamingResampler(message.sampleRate);position=0;title=[];titleCount=0;titleStarted=false;titlePre=[];runGeneration=message.generation;
+ resampler=null;position=0;title=[];titleCount=0;titleStarted=false;titlePre=[];runGeneration=message.generation;
  vadSession=await ort.InferenceSession.create(new URL('./vendor/silero_vad_v5.onnx',import.meta.url).href,{executionProviders:['wasm']});
  if(engineName==='heed') {
   const meta=await (await fetch(new URL('../heed/wake.json',import.meta.url))).json();
@@ -33,6 +33,7 @@ function collectTitle(frame,prob,recording) {
 }
 async function consume(message) {
  if(message.generation!==runGeneration)return;
+ if(!resampler)throw Error('Analysis input sample rate was not configured');
  const started=performance.now();
  if(Date.now()-message.sentAt>350){resetSignal();resampler=new StreamingResampler(message.sampleRate);send({type:'gap',generation:runGeneration,reason:'Stale analysis audio discarded'});return;}
  if(message.reset){resetSignal();resampler=new StreamingResampler(message.sampleRate);}
@@ -64,6 +65,7 @@ self.onmessage=event=>{
  const message=event.data;
  serial=serial.then(async()=>{
   if(message.type==='prepare')await prepare(message);
+  else if(message.type==='configure-rate'&&message.generation===runGeneration){resampler=new StreamingResampler(message.sampleRate);resetSignal();}
   else if(message.type==='audio') {try{await consume(message);}finally{send({type:'ack',id:message.id,generation:message.generation});}}
   else if(message.type==='finish'){const samples=joinFloat(title);self.postMessage({type:'title-audio',generation:runGeneration,samples},[samples.buffer]);}
  }).catch(error=>send({type:'error',generation:message.generation,message:String(error.stack||error)}));
