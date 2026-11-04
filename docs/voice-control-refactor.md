@@ -1,6 +1,6 @@
 # Voice-control stabilization and extraction
 
-Updated 4 November 2026. This is the current plan for voice-control architecture. After the initial tests/documentation checkpoint, the user reviewed and approved the **first command-controller extraction**. That extraction is implemented; device acceptance is pending. Wake detection, the audio graph, deployed-build work and model tuning are separate later changes requiring a new checkpoint.
+Updated 4 November 2026. This is the current plan for voice-control architecture. After the initial tests/documentation checkpoint, the user reviewed and approved the **first command-controller extraction**. That extraction is implemented; device acceptance is pending. Following reports of intermittent unsolicited Stop confirmations, the user also approved opt-in diagnostics behind a collapsed Advanced section. Further extraction is paused while evidence is collected. Wake detection, the audio graph, deployed-build work and model tuning are separate later changes requiring a new checkpoint.
 
 ## Current checkpoint
 
@@ -8,7 +8,7 @@ Updated 4 November 2026. This is the current plan for voice-control architecture
 
 `tests/test_voice_control.py` runs the complete controller with the real recorder bridge, `finalizeRecording()`, pause-event body and manual Record/Stop handlers. A separate fixture runs the complete TensorFlow adapter. Models, playback, timers, MediaRecorder and metadata storage remain controlled dependencies. Existing behavioral assertions were retained; two additional methods cover the narrow session interface and the existing Go/Stop versus Yes/No deadline distinction.
 
-All **39 repository test methods** pass across nine suites. An isolated headless Chrome check loaded the production page/module, recorded, manually paused/resumed/stopped, then recorded again; both sessions retained nonempty chunks and completed status, with no runtime exceptions. It used a synthetic microphone, disposable profile and blocked CDN model downloads. It does not establish spoken-command accuracy or replace MacBook/iPhone device acceptance.
+All **42 repository test methods** pass across ten suites. Voice lifecycle checks now run with diagnostics both off and on; focused checks cover bounded diagnostic memory, incident linking and controls. An isolated headless Chrome check loaded the production page/module, recorded, manually paused/resumed/stopped, then recorded again; both sessions retained nonempty chunks and completed status, with no runtime exceptions. It used a synthetic microphone, disposable profile and blocked CDN model downloads. It does not establish spoken-command accuracy or replace MacBook/iPhone device acceptance.
 
 These are characterization tests: they capture the behavior to retain during extraction. They do not prove that every possible race is handled or that current models recognize real speech accurately.
 
@@ -46,6 +46,27 @@ The proposed controller must use narrow recorder operations and a session-validi
 Preserve current timing semantics during the move: Go/Stop computes its expiry before awaiting listener startup; Yes/No starts its countdown after listener startup completes. These are currently different. Normalizing them would be a separate behavior change, not part of extraction.
 
 The adapter test also confirms that non-audio getUserMedia requests retain the original route. It does not establish safety for every concurrent microphone request or multiple recognizer instances. The temporary override remains a documented integration boundary, not a target for simultaneous redesign.
+
+## Investigating intermittent Stop confirmations
+
+After extraction the user reported unsolicited confirmation prompts in a quiet room, late in the command window, on MacBook Live Server and iPhone. A regression is suspected but not established. The extraction did not intentionally change the command model, microphone adapter, thresholds or acceptance rule. A controlled before/after comparison accepted and rejected identical late-window scores alike; that does not measure real acoustic false-activation rates.
+
+The current command accepts one winning Stop prediction at or above the configured threshold; it has no separate speech gate or consecutive-prediction requirement. The user reported a 0.70 Stop threshold. Keep settings unchanged while collecting diagnostic evidence, rather than hiding a possible regression through threshold changes.
+
+### Using Advanced diagnostics
+
+1. Open **Settings → Advanced → Enable voice diagnostics** before testing or normal voice-command use. Advanced starts collapsed; diagnostics start off on every page load. Enabling them does not load a model, open a microphone or change recognition settings.
+2. After an unsolicited Stop prompt, tap **Unintended confirmation** beside the command indicator. The marker becomes available after an accepted Stop and remains available during confirmation. It labels the latest accepted Stop; it does not cancel confirmation. Use No or the normal confirmation timeout to remain paused.
+3. Use **Download diagnostics** and send the JSON, along with device/browser, current settings and what you heard. Download promptly, before reloading or closing the page. Logging also keeps uneventful windows for exposure comparisons.
+4. **Clear diagnostics** removes only the diagnostic memory and pending incident marker; it does not remove recordings, reset settings or cancel voice commands. Turning diagnostics off stops collection and hides the marker while retaining the existing log for download.
+
+`js/voice-diagnostics.js` retains the latest **4,000 events** in a fixed-capacity page-memory ring. Export includes an explicit dropped-event count; logs may start/end partway through a window if enabled/disabled or truncated. Do not interpret incomplete windows or a small clean sample as proof of no regression. The log and opt-in state are not stored in localStorage or IndexedDB and do not survive reload.
+
+Events include the winning label/score and Go/Stop/Yes/No scores, effective thresholds, requested settings, elapsed/remaining listening time, session/window/generation identifiers, model readiness, prompt start/end/error, listener start/readiness/shutdown, timeout, accepted commands and user incident markers. The adapter now supplies its already-computed winning score as additional metadata; classifier filtering, overlap, deadlines and action conditions remain unchanged. Prediction decision time is sampled before logging so observer work does not redefine that callback's deadline test. No PCM, spectrogram, recording Blob or transcript is collected. Browser identity and diagnostic schema/code version are included at export; this is not a coherent production asset-version system.
+
+Diagnostic callbacks perform no storage transactions or extra audio connections. State-boundary updates refresh the compact UI; prediction events do not repaint it. Observation still has processing overhead and cannot establish the acoustic cause without further evidence. The recorder's saved-audio diagnostics remain separate.
+
+**Validation:** All 42 repository tests pass. Voice behavior checks run with collection disabled and enabled. An isolated Chrome check verified collapsed/default-off UI, zero microphone acquisition when enabling, synthetic Stop/incident linking, actual JSON download, clearing, normal manual recording/pause/resume/Stop with two retained completed sessions, and off/empty state after reload. No runtime exceptions occurred. This does not reproduce the reported spontaneous recognition or certify iPhone behavior; field diagnostics are the next evidence step.
 
 ## Ordered changes and approval checkpoints
 

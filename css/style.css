@@ -232,3 +232,10 @@ button:active {
 .imuse-mic-processing-controls input[type=checkbox] { accent-color:var(--accent);width:17px;height:17px; }
 .imuse-mic-processing-controls input:disabled { opacity:.45;cursor:not-allowed; }
 .imuse-mic-processing-controls label:has(input:disabled) { opacity:.55; }
+
+/* Optional voice diagnostics stay inside Advanced until enabled. */
+.advanced-settings { margin-top: 1rem; border-top: 1px solid #8884; padding-top: .75rem; }
+.advanced-settings summary { cursor: pointer; }
+.voice-diagnostic-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.voice-diagnostic-actions button, .voice-diagnostic-marker { font-size: .8rem; padding: .35rem .6rem; }
+.voice-command-status { display: flex; align-items: center; justify-content: center; gap: .5rem; flex-wrap: wrap; }

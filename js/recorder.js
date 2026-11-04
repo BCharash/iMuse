@@ -4,6 +4,7 @@ import { loadVoicuteWakeWord } from "./voicute/voicute-adapter.js";
 import { loadHeedWakeWord } from "./heed/heed-adapter.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { createVoiceController } from "./voice-controller.js";
+import { voiceDiagnostics, initializeVoiceDiagnostics } from "./voice-diagnostics.js";
 import { createRecordingStorageCoordinator } from "./recording-storage-coordinator.js";
 import { createRecordingRecovery } from "./recording-recovery.js";
 import { createRecordingLibrary } from "./recording-library.js";
@@ -515,6 +516,7 @@ function getVoiceSession(current) {
     let session = voiceSessions.get(current);
     if (!session) {
         session = {
+            get id() { return current.id; },
             get isCurrent() { return activeSession === current; },
             get state() { return current.recorder.state; },
             get discard() { return current.discard; },
@@ -547,7 +549,12 @@ function getVoiceSession(current) {
 
 // Spoken responses remain serialized by the dedicated audio manager.
 async function sayResponse(name) {
-    const result = await playSpokenResponse(name);
+    const context={prompt:name,sessionId:activeSession?.id};
+    voiceDiagnostics.record('prompt-start',context);
+    let result;
+    try { result = await playSpokenResponse(name); }
+    catch (error) { voiceDiagnostics.record('prompt-error',{...context,message:String(error)}); throw error; }
+    voiceDiagnostics.record('prompt-end',{...context,ok:result.ok});
     if (!result.ok) {
         console.warn(`Voice response ${name} could not be heard:`, result.error);
         setWakeStatus(`Voice prompt unavailable. Voice commands may still work.`);
@@ -1563,6 +1570,7 @@ window.addEventListener("pagehide", () => {
     }
 });
 
+initializeVoiceDiagnostics();
 initializePreservationTest();
 initialize();
 initializeWakeWord();

@@ -57,7 +57,7 @@ export async function startCommands(model, stream, overlapFactor, callback) {
         if (generation !== state.generation) return;
         const scores = Array.from(result.scores);
         const index = scores.indexOf(Math.max(...scores));
-        callback({ top: model.labels[index], go: scores[model.labels.indexOf('go')], stop: scores[model.labels.indexOf('stop')], yes: scores[model.labels.indexOf('yes')], no: scores[model.labels.indexOf('no')] });
+        callback({ top: model.labels[index], topScore: scores[index], go: scores[model.labels.indexOf('go')], stop: scores[model.labels.indexOf('stop')], yes: scores[model.labels.indexOf('yes')], no: scores[model.labels.indexOf('no')] });
       }, { probabilityThreshold: 0, overlapFactor, invokeCallbackOnNoiseAndUnknown: true });
     } finally {
       media.getUserMedia = original;
