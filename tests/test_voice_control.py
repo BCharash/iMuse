@@ -67,6 +67,33 @@ def check(script):
 
 
 class VoiceControlTests(unittest.TestCase):
+    def test_idle_status_tracks_preference_and_async_readiness(self):
+        handler=SOURCE[SOURCE.index('window.addEventListener("imuse-settings-changed"'):SOURCE.index('window.deviceClass = deviceClass;')]
+        idle=between('function refreshIdleWakeStatus()', 'function setLifecycleStatus(')
+        initialize=between('async function initializeWakeWord()', '// Recorder-owned capabilities:')
+        evaluate(r"""
+globalThis.testResult='pending';const assert=(v,m)=>{if(!v)throw Error(m);};
+let activeSession=null,wakeWord=null,wakeWordLoadError=null,selectedWakeEngine='heed',WAKE_THRESHOLD=.8,wakeWordPhrase='Hey Doc',text='';
+const settings={audioCommands:true,wakeEngine:'heed',wakeThreshold:.8,voicuteThreshold:.9},getSettings=()=>settings;
+const voiceController={suspended:false,active:false,setSuspended(value){this.suspended=value;}};
+const setWakeStatus=value=>text=value,closeCommandWindow=()=>{},clearWakeDetectorTimers=()=>{},syncAudioCommandsSuspension=()=>{},preloadCommandModel=()=>{},scheduleWakeDetectorArm=()=>{};
+let changed,resolveModel,rejectModel;const window={addEventListener:(name,fn)=>changed=fn};
+let progress;const loadHeedWakeWord=({onStatus})=>{progress=onStatus;return new Promise((resolve,reject)=>{resolveModel=resolve;rejectModel=reject;});};
+const loadVoicuteWakeWord=loadHeedWakeWord;
+"""+idle+initialize+handler+r"""
+(async()=>{
+ settings.audioCommands=false;changed({detail:settings});assert(text.includes('disabled for the next recording'),'idle disable refreshes immediately');
+ settings.audioCommands=true;changed({detail:settings});assert(text.includes('enabled for the next recording')&&text.includes('Preparing'),'idle enable clears stale disabled status before recording');
+ const pending=initializeWakeWord();settings.audioCommands=false;changed({detail:settings});progress('Model download progress');assert(text.includes('disabled for the next recording'),'late loading progress respects current preference');
+ resolveModel({phrase:'Hey Doc',engine:{}});await pending;assert(text.includes('disabled for the next recording'),'late model readiness cannot overwrite disabled setting');
+ settings.audioCommands=true;changed({detail:settings});assert(text.includes('enabled for the next recording')&&text.includes('Hey Doc'),'ready model is reflected on idle re-enable');
+ voiceController.suspended=true;refreshIdleWakeStatus();assert(text.includes('suspended for the next recording'),'temporary suspension is reflected while idle');voiceController.suspended=false;
+ activeSession={};voiceController.active=true;text='Listening for Go or Stop';changed({detail:settings});assert(text==='Listening for Go or Stop','idle updater leaves active command status alone');activeSession=null;voiceController.active=false;
+ wakeWord=null;const failed=initializeWakeWord();rejectModel(Error('offline'));await failed;assert(text.includes('enabled for the next recording')&&text.includes('unavailable'),'readiness errors do not masquerade as a disabled preference');
+ globalThis.testResult='PASS';
+})().catch(e=>globalThis.testResult=String(e)+String(e.stack||''));
+""")
+
     def test_suspend_blocks_actions_and_keeps_manual_controls(self):
         check(r"""
  const current=seed('suspended','recording');const preference=settings.audioCommands;

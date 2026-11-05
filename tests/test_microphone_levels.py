@@ -106,17 +106,21 @@ globalThis.testResult='PASS';
 class MicrophoneLevelTests(unittest.TestCase):
     def test_settings_category_navigation(self):
         nav=SETTINGS[SETTINGS.index('const panel ='):SETTINGS.index('const controls =')]
+        indicator=SETTINGS[SETTINGS.index('function renderVoiceCommandsIndicator()'):SETTINGS.index('function render()')]
         evaluate(r"""
 const assert=(value,message)=>{if(!value)throw Error(message);};
 class Element {constructor(){this.hidden=true;this.handlers={};this.attributes={};}addEventListener(name,fn){this.handlers[name]=fn;}setAttribute(name,value){this.attributes[name]=value;}}
 const elements=new Map(),document={getElementById:id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id);}};
-let changed=0;const window={dispatchEvent:()=>changed++},updateAutomaticOverlapLabel=()=>{};class Event{constructor(type){this.type=type;}}
-""" + nav + r"""
+const settings={audioCommands:false};let changed=0;const window={dispatchEvent:()=>changed++},updateAutomaticOverlapLabel=()=>{};class Event{constructor(type){this.type=type;}}
+""" + nav + indicator + r"""
 const el=id=>document.getElementById(id);
 el('microphoneSettingsButton').handlers.click();assert(!panel.hidden&&!el('microphoneSettingsSection').hidden&&el('audioSettingsSection').hidden,'mic button opens only microphone category');
 el('settingsButton').handlers.click();assert(!el('audioSettingsSection').hidden&&el('microphoneSettingsSection').hidden,'voice button switches category');
 el('storageSettingsButton').handlers.click();assert(!el('storageSettingsSection').hidden&&el('audioSettingsSection').hidden,'storage button opens storage controls');
 el('storageSettingsButton').handlers.click();assert(panel.hidden&&el('storageSettingsSection').hidden&&changed===4,'pressing selected category closes settings and notifies visibility observers');
+renderVoiceCommandsIndicator();assert(el('voiceCommandsEnabledIndicator').hidden&&button.attributes['data-enabled']==='false','disabled preference has no On badge');
+settings.audioCommands=true;renderVoiceCommandsIndicator();assert(!el('voiceCommandsEnabledIndicator').hidden&&button.attributes['data-enabled']==='true','enabled preference updates the persistent selector badge');
+assert(panel.hidden,'enabled indicator does not open settings');
 globalThis.testResult='PASS';
 """)
 

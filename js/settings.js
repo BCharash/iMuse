@@ -74,8 +74,16 @@ export function setSilencePauseLocked(locked) {
     const slider = document.getElementById("silencePauseSeconds");
     if (slider) slider.disabled = silencePauseLocked;
 }
+function renderVoiceCommandsIndicator() {
+    const enabled=settings.audioCommands;
+    button.setAttribute('data-enabled',String(enabled));
+    button.setAttribute('aria-label',enabled?'Voice commands settings. Audio commands enabled.':'Voice commands settings. Audio commands disabled.');
+    const indicator=document.getElementById('voiceCommandsEnabledIndicator');
+    if(indicator)indicator.hidden=!enabled;
+}
 function render() {
     updateAutomaticOverlapLabel();
+    renderVoiceCommandsIndicator();
     for (const [key,id] of Object.entries(controls)) {
         const el=document.getElementById(id);if (!el) continue;
         if (el.type === "checkbox") el.checked = settings[key]; else el.value=String(settings[key]);

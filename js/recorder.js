@@ -59,6 +59,7 @@ window.addEventListener("imuse-settings-changed", event => {
     if (event.detail.audioCommands && activeSession && !voiceController.active && wakeWord) {
         scheduleWakeDetectorArm(activeSession, 0);
     }
+    refreshIdleWakeStatus();
 });
 window.deviceClass = deviceClass;
 
@@ -144,8 +145,9 @@ function updatePreservationTestControls() {
 }
 
 function initializePreservationTest() {
-    const panel = document.createElement("details");
-    const heading = document.createElement("summary");
+    const panel = document.createElement("section");
+    panel.id = "recordingPreservationTest";
+    const heading = document.createElement("h3");
     heading.textContent = "Recording preservation test";
     const note = document.createElement("p");
     note.textContent = "Use a disposable recording. This test stops it by simulating a storage-write failure, retaining unsaved audio in this open page. Existing recordings are unchanged. Keep the page open until you download the emergency audio.";
@@ -512,6 +514,17 @@ function setWakeStatus(message) {
     if (wakeStatus) wakeStatus.textContent = message;
 }
 
+// Idle status describes the current preference/readiness for the next recording,
+// rather than retaining the last detector or command episode's message.
+function refreshIdleWakeStatus() {
+    if(activeSession)return;
+    if(!getSettings().audioCommands)setWakeStatus('Audio commands disabled for the next recording.');
+    else if(voiceController.suspended)setWakeStatus('Audio command actions suspended for the next recording. Resume audio commands to use them.');
+    else if(wakeWordLoadError)setWakeStatus('Audio commands enabled for the next recording, but the wake detector is unavailable. Manual controls remain available.');
+    else if(wakeWord)setWakeStatus(`Audio commands enabled for the next recording — “${wakeWordPhrase}”.`);
+    else setWakeStatus('Audio commands enabled for the next recording. Preparing the wake detector…');
+}
+
 function setLifecycleStatus(message) {
     if (lifecycleStatus) lifecycleStatus.textContent = message;
 }
@@ -520,20 +533,21 @@ async function initializeWakeWord() {
  const engineName=selectedWakeEngine;
  WAKE_THRESHOLD=engineName==="heed"?getSettings().wakeThreshold:getSettings().voicuteThreshold;
  wakeWordLoadError=null;
- setWakeStatus(`Preparing voice commands…`);
+ if(activeSession)setWakeStatus(`Preparing voice commands…`);else refreshIdleWakeStatus();
+ const onStatus=message=>{if(activeSession)setWakeStatus(message);else refreshIdleWakeStatus();};
  try {
   const loaded=engineName==="heed"
-   ?await loadHeedWakeWord({threshold:WAKE_THRESHOLD,onStatus:setWakeStatus})
-   :await loadVoicuteWakeWord({threshold:WAKE_THRESHOLD,onStatus:setWakeStatus});
+   ?await loadHeedWakeWord({threshold:WAKE_THRESHOLD,onStatus})
+   :await loadVoicuteWakeWord({threshold:WAKE_THRESHOLD,onStatus});
   if(selectedWakeEngine!==engineName)return;
   wakeWord=loaded;
   wakeWordPhrase=loaded.phrase;
-  setWakeStatus(`Voice commands ready — “${wakeWordPhrase}”.`);
+  if(activeSession)setWakeStatus(`Voice commands ready — “${wakeWordPhrase}”.`);else refreshIdleWakeStatus();
   if(activeSession && getSettings().audioCommands)scheduleWakeDetectorArm(activeSession,0);
  }catch(error){
   if(selectedWakeEngine!==engineName)return;
   wakeWordLoadError=error;
-  setWakeStatus(`Voice commands unavailable. You can still use the recording buttons.`);
+  if(activeSession)setWakeStatus(`Voice commands unavailable. You can still use the recording buttons.`);else refreshIdleWakeStatus();
  }
 }
 
@@ -608,7 +622,7 @@ function syncAudioCommandsSuspension() {
 }
 document.getElementById('suspendAudioCommands')?.addEventListener('click',()=>{
     if(!getSettings().audioCommands)return;
-    voiceController.setSuspended(!voiceController.suspended);syncAudioCommandsSuspension();
+    voiceController.setSuspended(!voiceController.suspended);syncAudioCommandsSuspension();refreshIdleWakeStatus();
 });
 syncAudioCommandsSuspension();
 function preloadCommandModel() { return voiceController.preload(); }
@@ -1075,6 +1089,7 @@ function setAudioCommandsToggleLocked(locked) {
 }
 
 function setReadyUI() {
+    refreshIdleWakeStatus();
     setAudioCommandsToggleLocked(false);
     setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
     setRecordingControlState("idle");

@@ -50,7 +50,7 @@ Web Locks protection covers cooperating updated pages in the same storage scope.
 
 The separate [wake-word and filename lab](wake-word-evaluation.md) now provides a simple recorder, local Whisper filename suggestions and Silero speech-gated Heed/Voicute detection. The earlier clip-review lab is archived with its separate storage preserved. Production wake behavior is unchanged.
 
-**Settings → Microphone → Microphone levels → View** shows one needle-style RMS dBFS meter above both thresholds; the initial duplicate readouts were consolidated at the user's request. The dial spans −70 to 0 dBFS, with an exact numeric reading even below that range. Before recording, click **Check microphone level (10 s)**. Its status counts down the seconds remaining until microphone release. During recording or pause the same meter automatically uses the recording input. It measures normalized input after browser microphone processing, before Heed's filtering/preprocessing—not model confidence, peak level or calibrated room sound pressure. Less-negative values mean louder input.
+**Settings → Microphone → Microphone levels → View** shows one needle-style RMS dBFS meter above both thresholds; the initial duplicate readouts were consolidated at the user's request. The dial spans −70 to 0 dBFS, with an exact numeric reading even below that range. Before recording, click **Check microphone level (10 s)**. Its status counts down the seconds remaining until microphone release. The browser-reported processing report is under **Settings → Microphone → Advanced microphone settings**. During recording or pause the same meter automatically uses the recording input. It measures normalized input after browser microphone processing, before Heed's filtering/preprocessing—not model confidence, peak level or calibrated room sound pressure. Less-negative values mean louder input.
 
 **Mark quiet room** and **Mark noisy room** place Q/N reference markers at the current measured level. No universal room-to-dBFS bands are assumed. Markers last until reload, do not affect thresholds and should be remeasured after microphone/gain changes. They are available only for finite live readings. The dial includes text/shape identifiers rather than relying on color, and respects reduced-motion preferences.
 
@@ -113,7 +113,7 @@ Stuck writes, missing stop events, encoder errors and malformed structures are s
 
 ### Short microphone-check acceptance
 
-1. On MacBook and iPhone, open Settings → Microphone → Microphone levels → View, then Check microphone level (10 s). Confirm level response and the microphone-processing report; no saved recording should appear.
+1. On MacBook and iPhone, open Settings → Microphone → Microphone levels → View, then Check microphone level (10 s). Confirm level response and inspect the microphone-processing report under Advanced microphone settings; no saved recording should appear.
 2. Wait for automatic completion and check that microphone access ends. Repeat and stop early, close Settings/disclosure, or background the page.
 3. Start Record during a check, then speak, Stop and play. The check must release its input; the recording must retain its own live microphone. Closing Settings while recording must not stop capture.
 4. Where permission has not been granted, cancel a pending check by closing Settings or pressing Record. A late response must not resurrect the check or end a newer recording.
