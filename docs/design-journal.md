@@ -1641,3 +1641,16 @@ Grouped Settings, temporary Suspend/Resume audio commands and the idle next-reco
 The next discussed assessment is conventional generated asset fingerprinting, preserving readable source filenames and considering automated build/publish. No build tool, fingerprinting, service worker, release-folder system or hosting change is implemented or authorized by this entry. Keep that migration independent; inventory model/worker/lab paths and validate an existing-cache update before deployment changes. Native feasibility remains deferred until equipment is available, and Whisper stays outside live wake verification.
 
 Documentation cleanup makes the accepted checkpoint and remaining queue current, archives detailed voice stage history, and removes four obsolete archived installation checklists: stage 1, stage 2, voice-command rollout and root relocation. They add no unique measured evidence and contain superseded instructions. Retained archives preserve investigations, original requirements, model findings and the still-available comparison lab. Application code, models, tests and browser data are unchanged by this documentation pass; validation checks local links/anchors and the diff rather than rerunning the already-passing implementation suite.
+
+
+---
+
+# DJ027 — Download naming and retained current-player audio
+
+**Date:** 5 November 2026. **Status:** Build 2026-11-05.6 user-reported working; 94 automated methods across fourteen suites passed at the implementation checkpoint.
+
+The user chose local recording-start time for download filenames, with a fixed `YYYY-MM-DD_HH-mm-ss_` prefix and an editable description initially `iMuse`. The dialog appears only on Download; descriptions are not stored as saved-list titles. New sessions store the local prefix alongside their UTC start timestamp. Older sessions lack the original timezone and derive their prefix using the device's current local timezone. The actual audio format determines the extension. Future Whisper suggestions may supply the description, but production Whisper naming and a general file-save workflow are not implemented.
+
+Build .4 introduced the dialog; .5 connected creation of the main player's Download button. Testing then established that audio remained playable after permanent deletion but Download failed because it still looked up deleted database metadata. Build .6 keeps a filename snapshot with the player's audio Blob, removes that lookup, and clears/replaces both together. The user requested no extra deletion message and subsequently reported “okay that worked.” The retained player can download independently of the deleted saved copy until cleared/replaced or the page is lost. Emergency Discard retains its separate explicit cleanup semantics. Device/browser details of this acceptance were not specified.
+
+The user deferred asset fingerprinting/version-maintenance upgrades and further live lab work. Future browser/native saving and Memora integration remain open choices, with Memora intended to retain browser capability. Documentation now links a root-level file map covering all repository files, while subject guides remain authoritative for behavior and acceptance evidence.

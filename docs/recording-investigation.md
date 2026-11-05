@@ -2,7 +2,7 @@
 
 Updated 5 November 2026. This is the current recording reference. The four preservation stages and interface cleanup are implemented; no further preservation stage is underway. The [roadmap](iMuse%20next%20steps.md) owns future priorities. Detailed experiment/stage history is [archived](Archive/recording-investigation-stages-2026-11-03.md).
 
-**Accepted checkpoint: build 2026-11-05.3.** The user tested the wake refactor and separately approved race corrections, reported they worked as expected and called the work a success. The last implementation suite passed **89 methods across thirteen suites**. Model loading/inference delegate through `js/wake-detector.js`; readiness, microphone/audio graph, buffers, session/busy guards and timers remain recorder-owned. Models and audio delivery are unchanged. Device/browser and individual scenarios were not specified; the report does not establish platform-wide recognition accuracy, latency or background capture. Current behavior is in the [voice-control guide](voice-control-refactor.md#wake-race-corrections), with detailed staged history [archived](Archive/voice-control-history-2026-11-05.md).
+**Earlier accepted wake checkpoint: build 2026-11-05.3.** The user tested the wake refactor and separately approved race corrections, reported they worked as expected and called the work a success. That wake-refactor checkpoint passed **89 methods across thirteen suites**; the latest download checkpoint passed **94 methods across fourteen suites**. Model loading/inference delegate through `js/wake-detector.js`; readiness, microphone/audio graph, buffers, session/busy guards and timers remain recorder-owned. Models and audio delivery are unchanged. Device/browser and individual scenarios were not specified; the report does not establish platform-wide recognition accuracy, latency or background capture. Current behavior is in the [voice-control guide](voice-control-refactor.md#wake-race-corrections), with detailed staged history [archived](Archive/voice-control-history-2026-11-05.md).
 
 ## Current code ownership
 
@@ -40,15 +40,19 @@ Recovery copies already use the recorder's original format, typically M4A/AAC on
 
 ### Download naming
 
-Build **2026-11-05.6** retains the default filename alongside the current player's audio. Download no longer reads session metadata from the database, so it remains usable after the saved copy is permanently deleted. Clearing/replacing the current player clears/replaces its filename too. This adds no deletion message.
+**Accepted download checkpoint: build 2026-11-05.6.** After the retained-player fix, the user reported “okay that worked.” This confirms the reported current-player download scenario after permanent deletion; device/browser and a full scenario matrix were not specified.
 
-Build **2026-11-05.5** fixes current-playback button creation: once a stopped recording is shown in the main player, Download audio file appears beside Delete. Build .4 defined the button without calling its creation function. The regression check now exercises display, button creation, download, cancellation and repeated playback.
+A filename dialog appears only when Download is selected, from either Saved recordings or the current recording. The description starts as `iMuse`; the fixed prefix is local recording-start date/time, for example `2026-11-05_14-32-08_iMuse.m4a`. The preview uses the actual audio format's extension. Unsupported filename characters are replaced with hyphens; an empty description falls back to `iMuse`. Cancel/Escape starts no download and retains all audio. Descriptions apply to that download only, without renaming stored recordings or adding editable fields to the list. Whisper suggestions are not implemented.
 
-Build **2026-11-05.4** adds a filename dialog only when Download is selected, from either Saved recordings or the current recording. The description starts as `iMuse`; the fixed prefix is local recording-start date/time, for example `2026-11-05_14-32-08_iMuse.m4a`. The preview uses the actual audio format's extension. Unsupported filename characters are replaced with hyphens; an empty description falls back to `iMuse`. Cancel/Escape starts no download and retains all audio. Descriptions apply to that download only, without renaming stored recordings or adding editable fields to the list. Whisper suggestions are not implemented.
+Once a stopped recording appears in the main player, Download audio file appears beside Delete. The player retains the assembled audio Blob and a snapshot of its default filename. Deleting or permanently deleting the database copy leaves this ordinary current-player copy playable and downloadable, without an additional message. Download no longer reads the deleted session's metadata. Starting the next recording clears this player; clearing/replacing it clears/replaces the retained filename too. This temporary player copy does not provide reload/closure recovery. Explicit emergency Discard remains a separate action that releases the retained emergency copy and its matching player.
+
+Build .4 introduced the naming dialog; .5 corrected the uncalled current-player button creation; .6 removed the download's database-metadata dependency. Those intermediate bugs are corrected.
 
 New recordings store their local start-time prefix alongside the existing UTC timestamp, preserving it across timezone changes. Older recordings lack the original timezone: their prefix uses the stored start instant in the device's current local timezone. No database version change or backfill is needed. Saved-audio assembly releases the storage writer lock before waiting for the filename choice.
 
 Focused acceptance: download an existing and a new recording; edit the description and check the resulting filename/audio; cancel a second download; check the current-player download uses recording-start time and still works after permanently deleting that saved recording. Check the dialog and keyboard on iPhone and desktop. Automated checks do not establish browser/device download behavior.
+
+### Storage and temporary copies
 
 Committed audio can be recovered after reopening. **Memory-only emergency audio cannot survive closure, reload or OS process termination unless it is successfully persisted or exported.** Automatic retries for that tail are not implemented. Download initiation does not confirm a usable file reached Files/Downloads; open important exports and check them.
 
@@ -109,7 +113,7 @@ From the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-The last verified checkpoint has **eleven suites and 49 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
+The last verified implementation checkpoint has **fourteen suites and 94 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
 
 The suites execute production functions with controlled DOM/storage/lock/timer mocks. They do not prove native player rendering, actual IndexedDB behavior, browser permission decisions, container decoding, background capture or multi-hour memory reliability.
 
