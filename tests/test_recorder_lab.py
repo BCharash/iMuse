@@ -146,8 +146,8 @@ assert(near.review==='false negative'&&wake.review==='true positive'&&events.len
 const sampledNear={id:'sample',type:'near-wake',eventSample:160000,sampleRate:16000},sampledWake={id:'sample',type:'wake',eventSample:168000,sampleRate:16000,accepted:false};
 assert(linkedNearTriggers([sampledNear,sampledWake]).get(sampledNear)===sampledWake,'sample positions link rejected candidates too');
 assert(reviewChoices(wake).join(',')==='unreviewed,true positive,false positive','accepted candidates offer only positive labels');
-assert(reviewChoices(sampledWake).join(',')==='unreviewed,true negative,false negative','rejected candidates offer only negative labels');
-assert(reviewChoices(near).join(',')==='unreviewed,true negative,false negative','near triggers are non-accepted observations');
+assert(reviewChoices(sampledWake).join(',')==='unreviewed,false negative,true negative','rejected candidates offer only negative labels');
+assert(reviewChoices(near).join(',')==='unreviewed,false negative,true negative','near triggers are non-accepted observations');
 globalThis.testResult='PASS';
 """)
 
@@ -244,11 +244,11 @@ const urls=[];const URL={createObjectURL:audio=>{urls.push(audio);return 'blob:t
  const metadata=reviewMetadata(event);assert(!('audio' in metadata)&&metadata.review==='false positive','diagnostics omit binary audio and retain labels');
  delete event.analysisMs;delete event.transportMs;renderEvents();row=$('events').children[0];assert(row.children[4].children[3].children[1].textContent==='—'&&row.children[4].children[4].children[1].textContent==='—','missing timing is not reported as zero latency');
  deleting.clear();event.accepted=false;renderEvents();row=$('events').children[0];
- const rejected=row.children[1].children[1].children;assert(rejected.map(button=>button.value).join(',')==='true negative,false negative,unreviewed','rejected card cannot offer either positive label');assert(rejected[0].textContent==='No wake phrase · True negative'&&rejected[1].textContent==='Wake phrase heard · False negative','rejection context is explicit beside playback');
+ const rejected=row.children[1].children[1].children;assert(rejected.map(button=>button.value).join(',')==='false negative,true negative,unreviewed','rejected card cannot offer either positive label');assert(rejected[0].textContent==='Wake phrase heard · False negative'&&rejected[1].textContent==='No wake phrase · True negative','heard and not-heard positions stay fixed when outcome changes');
  assert(event.review==='false positive'&&row.children[2].textContent.includes('Previous label: false positive'),'older incompatible label retained until user changes it');
- rejected[1].onclick();await reviewWrites;assert(event.review==='false negative'&&savedLabels.at(-1)==='false negative','genuine rejected phrase saves as false negative');
+ rejected[0].onclick();await reviewWrites;assert(event.review==='false negative'&&savedLabels.at(-1)==='false negative','genuine rejected phrase saves as false negative');
  $('events').children[0].children[1].children[1].children[2].onclick();await reviewWrites;assert(event.review==='unreviewed'&&savedLabels.at(-1)==='unreviewed','clear label is explicit and persisted');
- for(const type of ['near-wake','missed-wake','manual-negative']){event.type=type;renderEvents();assert($('events').children[0].children[1].children[1].children.map(button=>button.value).join(',')==='true negative,false negative,unreviewed','non-trigger '+type+' only offers negative classifications');}
+ for(const type of ['near-wake','missed-wake','manual-negative']){event.type=type;renderEvents();assert($('events').children[0].children[1].children[1].children.map(button=>button.value).join(',')==='false negative,true negative,unreviewed','non-trigger '+type+' only offers negative classifications');}
  maintenance=true;renderEvents();assert($('events').children[0].children[1].children[1].children.every(button=>button.disabled),'classification disabled during maintenance');
  globalThis.testResult='PASS';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));

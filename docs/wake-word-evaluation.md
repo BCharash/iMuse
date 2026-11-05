@@ -113,7 +113,28 @@ Validation: **61 tests pass** across twelve suites, including exact sample endpo
 4. Stop. On each actual candidate's card compare Continuous and Fresh pass/reject, peak, qualifying blocks and added milliseconds; expand **Speech scores by 32 ms block** when needed. Listen and label the one shared clip according to the actual action. Wait for pending fresh checks before exporting completed results.
 5. Export both diagnostics and review audio + labels. Evaluate genuine phrases rescued versus false activations admitted on the same completed pairs before longer background runs or production decisions. Do not change the recording/pause policies or lower thresholds during this first comparison.
 
+## First completed fresh comparison: music on the same MacBook
+
+The user supplied `RecorderLab-review-1793887325850.json` and matching diagnostics `RecorderLab-diagnostics-1793887320502.json`, from **lab build 2026-11-05.2**, and reported music playing through QuickTime on the same MacBook. Both exports contain identical events/recording metadata. Recording ran **210.133 s** on 5 November, with Heed threshold **0.7**, required speech threshold **0.6**, level gate and Whisper off, and fresh comparison enabled. Echo cancellation and noise suppression were enabled; these results include that browser microphone processing.
+
+There were **4 actual wake candidates**, all reviewed true positive, accepted by continuous Silero and also passed by fresh Silero. All four fresh results were complete, each using 35 blocks / **1.12 s** of historical audio ending exactly at the detector's consumed-sample endpoint. No fresh checks were skipped or incomplete, and no analysis gaps or storage errors were logged.
+
+| Event | Continuous peak / qualifying blocks | Fresh peak / qualifying blocks | Candidate-to-fresh-result delay |
+| --- | --- | --- | --- |
+| 2-3 | 0.9992 / 21 | 0.9996 / 22 | 24 ms |
+| 2-5 | 0.9964 / 13 | 0.9970 / 19 | 28 ms |
+| 2-11 | 0.9876 / 12 | 0.9994 / 17 | 39 ms |
+| 2-13 | 0.9844 / 13 | 0.9995 / 18 | 45 ms |
+
+Median fresh delay was **33.5 ms**; worker processing ranged **20.0–26.9 ms**, median **21.9 ms**. Total delay includes dispatch/return overhead; these overlapping fields must not be added. This is measured comparison delay on this MacBook, not spoken-phrase-end-to-response latency or an iPhone guarantee. Fresh is still report-only.
+
+Of **12 near-trigger clips**, 9 were labeled true negative; 8 of those had continuous speech peaks between **0.000143 and 0.02306**. They never became actual wake candidates and received no fresh check, so they cannot be counted as activations prevented by either gate. The three near clips labeled false negative precede accepted candidates by **0.192, 0.224 and 0.224 s** and are linked/excluded from independent comparison counts. These are consistent with the same phrase windows, not evidence of three independent missed attempts. One early negative clip has short pre-roll.
+
+The run demonstrates completed, low-delay fresh checks retaining all four reviewed genuine candidates under these conditions. It contains no false-positive candidate and no continuous-gate rejection, so it cannot yet establish improved false-accept/false-reject discrimination or superiority over continuous evaluation. A targeted follow-up should include conditions that previously produced nuisance candidates or genuine gate rejections, keeping settings fixed. Private audio and raw exports remain outside the repository.
+
 ## Practical evaluation
+
+**Lab build 2026-11-05.3** keeps listening judgments in a fixed order: **Wake phrase heard** first (left, or above when stacked), **No wake phrase** second, then Clear label. The outcome-specific classifications change with acceptance: TP/FP for accepted triggers and FN/TN for rejected/non-trigger clips. Saved classification values and all Silero reporting/decisions are unchanged. Existing tests now verify the stable order for accepted, rejected, near-trigger and manual cards.
 
 **Lab build 2026-11-05.2** makes review choices directly visible beside Play clip, replacing the classification dropdown. Accepted triggers offer **Wake phrase heard · True positive** and **No wake phrase · False positive**. Rejected/near/manual events offer **Wake phrase heard · False negative** and **No wake phrase · True negative**. Only those applicable outcomes are offered; Clear label restores unreviewed, and the selected classification is highlighted. The heading shows Accepted/Rejected/Near trigger and controls wrap inside the card. Labels describe the final gated outcome; the comparison independently derives the raw Heed/Voicute result from phrase presence. Older incompatible labels remain saved and are identified as Previous label until explicitly changed.
 

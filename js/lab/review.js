@@ -44,7 +44,8 @@ export function linkedNearTriggers(events) {
  return links;
 }
 export function reviewChoices(event) {
- return event.type==='wake'&&event.accepted?['unreviewed','true positive','false positive']:['unreviewed','true negative','false negative'];
+ // Keep listening judgments stable: heard first, not heard second, for every outcome.
+ return event.type==='wake'&&event.accepted?['unreviewed','true positive','false positive']:['unreviewed','false negative','true negative'];
 }
 export function reviewClassification(event,requireSpeech=false) {
  const truth=['true positive','false negative','wake'].includes(event.review)?true:['false positive','true negative','speech','noise'].includes(event.review)?false:null;
