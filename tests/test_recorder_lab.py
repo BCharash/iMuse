@@ -224,9 +224,9 @@ class WakeWordDetector {constructor(){this.calls=0;}reset(){}async step(){this.c
         evaluate(review + r"""
 globalThis.testResult='pending';
 const assert=(value,message)=>{if(!value)throw Error(message);};
-class Element {constructor(){this.children=[];this.value='';}append(...items){this.children.push(...items);}replaceChildren(){this.children=[];}setAttribute(){}play(){this.played=true;return Promise.resolve();}}
+class Element {constructor(){this.children=[];this.value='';this.attributes={};}append(...items){this.children.push(...items);}replaceChildren(){this.children=[];}setAttribute(name,value){this.attributes[name]=value;}play(){this.played=true;return Promise.resolve();}}
 const elements=new Map();const document={getElementById:id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id);},createElement:()=>new Element()};
-let puts=0;const createLabStore=()=>({put:async record=>{puts++;assert(record.reviews[0].review==='false positive','saved record includes changed classification');}});
+let puts=0;const savedLabels=[];const createLabStore=()=>({put:async record=>{puts++;savedLabels.push(record.reviews[0].review);}});
 const urls=[];const URL={createObjectURL:audio=>{urls.push(audio);return 'blob:test';},revokeObjectURL:()=>{}};
 """ + ui + r"""
 (async()=>{
@@ -235,13 +235,21 @@ const urls=[];const URL={createObjectURL:audio=>{urls.push(audio);return 'blob:t
  let row=$('events').children[0];assert(row.children[4].children[3].children[1].textContent==='3.2'&&row.children[4].children[4].children[1].textContent==='3.0','processing and overlapping packet latency are shown separately');assert(row.children[1].children[0].disabled===false,'completed audio can be played');
  current={};renderEvents();row=$('events').children[0];assert(row.children[1].children[0].disabled,'review playback disabled during recording');playReview(event);assert(urls.length===0,'playback guard also protects direct calls');
  current=null;renderEvents();row=$('events').children[0];row.children[1].children[0].onclick();assert($('player').played&&urls[0]===event.audio,'clip audio is passed to native player');
- const select=row.children[1].children[1].children[0];assert(select.children.map(option=>option.value).join(',')==='unreviewed,true positive,false positive','accepted card only offers positive-result classifications');select.value='false positive';select.onchange();await reviewWrites;
+ const buttons=row.children[1].children[1].children;assert(buttons.map(button=>button.value).join(',')==='true positive,false positive,unreviewed','accepted card only offers positive-result classifications and clear');assert(buttons[0].textContent==='Wake phrase heard · True positive'&&buttons[1].textContent==='No wake phrase · False positive','audio truth and outcome are visible together');buttons[1].onclick();await reviewWrites;
  assert(puts===1&&event.review==='false positive','classification is persisted');
+ assert($('events').children[0].children[1].children[1].children[1].attributes['aria-pressed']==='true','selected classification stays highlighted after rerender');
  assert($('comparison').textContent.includes('1 FP')&&$('comparison').textContent.includes('1 TN'),'summary compares identical reviewed event with gate on and off');
  pendingCaptures.add('record');persistReview(event);await reviewWrites;assert(puts===1,'active capture defers review writes to capture finalization');
  pendingCaptures.clear();deleting.add('record');persistReview(event);await reviewWrites;assert(puts===1,'review updates cannot resurrect deleted recordings');
  const metadata=reviewMetadata(event);assert(!('audio' in metadata)&&metadata.review==='false positive','diagnostics omit binary audio and retain labels');
  delete event.analysisMs;delete event.transportMs;renderEvents();row=$('events').children[0];assert(row.children[4].children[3].children[1].textContent==='—'&&row.children[4].children[4].children[1].textContent==='—','missing timing is not reported as zero latency');
+ deleting.clear();event.accepted=false;renderEvents();row=$('events').children[0];
+ const rejected=row.children[1].children[1].children;assert(rejected.map(button=>button.value).join(',')==='true negative,false negative,unreviewed','rejected card cannot offer either positive label');assert(rejected[0].textContent==='No wake phrase · True negative'&&rejected[1].textContent==='Wake phrase heard · False negative','rejection context is explicit beside playback');
+ assert(event.review==='false positive'&&row.children[2].textContent.includes('Previous label: false positive'),'older incompatible label retained until user changes it');
+ rejected[1].onclick();await reviewWrites;assert(event.review==='false negative'&&savedLabels.at(-1)==='false negative','genuine rejected phrase saves as false negative');
+ $('events').children[0].children[1].children[1].children[2].onclick();await reviewWrites;assert(event.review==='unreviewed'&&savedLabels.at(-1)==='unreviewed','clear label is explicit and persisted');
+ for(const type of ['near-wake','missed-wake','manual-negative']){event.type=type;renderEvents();assert($('events').children[0].children[1].children[1].children.map(button=>button.value).join(',')==='true negative,false negative,unreviewed','non-trigger '+type+' only offers negative classifications');}
+ maintenance=true;renderEvents();assert($('events').children[0].children[1].children[1].children.every(button=>button.disabled),'classification disabled during maintenance');
  globalThis.testResult='PASS';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));
 """)

@@ -8,7 +8,7 @@ const $=id=>document.getElementById(id),store=createLabStore(),records=new Map()
 let current=null,preparing=false,preparingCleanup=null,maintenance=false,generation=0,temporaryStream=null,playerUrl=null,whisper=null,whisperReady=false,whisperLoading=null,whisperSerial=0;
 let logEpoch=0;
 let events=[],displayStart=0,titleRequests=new Map(),offlinePreparing=false;
-const LAB_BUILD='2026-11-05.1';$('build').textContent='Lab build '+LAB_BUILD;
+const LAB_BUILD='2026-11-05.2';$('build').textContent='Lab build '+LAB_BUILD;
 const status=text=>$('status').textContent=text;
 const modelStatus=text=>$('modelStatus').textContent=text;
 const settings=()=>({freshSpeech:$('freshSpeech').checked&&$('liveAnalysis').checked&&$('labMode').value==='wake'&&$('engine').value!=='off',verifyWake:$('verifyWake').checked&&$('liveAnalysis').checked&&$('labMode').value==='wake'&&$('engine').value!=='off',autoName:$('autoName').checked,nearThreshold:Number($('nearThreshold').value),formatPreference:$('format').value,liveAnalysis:$('liveAnalysis').checked,engine:$('engine').value,threshold:Number($('wakeThreshold').value),requireSpeech:$('speechGate').checked,speechThreshold:Number($('speechThreshold').value),minimumDb:$('levelGate').checked?Number($('minimumDb').value):null});
@@ -76,10 +76,14 @@ function renderEvents() {
   const heading=document.createElement('strong');heading.textContent=`${new Date(event.at).toLocaleTimeString()} · ${result}`;card.append(heading);
   const actions=document.createElement('div');actions.className='review-actions';
   const play=document.createElement('button');play.textContent=event.audio?'▶ Play clip':'Awaiting clip';play.disabled=!!current||preparing||!event.audio?.size;play.onclick=()=>playReview(event);actions.append(play);
-  const label=document.createElement('label');label.textContent='Classification ';
-  const choice=document.createElement('select'),choices=reviewChoices(event);
-  for(const value of choices){const option=document.createElement('option');option.value=value;option.textContent=value;choice.append(option);}
-  choice.setAttribute('aria-label','Classification for '+new Date(event.at).toLocaleTimeString());choice.disabled=maintenance;choice.value=choices.includes(event.review)?event.review:'unreviewed';choice.onchange=()=>{event.review=choice.value;persistReview(event);renderEvents();};label.append(choice);actions.append(label);card.append(actions);
+  const choices=reviewChoices(event),labels={'unreviewed':'Clear label','true positive':'Wake phrase heard · True positive','false positive':'No wake phrase · False positive','true negative':'No wake phrase · True negative','false negative':'Wake phrase heard · False negative'};
+  const group=document.createElement('div');group.className='review-choices';group.setAttribute('role','group');group.setAttribute('aria-label',result+' — classification for '+new Date(event.at).toLocaleTimeString());
+  for(const value of [...choices.slice(1),'unreviewed']){
+   const choice=document.createElement('button');choice.type='button';choice.value=value;choice.textContent=labels[value];choice.disabled=maintenance;
+   choice.setAttribute('aria-pressed',String(value!=='unreviewed'&&value===event.review));
+   choice.onclick=()=>{event.review=value;persistReview(event);renderEvents();};group.append(choice);
+  }
+  actions.append(group);card.append(actions);
   const info=document.createElement('p');info.className='review-meta';
   info.textContent=event.duration===undefined?'':`${event.duration.toFixed(1)} s · event at ${event.eventOffset.toFixed(1)} s${event.shortPreRoll?' · short pre-roll':''}${event.shortPostRoll?' · short post-roll':''}`;
   const preceding=[...links].filter(([,wake])=>wake===event).map(([near])=>near);

@@ -115,6 +115,10 @@ Validation: **61 tests pass** across twelve suites, including exact sample endpo
 
 ## Practical evaluation
 
+**Lab build 2026-11-05.2** makes review choices directly visible beside Play clip, replacing the classification dropdown. Accepted triggers offer **Wake phrase heard · True positive** and **No wake phrase · False positive**. Rejected/near/manual events offer **Wake phrase heard · False negative** and **No wake phrase · True negative**. Only those applicable outcomes are offered; Clear label restores unreviewed, and the selected classification is highlighted. The heading shows Accepted/Rejected/Near trigger and controls wrap inside the card. Labels describe the final gated outcome; the comparison independently derives the raw Heed/Voicute result from phrase presence. Older incompatible labels remain saved and are identified as Previous label until explicitly changed.
+
+Validation: the existing review test now checks direct-button labels, persistence/highlighting, rejected and manual/near choices, Clear label, maintenance disabling and preservation of older labels. Isolated Chrome fixtures using the actual renderer and stylesheet at **320, 390 and 880 pixels** showed no page/card horizontal overflow and saved a rejected genuine phrase as false negative. These are review-layout checks, not microphone/model tests. The state-dependent recording/silence/pause policy remains unimplemented; fresh-versus-continuous comparison is unchanged. Production iMuse build numbering/code are unaffected.
+
 1. Prepare models. Select Speech-gated wake testing, Mark detection, and leave Whisper verification off. Initially disable the level gate to isolate speech gating.
 2. Test deliberate phrases at normal distance, quiet/noise, conversation and soundalikes. Compare speech gate on/off in separate runs. Record microphone, settings, environment and observation duration.
 3. Triggers and sampled near triggers collect clips. Mark missed phrases promptly; Capture negative sample adds a reviewed non-wake example. Stop and label actual speech through playback: TP/FP/FN/TN. Short/overlapping clips need caution.
