@@ -2,7 +2,7 @@
 
 Updated 5 November 2026. This is the current recording reference. The four preservation stages and interface cleanup are implemented; no further preservation stage is underway. The [roadmap](iMuse%20next%20steps.md) owns future priorities. Detailed experiment/stage history is [archived](Archive/recording-investigation-stages-2026-11-03.md).
 
-Wake-detector characterization and the first loader-only extraction on 5 November are complete; all **80 methods across thirteen suites pass**. Model selection/loading now delegates through `js/wake-detector.js`; readiness, inference and the audio graph remain recorder-owned. Models and audio delivery are unchanged. Coverage, the narrow extraction and existing async limitations are recorded in the [voice-control checkpoint](voice-control-refactor.md#wake-detector-characterization-checkpoint). This establishes an automated baseline, not device recognition or latency acceptance.
+Wake-detector characterization and both extraction steps on 5 November are complete; all **83 methods across thirteen suites pass**. Model loading and inference routing now delegate through `js/wake-detector.js`; readiness, microphone/audio graph, buffers, session/busy guards and timers remain recorder-owned. Models and audio delivery are unchanged. The user reported stage one seemed normal; stage two awaits device acceptance using **build 2026-11-05.2**. Coverage, the extraction and existing async limitations are recorded in the [voice-control checkpoint](voice-control-refactor.md#wake-detector-characterization-checkpoint). This establishes an automated baseline, not device recognition or latency acceptance.
 
 ## Current code ownership
 

@@ -92,6 +92,49 @@ def check(script, source=ROUTING + SETTINGS, harness=HARNESS):
 
 
 class WakeRoutingTests(unittest.TestCase):
+    def test_extracted_evaluator_uses_live_callbacks_without_recorder_state(self):
+        check(r"""
+ for(const name of ['heed','voicute']){
+  const gate=deferred(),order=[],calls=[];
+  let enabled=true,current=true,listening=true,threshold=.8;
+  const engine={consume:()=>gate.promise,audioSamplesNeeded:()=>4,predict:()=>gate.promise,
+   detect(...args){calls.push(args);return true;}};
+  const options={engineName:name,engine,buffer:{ring:new Float32Array(2048),position:0,collectedSamples:2048},sampleRate:16000,
+   getThreshold:()=>threshold,cooldownMs:1500,isEnabled:()=>enabled,isCurrent:()=>current,isListening:()=>listening,
+   onTrigger:()=>order.push('trigger'),onError:()=>order.push('error'),onComplete:()=>order.push('complete')};
+  const evaluation=evaluateWakeDetector(options);threshold=.91;
+  gate.resolve({triggered:true,word:'wake',prob:.99,consFrames:3,sigmoid:true});await evaluation;
+  assert(order.join(',')==='trigger,complete','trigger then completion: '+name);
+  if(name==='voicute')assert(calls[0][3]===.91,'threshold read after prediction, not snapshotted');
+  for(const guard of ['enabled','current','listening']){
+   const late=deferred();engine.consume=engine.predict=()=>late.promise;order.length=0;
+   enabled=current=listening=true;const pending=evaluateWakeDetector(options);
+   if(guard==='enabled')enabled=false;if(guard==='current')current=false;if(guard==='listening')listening=false;
+   late.resolve({triggered:true,word:'wake',prob:.99});await pending;
+   assert(order.join(',')===(name==='heed'&&guard==='listening'?'trigger,complete':'complete'),'live guard with preserved per-engine state rule: '+name+'/'+guard);
+  }
+ }
+""", WAKE_LOADER, COMMON)
+
+    def test_recorder_trigger_error_and_busy_cleanup_keep_callback_order(self):
+        check(r"""
+ handleWakeDetected=current=>{
+  assert(current.wakeInferenceBusy,'busy remains set while trigger enters controller');triggers.push(current);
+ };
+ for(const name of ['heed','voicute'])for(const fail of [false,true]){
+  const current=seed(),engine=install(name),gate=deferred();append(current,new Float32Array(2048));
+  engine.consume=engine.predict=()=>gate.promise;const before=triggers.length;
+  const evaluation=runWakeWordInference(current,16000);
+  const observer=gate.promise.then(()=>{
+   assert(triggers.length===before+1&&!current.wakeInferenceBusy,'trigger and cleanup finish in original inference continuation');
+  },()=>{
+   assert(!current.wakeDetectorEnabled&&!current.wakeInferenceBusy&&statuses.at(-1).includes('recording buttons'),'error and cleanup finish before next promise observer');
+  });
+  if(fail)gate.reject(Error('model failure'));else gate.resolve({triggered:true,word:'wake',prob:.99});
+  await observer;await evaluation;
+ }
+""")
+
     def test_actual_audio_callback_scaling_graph_and_record_pause_delivery(self):
         check(r"""
  const current=seed(),engine=install();await setupSilenceMonitor(current);
@@ -286,7 +329,7 @@ async function fetch(url){requests.push(url.href);return {ok:!fetchFails,status:
 
 class WakeAdapterTests(unittest.TestCase):
     def test_extracted_loader_delegation_promise_identity_and_failure(self):
-        self.assertIn('import { loadWakeDetector } from "./wake-detector.js";', SOURCE)
+        self.assertIn('import { loadWakeDetector, evaluateWakeDetector } from "./wake-detector.js";', SOURCE)
         self.assertNotIn('import { loadHeedWakeWord }', SOURCE)
         self.assertNotIn('import { loadVoicuteWakeWord }', SOURCE)
         check(r"""

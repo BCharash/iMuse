@@ -1,6 +1,6 @@
 import { playSpokenResponse, prepareSpokenResponses } from "./audio-response-manager.js";
 import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSelectionLocked, getRequestedMicrophoneConstraints } from "./microphone-manager.js";
-import { loadWakeDetector } from "./wake-detector.js";
+import { loadWakeDetector, evaluateWakeDetector } from "./wake-detector.js";
 import { APP_BUILD, displayBuildInfo } from "./build-info.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { createMicrophoneLevelCheck } from "./microphone-level-check.js";
@@ -680,76 +680,29 @@ async function runWakeWordInference(current, sampleRate) {
         !current.wakeRing
     ) return;
 
-    const engine = wakeWord.engine;
     current.wakeInferenceBusy = true;
-    try {
-        if(selectedWakeEngine==="heed"){
-          const needed=2048;
-          if(current.wakeCollectedSamples<needed)return;
-          const raw=new Float32Array(needed);
-          const start=(current.wakeRingPos-needed+current.wakeRing.length)%current.wakeRing.length;
-          for(let i=0;i<needed;i++)raw[i]=current.wakeRing[(start+i)%current.wakeRing.length];
-          const result=await engine.consume(raw,sampleRate);
-          if(result?.triggered && current.wakeDetectorEnabled && activeSession === current) {
-            void handleWakeDetected(current);
-          }
-          return;
-        }
-        const samplesNeededAt16k = engine.audioSamplesNeeded();
-        const needed = Math.ceil(samplesNeededAt16k * sampleRate / 16000);
-        if (current.wakeCollectedSamples < needed || needed <= 0 || needed > current.wakeRing.length) return;
-
-        const raw = new Float32Array(needed);
-        const start = (current.wakeRingPos - needed + current.wakeRing.length) % current.wakeRing.length;
-        for (let i = 0; i < needed; i++) {
-            raw[i] = current.wakeRing[(start + i) % current.wakeRing.length];
-        }
-
-        let modelChunk;
-        if (sampleRate === 16000) {
-            modelChunk = raw;
-        } else {
-            const outputLength = Math.floor(raw.length * 16000 / sampleRate);
-            modelChunk = new Float32Array(outputLength);
-            const ratio = sampleRate / 16000;
-            for (let i = 0; i < outputLength; i++) {
-                const position = i * ratio;
-                const low = Math.floor(position);
-                const high = Math.min(low + 1, raw.length - 1);
-                const fraction = position - low;
-                modelChunk[i] = raw[low] * (1 - fraction) + raw[high] * fraction;
-            }
-        }
-
-        const result = await engine.predict(modelChunk);
-        if (
-            !result ||
-            !current.wakeDetectorEnabled ||
-            activeSession !== current ||
-            !["paused", "recording"].includes(current.recorder.state)
-        ) return;
-
-        const probability = Number(result.prob) || 0;
-        const detected = engine.detect(
-            result.word,
-            result.prob,
-            result.consFrames,
-            WAKE_THRESHOLD,
-            WAKE_DETECT_COOLDOWN_MS,
-            Date.now(),
-            result.sigmoid
-        );
-
-        if (detected && activeSession === current && current.wakeDetectorEnabled) {
-            void handleWakeDetected(current);
-        }
-    } catch (error) {
-        current.wakeDetectorEnabled = false;
-        console.warn("Wake-word inference failed:", error);
-        setWakeStatus(`Voice detection stopped. Use the recording buttons.`);
-    } finally {
-        current.wakeInferenceBusy = false;
-    }
+    return evaluateWakeDetector({
+        engineName: selectedWakeEngine,
+        engine: wakeWord.engine,
+        buffer: {
+            ring: current.wakeRing,
+            position: current.wakeRingPos,
+            collectedSamples: current.wakeCollectedSamples
+        },
+        sampleRate,
+        getThreshold: () => WAKE_THRESHOLD,
+        cooldownMs: WAKE_DETECT_COOLDOWN_MS,
+        isEnabled: () => current.wakeDetectorEnabled,
+        isCurrent: () => activeSession === current,
+        isListening: () => ["paused", "recording"].includes(current.recorder.state),
+        onTrigger: () => { void handleWakeDetected(current); },
+        onError: error => {
+            current.wakeDetectorEnabled = false;
+            console.warn("Wake-word inference failed:", error);
+            setWakeStatus(`Voice detection stopped. Use the recording buttons.`);
+        },
+        onComplete: () => { current.wakeInferenceBusy = false; }
+    });
 }
 
 async function requestScreenWakeLock() {
