@@ -132,6 +132,45 @@ Of **12 near-trigger clips**, 9 were labeled true negative; 8 of those had conti
 
 The run demonstrates completed, low-delay fresh checks retaining all four reviewed genuine candidates under these conditions. It contains no false-positive candidate and no continuous-gate rejection, so it cannot yet establish improved false-accept/false-reject discrimination or superiority over continuous evaluation. A targeted follow-up should include conditions that previously produced nuisance candidates or genuine gate rejections, keeping settings fixed. Private audio and raw exports remain outside the repository.
 
+## All-negative background-speech comparison, 5 November
+
+The user supplied `RecorderLab-review-1793891895087.json` and matching diagnostics `RecorderLab-diagnostics-1793891880251.json` from **lab build 2026-11-05.3**, stating that **no wake words were spoken anywhere in the run**. Use that run-wide ground truth for all candidates, including four without saved review labels; do not interpret an unannotated card as a genuine phrase. The user reported faint background speech and some audible Portuguese speech receiving low scores. Speech presence and wake-phrase presence are separate judgments.
+
+The recording lasted **49 min 13.639 s**, with Heed threshold **0.7**, required speech threshold **0.6**, fresh comparison on, Whisper/level gate off, and echo cancellation/noise suppression on. Exports contain identical event/recording metadata: **23 actual candidates**, 124 sampled near triggers and 29,461 measurements. All actual candidates are false positives from Heed under the user's stated ground truth.
+
+| Decision policy on the same 23 candidates | Unwanted activations accepted | Correctly rejected |
+| --- | --- | --- |
+| Raw Heed, without a speech gate | 23 | 0 |
+| Continuous Silero, actual live gate | 15 | 8 |
+| Fresh detector-aligned Silero, hypothetical replacement | 20 | 3 |
+
+Continuous blocked **8/23 (34.8%)** nuisance candidates; fresh would block **3/23 (13.0%)**. Both passed 13, both rejected 1, fresh passed 7 that continuous rejected, and fresh rejected 2 that continuous passed. The latter are **1-66 and 1-128**. The seven fresh-only passes are **1-33, 1-59, 1-68, 1-78, 1-113, 1-118 and 1-122**. Thus replacing continuous with fresh would add five unwanted acceptances in this run. Requiring both to pass would accept 13, but this negative-only run cannot establish the effect of that stricter policy on genuine phrases.
+
+For example, **1-113** is annotated audible unrelated speech: continuous peak **0.524** rejected it, while fresh peak **0.758**, seven qualifying blocks, passed it. That may improve speech detection while worsening wake filtering, because no wake phrase was spoken. Conversely, **1-66** had continuous peak **0.799** but fresh **0.409**, so fresh would reject an actual nuisance acceptance. The exports alone do not isolate Portuguese as the cause of any speech-score error, and a correct rejection of a non-wake is not a wake false negative merely because speech is audible.
+
+All **23 fresh checks completed** with complete 35-block / **1.12 s** windows ending at the detector endpoint. All **46 continuous/fresh gate decisions**, peaks and qualifying-block counts were cross-checked against the actual lab gate helper. Fresh total delay ranged **30–248 ms**, median **74 ms**, with 95th percentile about **245 ms**. Worker processing was **13.7–24.5 ms**, median **15.9 ms**; dispatch-to-worker-start was 0–1 ms. Most of the longer end-to-end delay is therefore outside the measured fresh model loop, not evidence of slow Silero inference alone.
+
+There were **20 analysis-queue-limit gap messages**, starting around 14:45:17 UTC. Fifteen review clips have short post-roll (six actual-candidate clips); all clips contain audio and no recording storage error was logged. Gaps affect analysis/review completeness and prevent treating this as uninterrupted whole-session accuracy certification. They do not by themselves prove a gap in the separately captured MediaRecorder audio. The code synchronously rebuilds review cards before dispatching fresh work and on review updates; profiling is needed to establish its contribution to delay/queue pressure before changing scheduling. No timing fix was made during this evaluation.
+
+This run supports retaining continuous gating as the current baseline rather than switching to fresh-only confirmation. It cannot measure genuine-phrase recall because none were spoken. Before selecting a graded policy or a stricter combination, collect deliberate wake attempts mixed into the same background conditions and assess the lab's rendering/queue overhead separately. Higher speech sensitivity is not automatically better wake discrimination. Raw audio/exports and original review labels are unchanged and remain outside the repository.
+
+## Deferred queue and fresh-latency investigation
+
+On 5 November the user deferred this work because they could not do it then and requested documentation. **No scheduling, queue, model or recording-policy change is implemented by this note.** Resume as a separate lab experiment when requested; production iMuse remains outside its scope.
+
+Baseline: the all-negative run above had a median **74 ms**, range **30–248 ms**, from Heed candidate to fresh result returning, despite median **15.9 ms** fresh worker processing. If fresh were mandatory confirmation, this measured interval would be additional decision delay after Heed's candidate, excluding prior audio/window accumulation and the later spoken response. Fresh remains observational in the current lab. The **20 gaps are twenty queue-limit occurrences, not a queue of twenty**: the existing limit is eight pending packets/acknowledgements. Incoming analysis packets are skipped at that limit. A busy main thread can delay audio forwarding and acknowledgement handling even if worker inference is fast; the gap messages alone do not isolate the cause.
+
+Proposed resume sequence:
+
+1. Record a baseline and separate the stages: candidate timestamp, fresh-audio arrival, dispatch, fresh worker start/end, main-thread result arrival and UI update. Measure main-thread render duration, queue occupancy and dropped analysis packets. Distinguish actual worker work from delayed delivery/acknowledgement handling.
+2. Dispatch the fresh request before rendering its Checking state. Batch/coalesce review UI updates, avoid rebuilding unchanged cards and reduce review work during capture; retain final labels/clips, export fidelity and playback guards.
+3. Hold models, thresholds, detector windows, queue limit and decision rules fixed. Repeat comparable short/long runs and report total/worker delay distributions, dropped packets, incomplete review clips, classification persistence and recording/playback outcomes. Preserve continuous ownership of live actions while evaluating.
+4. If the queue still fills, separately evaluate a direct AudioWorklet-to-analysis-worker MessagePort route, retaining bounded flow control and lifecycle/generation guards. This is a later architectural option, not part of the initial UI scheduling change.
+
+Do not first increase the queue size: that may trade dropped packets for longer detection latency. Do not claim a cause or improvement without measurements. A successful experiment should reduce avoidable delay/queue pressure without changing speech decisions or losing review data; no device-independent latency target is established. Only then consider graded recording/silence/pause gating, still report-only initially.
+
+The motivation for fresh evaluation remains the **4 November 18:09:56 UTC genuine Hey Doc with music**: corrected continuous input scored **0.386** and rejected at **0.6**; a fresh-state replay of saved pre-trigger audio scored **0.994** and passed. The earlier **17:38:20 UTC** rejection also passed fresh replay, but that build had the subsequently fixed 64-sample-context omission. These were offline saved-audio experiments, including a three-second fresh recheck; they are not proof that the current live 1.12-second candidate check rescues those same cases. The completed live music comparison retained all four genuine candidates with both methods; the all-negative run admitted more nuisance candidates with fresh. A mixed run with deliberate wake phrases in the same troublesome background is still needed to measure the tradeoff.
+
 ## Practical evaluation
 
 **Lab build 2026-11-05.3** keeps listening judgments in a fixed order: **Wake phrase heard** first (left, or above when stacked), **No wake phrase** second, then Clear label. The outcome-specific classifications change with acceptance: TP/FP for accepted triggers and FN/TN for rejected/non-trigger clips. Saved classification values and all Silero reporting/decisions are unchanged. Existing tests now verify the stable order for accepted, rejected, near-trigger and manual cards.
