@@ -8,7 +8,7 @@ Updated 5 November 2026. This guide owns wake-model evidence and lab use. Produc
 - Prioritize dedicated wake models, phrase choice and measured parameters. Tiny's live verification was too slow and missed genuine phrases. Keep Whisper out of the production live path.
 - Command diagnostics showed the user's intended Go/Stop scores at least 0.90 and unintended ones at most 0.88; the user raised the threshold. Preserve those settings. This limited observed separation is not a guaranteed cutoff across environments.
 - Speech gating can reject nonspeech but not all unrelated conversation. Level gating cannot identify the speaker. Production wake-word minimum dBFS remains evaluation-only and does not filter activations.
-- Next intended code work is behavior-preserving wake-detector extraction, described and approved before production edits. Model/DSP changes remain separate experiments.
+- Production wake loading/inference extraction and the subsequent race fixes are complete and user-accepted in **build 2026-11-05.3**; see [current ownership and validation](voice-control-refactor.md). Production and lab build numbers are independent. Model/DSP changes and Silero adoption remain separate experiments; the accepted refactor does not establish a new acoustic false-trigger rate.
 
 ## Evidence retained
 

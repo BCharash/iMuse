@@ -1,23 +1,22 @@
 # Documentation archive
 
-Reviewed 4 November 2026. These are historical source reviews, installation snapshots and research records. Their imperative wording and “current” labels describe their original dates; use the [active documentation index](../README.md) for present work. No archived checklist is authority to restore removed features or rerun completed tests.
+Reviewed 5 November 2026. These are retained investigations, design decisions and implementation snapshots. Their imperative wording, “current” labels and test counts describe their original dates. Use the [active index](../README.md) for present work; archived checklists do not authorize restoring retired features or repeating completed stages.
 
 | Snapshot | Why retained / what supersedes it |
-| [Native proposal snapshot, 4 November](native-proposal-2026-11-04.md) | Earlier recorder-only scope, system-integration details and proposed phases; current native guide includes possible transcription/model management and recording priority |
-| [Recorder lab guide snapshot, 4 November](recorder-lab-guide-2026-11-04.md) | Detailed build/startup history and live Whisper procedures; current evaluation guide records rejected latency and focused wake-model work |
 | --- | --- |
-| [Recording investigation/stage history, 3 November](recording-investigation-stages-2026-11-03.md) | Detailed lab evidence, negative experiments and four preservation-stage implementation notes; current behavior and one acceptance checklist now live in the concise recording brief |
-| [Architecture stabilization review](architecture-stabilization-review.md) | Earlier iMuse(7).zip audit; current source observations and remaining questions consolidated into the recording investigation |
-| [Recording handoff, 2 November](recording-investigation-handoff-2026-11-02.md) | Detailed startup-instrumentation regressions, cache incident, older timeline and file-version caveats; later installed-host evidence supersedes its iMuse-specific hypothesis |
-| [Roadmap, 1 November](roadmap-2026-11-01.md) | Detailed finalization/UUID/naming/Combine requirements; active priorities now live in Next steps |
-| [Wake-word experiments](wake%20word%20implementation.md) | Early Voicute/Heed model and threshold evidence; pause-only and Whisper-command proposals are superseded by current active-session voice behavior |
-| [Headset experiments](headset%20control.md) | Desktop/mobile media-button and keep-alive findings; media-button controls were subsequently retired on both platforms; microphone selection remains |
-| [Voice-control integration plan](iMuse%20voice-control%20integration%20plan.md) | Earlier proposed component tree and staged rollout; current adapters exist under js/heed, js/voicute and js/tensorflow |
-| [Stage 1 checklist](stage-1-checklist.md) | Historical settings/readiness installation snapshot; startup microphone readiness capture is no longer invoked |
-| [Stage 2 checklist](stage-2-checklist.md) | Historical wake-only rollout; command recognition is now implemented |
-| [Voice-command checklist](voice-command-stage-checklist.md) | Historical delivery/testing snapshot; direct spoken Stop behavior and old audio paths are superseded |
-| [Root cleanup checklist](root-cleanup-checklist.md) | Historical relocation/deletion instructions; not a fresh instruction to delete files |
+| [Voice-control extraction history, 5 November](voice-control-history-2026-11-05.md) | Detailed pre-acceptance characterization, staged extraction, original race observations and prior UI/diagnostic validation. Current accepted architecture is in the voice-control guide. |
+| [Native proposal snapshot, 4 November](native-proposal-2026-11-04.md) | Earlier recorder-only scope and system-integration detail; current native guide includes possible transcription/model management and recording priority. |
+| [Recorder lab guide snapshot, 4 November](recorder-lab-guide-2026-11-04.md) | Detailed startup/build history and earlier live Whisper procedures; current evaluation guide records rejected latency and detector-aligned Silero work. |
+| [Recording investigation/stage history, 3 November](recording-investigation-stages-2026-11-03.md) | Lab evidence, negative experiments and preservation-stage implementation notes; current behavior and manual checks live in the recording brief. |
+| [Architecture stabilization review](architecture-stabilization-review.md) | Earlier source audit and unique microphone/adapter questions; historical findings are not current defects without reproduction. |
+| [Recording handoff, 2 November](recording-investigation-handoff-2026-11-02.md) | Startup-instrumentation regressions, cache incident and older hypotheses; later installed-host evidence supersedes the iMuse-specific hypothesis. |
+| [Roadmap, 1 November](roadmap-2026-11-01.md) | Detailed UUID/provenance, naming and Combine requirements; current priorities live in Next steps. |
+| [Wake-word experiments](wake%20word%20implementation.md) | Early Voicute/Heed phrase/model/threshold evidence; pause-only and Whisper-command proposals are superseded. |
+| [Headset experiments](headset%20control.md) | Media-button/keep-alive findings; those controls were retired on both platforms. Microphone selection remains supported. |
+| [Voice-control integration plan](iMuse%20voice-control%20integration%20plan.md) | Original proposed component/state separation and test gates; current owners and interfaces are in the voice-control guide. |
+| [Comparison lab, 4 November](wake-word-comparison-lab-2026-11-04.html) | Still-available earlier review tool and its separate saved-review database; not an instruction to restart that experiment. |
+| [Comparison lab review instructions](wake-word-review-notes-2026-11-04.md) | Companion instructions for opening/reviewing that retained tool's data. |
 
-Evidence is preserved here rather than merged verbatim into current briefs. Previous ZIP artifacts and Desktop JSON files may not be available. Request an exact historical artifact only if investigating its specific regression; current workspace files are the source for present changes.
+Removed during this review: `stage-1-checklist.md`, `stage-2-checklist.md`, `voice-command-stage-checklist.md` and `root-cleanup-checklist.md`. These were obsolete ZIP-installation/rollout instructions, not unique measured evidence. They described removed readiness/headset behavior, incomplete command integration, direct spoken Stop or already-completed file relocation. Current settings/voice behavior and regression checks replace them; Git history retains their contents.
 
-The [4 November comparison lab](wake-word-comparison-lab-2026-11-04.html) and its [review instructions](wake-word-review-notes-2026-11-04.md) preserve the previous wake-word audio-review experiment. Current findings and the replacement recorder lab are documented in [wake-word evaluation](../wake-word-evaluation.md).
+Private audio/Desktop exports and old ZIPs may no longer be available. Current workspace source is authoritative. Keep the archived lab and its regression tests while it remains available; its **imuse-wake-review-lab** database is separate from production and the current lab. See [current wake evaluation](../wake-word-evaluation.md).

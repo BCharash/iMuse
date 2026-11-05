@@ -1,6 +1,6 @@
 # iMuse Design Journal
 
-Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated snapshots. DJ012 records the installed failure; DJ013 records preservation; DJ014–DJ016 record library/store/recovery extractions. DJ025 records the latest roadmap, transcription priority and documentation consolidation. Older proposals, test counts and labels are historical, not current instructions.
+Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated snapshots. DJ012 records the installed failure; DJ013 records preservation; DJ014–DJ016 record library/store/recovery extractions. DJ025 records the earlier roadmap/transcription priority; DJ026 records the accepted wake refactor, build identity and latest documentation cleanup. Older proposals, test counts and labels are historical, not current instructions.
 
 ---
 
@@ -1624,3 +1624,20 @@ The user is considering native iMuse with transcription and multiple cached mode
 **Recording always has priority.** Future transcription/naming runs only outside active recording sessions, yields to Record, and retains queued work/source audio. Paused sessions, startup and finalization retain priority. Required live wake/command processing remains available. Verify real cancellation/resource release on-device. The lab currently permits an earlier filename inference to overlap a new recording; the requirement is not yet implemented there or as a production scheduler.
 
 Reviewed active guides, retained regression-test documentation and archived the superseded detailed native proposal/lab guide with explicit historical notices. Updated the index, roadmap, voice-control plan, recording reference and integration contract; corrected old test counts and the Advanced failure-test path. No production files, model assets, browser data or test code changed. The last code checkpoint is 49 methods across eleven suites; this documentation pass checks links/diff rather than rerunning code tests. Current guides take precedence over historical journal entries and archived plans.
+
+
+---
+
+# DJ026 — Accepted wake refactor, build identity and documentation checkpoint
+
+**Date:** 5 November 2026. **Status:** User-accepted implementation checkpoint; documentation cleanup complete.
+
+The user tested production **build 2026-11-05.3**, reported it worked as expected and called the refactor a success. Loading and inference routing now live in `js/wake-detector.js`; recorder-owned microphone/audio graph, ring, rearming and recording/storage operations are preserved. The command controller remains separate. Do not restart the completed extraction. Device/browser and individual scenarios for the final user report were not specified; acceptance does not establish a universal false-trigger rate or resolve installed-iPhone background capture.
+
+Characterization preceded the two extraction stages. Separately approved corrections then added latest-load generation guards, latest-threshold application at readiness, common post-inference validity checks and arm-generation invalidation. Outdated results/errors/timer callbacks cannot affect a later session or arming cycle; completion releases its own busy flag. No intentional wait or extra inference was added. The last implementation run passed **89 methods across thirteen suites**, including 26 wake methods. Earlier counts and unwanted baseline assertions are historical. See the [current voice guide](voice-control-refactor.md) and its [archived staged history](Archive/voice-control-history-2026-11-05.md).
+
+Grouped Settings, temporary Suspend/Resume audio commands and the idle next-recording status are implemented. Production numbering uses **YYYY-MM-DD.N**, with a runtime label below the Settings selectors and `appBuild` in voice/saved-recording diagnostic exports. This identifies the exporting page's build module, not every cached asset or the capture build of an older recording.
+
+The next discussed assessment is conventional generated asset fingerprinting, preserving readable source filenames and considering automated build/publish. No build tool, fingerprinting, service worker, release-folder system or hosting change is implemented or authorized by this entry. Keep that migration independent; inventory model/worker/lab paths and validate an existing-cache update before deployment changes. Native feasibility remains deferred until equipment is available, and Whisper stays outside live wake verification.
+
+Documentation cleanup makes the accepted checkpoint and remaining queue current, archives detailed voice stage history, and removes four obsolete archived installation checklists: stage 1, stage 2, voice-command rollout and root relocation. They add no unique measured evidence and contain superseded instructions. Retained archives preserve investigations, original requirements, model findings and the still-available comparison lab. Application code, models, tests and browser data are unchanged by this documentation pass; validation checks local links/anchors and the diff rather than rerunning the already-passing implementation suite.
