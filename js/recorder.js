@@ -87,6 +87,7 @@ const MAX_PENDING_AUDIO_BYTES = 8 * 1024 * 1024;
 let activeSession = null;
 let recordingUrl = null;
 let displayedSessionId = null;
+let displayedRecordingFilename = null;
 let startRequest = 0;
 let lastRecordingPeakBytes = 0;
 const recordingRecovery = createRecordingRecovery({
@@ -1040,6 +1041,7 @@ function clearPlayback() {
     recordingControls.hidden = true;
     window.lastRecording = null;
     displayedSessionId = null;
+    displayedRecordingFilename = null;
     if (recordingUrl) {
         URL.revokeObjectURL(recordingUrl);
         recordingUrl = null;
@@ -1061,10 +1063,12 @@ function setReadyUI() {
     setRecordingControlState("idle");
 }
 
-function showPlayback(blob, sessionId = null) {
+function showPlayback(blob, sessionId = null, metadata = null) {
     ensureCurrentDownloadButton();
     window.lastRecording = blob;
     displayedSessionId = sessionId;
+    // Retain the name with the audio, independent of later database deletion.
+    displayedRecordingFilename = sessionFilename(metadata);
     if (recordingUrl) URL.revokeObjectURL(recordingUrl);
     recordingUrl = URL.createObjectURL(blob);
     audioPlayer.src = recordingUrl;
@@ -1121,10 +1125,7 @@ function ensureCurrentDownloadButton() {
         try {
             if (!window.lastRecording) throw new Error("No recording is currently loaded.");
             const blob = window.lastRecording;
-            const id = displayedSessionId;
-            const item = emergencyRecordings.get(id)?.metadata || (id ? await boundedStorageRead(getSession(id)) : null);
-            if (!item) throw new Error("The recording's start time is unavailable. Download it from Saved recordings.");
-            const downloaded = await downloadAudioBlob(blob, sessionFilename(item));
+            const downloaded = await downloadAudioBlob(blob, displayedRecordingFilename);
             status.textContent = downloaded ? "Download started. Check the exported audio before deleting the original." : "Download canceled. Recording retained.";
         } catch (error) {
             status.textContent = `Could not download audio: ${error.message || "unknown error"}`;

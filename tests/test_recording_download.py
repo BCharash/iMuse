@@ -59,32 +59,38 @@ const controls={hidden:true,children:[],insertBefore(button,before){assert(befor
 const deleteButton={parentElement:controls};controls.children.push(deleteButton);
 const document={getElementById:id=>controls.children.find(child=>child.id===id),createElement:()=>({events:{},addEventListener(type,fn){this.events[type]=fn;}})};
 const window={lastRecording:null},status={},recordingControls=controls;
-const audioPlayer={hidden:true,load(){}},URL={createObjectURL:()=> 'blob:current',revokeObjectURL(){}};
-let recordingUrl=null,displayedSessionId=null;
+const audioPlayer={hidden:true,load(){},pause(){},removeAttribute(){}},URL={createObjectURL:()=> 'blob:current',revokeObjectURL(){}};
+let recordingUrl=null,displayedSessionId=null,displayedRecordingFilename=null;
 const metadata={startedAt:'2026-11-05T14:32:08Z',downloadStamp:'2026-11-05_14-32-08'};
 const emergencyRecordings=new Map();
-const getSession=async id=>{assert(id==='current','reads current session');return metadata;};
+const getSession=async()=>{throw Error('download must not read deleted database metadata');};
 const boundedStorageRead=promise=>promise;
 let requested,downloaded=true;
 const downloadAudioBlob=async(blob,name)=>{requested={blob,name};return downloaded;};
-''' + NAMING + between('function showPlayback(', 'function audioFileExtension(')
+''' + NAMING + between('function clearPlayback()', 'function setAudioCommandsToggleLocked(')
+                 + between('function showPlayback(', 'function audioFileExtension(')
                  + between('function sessionFilename(', 'function renderRecoverableSessions(') + r'''
 globalThis.testResult='pending';
 (async()=>{
  const blob={size:12,type:'audio/mp4'};
- showPlayback(blob,'current');
+ showPlayback(blob,'current',metadata);
  const button=document.getElementById('downloadRecordingButton');
  assert(button&&controls.hidden===false&&audioPlayer.hidden===false,'current playback exposes download control');
  await button.events.click();
  assert(requested.blob===blob&&requested.name==='2026-11-05_14-32-08_iMuse','current audio uses original start time');
  assert(!button.disabled&&status.textContent.includes('Download started'),'success restores button');
- showPlayback(blob,'current');
+ showPlayback(blob,'current',metadata);
  assert(controls.children.length===2,'repeated playback does not duplicate control');
  downloaded=false;await button.events.click();
  assert(status.textContent.includes('canceled')&&window.lastRecording===blob&&!button.disabled,'cancel retains current audio');
+ metadata.downloadStamp='2026-11-06_00-00-00';
+ downloaded=true;await button.events.click();
+ assert(requested.name==='2026-11-05_14-32-08_iMuse','name snapshot survives metadata changes and deleted database');
  emergencyRecordings.set('emergency',{metadata});
- showPlayback(blob,'emergency');await button.events.click();
- assert(requested.name==='2026-11-05_14-32-08_iMuse','emergency current download also works without database read');
+ showPlayback(blob,'emergency',metadata);emergencyRecordings.clear();await button.events.click();
+ assert(requested.name==='2026-11-06_00-00-00_iMuse','replacing player replaces name and does not depend on emergency map');
+ clearPlayback();
+ assert(window.lastRecording===null&&displayedRecordingFilename===null&&controls.hidden&&audioPlayer.hidden,'clearing player clears audio and filename together');
  globalThis.testResult='PASS';
 })().catch(e=>globalThis.testResult=String(e.stack));
 ''')

@@ -68,7 +68,7 @@ export function createRecordingRecovery({
     function playEmergencyRecording(id, present = showPlayback) {
         const emergency = emergencyRecordings.get(id);
         if (!emergency) return false;
-        present(emergency.blob, id);
+        present(emergency.blob, id, emergency.metadata);
         status.textContent = emergency.unsavedBytes
             ? "Available audio loaded, including unsaved audio. Download it before closing or reloading iMuse and check for missing sections."
             : "Recovery audio loaded. Finalization was delayed; check for missing sections and download before closing or reloading iMuse.";
@@ -150,7 +150,7 @@ export function createRecordingRecovery({
                     recoveredAt: new Date().toISOString(),
                     lastUpdatedAt: new Date().toISOString()
                 });
-                present(blob, id);
+                present(blob, id, item);
                 status.textContent = state === "completed"
                     ? "Recording loaded. Saved chunks passed structural checks; check playback."
                     : `Available audio loaded from an interrupted recording.${integrityNotice(report)} Check playback for missing sections.`;
@@ -196,7 +196,7 @@ export function createRecordingRecovery({
                 retainEmergencyRecording(current, finalBlob);
             } else if (emergencyRecordings.has(id)) retainEmergencyRecording(current, finalBlob);
             finalBlob = emergencyRecordings.get(id)?.blob || finalBlob;
-            showPlayback(finalBlob, id);
+            showPlayback(finalBlob, id, current.metadata);
             status.textContent = emergencyRecordings.get(id)?.unsavedBytes
                 ? `Recording was interrupted. Available audio includes unsaved data; download before closing or reloading.${integrityNotice(assembly.report)}`
                 : current.metadata.state === "completed"
@@ -222,7 +222,7 @@ export function createRecordingRecovery({
             finalBlob = new Blob(fallbackParts, { type: current.metadata.mimeType || fallbackParts.find(part => part.type)?.type || "application/octet-stream" });
             if (finalBlob.size) {
                 retainEmergencyRecording(current, finalBlob);
-                showPlayback(emergencyRecordings.get(id).blob, id);
+                showPlayback(emergencyRecordings.get(id).blob, id, emergencyRecordings.get(id).metadata);
             }
             current.metadata.state = error.integrityReport ? "interrupted" : "storage-error";
             current.metadata.finalizationError = String(error.message || error);

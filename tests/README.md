@@ -10,7 +10,7 @@ Python 3 runs JavaScript through Node when available, otherwise the macOS JavaSc
 
 | Suite | Why retained |
 | --- | --- |
-| `test_recording_download.py` | Local timestamps, portable names, dialog preview/confirmation/cancellation, single-dialog ownership, actual download format and URL behavior, current-playback button creation/start-time naming, and saved/emergency cancellation outside the writer lock |
+| `test_recording_download.py` | Local timestamps, portable names, dialog preview/confirmation/cancellation, single-dialog ownership, actual download format and URL behavior, current-playback button creation/start-time naming and retained downloads without database metadata, and saved/emergency cancellation outside the writer lock |
 | `test_emergency_recordings.py` | Emergency retention and recorder/library integration; a separate test exercises the complete library module directly, including dialog ownership and deletion/restore/bulk cancellation |
 | `test_preservation_failure_control.py` | Opt-in fault control, default-off behavior, final tail retention and a normal next recording |
 | `test_recording_storage.py` | Complete store module plus recorder wiring: ordering, counters, ownership, competing startup/deletion, abort/restore, diagnostic cleanup, schema and blocked/failed opens |

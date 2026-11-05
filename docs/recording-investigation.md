@@ -40,13 +40,15 @@ Recovery copies already use the recorder's original format, typically M4A/AAC on
 
 ### Download naming
 
+Build **2026-11-05.6** retains the default filename alongside the current player's audio. Download no longer reads session metadata from the database, so it remains usable after the saved copy is permanently deleted. Clearing/replacing the current player clears/replaces its filename too. This adds no deletion message.
+
 Build **2026-11-05.5** fixes current-playback button creation: once a stopped recording is shown in the main player, Download audio file appears beside Delete. Build .4 defined the button without calling its creation function. The regression check now exercises display, button creation, download, cancellation and repeated playback.
 
 Build **2026-11-05.4** adds a filename dialog only when Download is selected, from either Saved recordings or the current recording. The description starts as `iMuse`; the fixed prefix is local recording-start date/time, for example `2026-11-05_14-32-08_iMuse.m4a`. The preview uses the actual audio format's extension. Unsupported filename characters are replaced with hyphens; an empty description falls back to `iMuse`. Cancel/Escape starts no download and retains all audio. Descriptions apply to that download only, without renaming stored recordings or adding editable fields to the list. Whisper suggestions are not implemented.
 
 New recordings store their local start-time prefix alongside the existing UTC timestamp, preserving it across timezone changes. Older recordings lack the original timezone: their prefix uses the stored start instant in the device's current local timezone. No database version change or backfill is needed. Saved-audio assembly releases the storage writer lock before waiting for the filename choice.
 
-Focused acceptance: download an existing and a new recording; edit the description and check the resulting filename/audio; cancel a second download; check the current-player download uses recording-start time. Check the dialog and keyboard on iPhone and desktop. Automated checks do not establish browser/device download behavior.
+Focused acceptance: download an existing and a new recording; edit the description and check the resulting filename/audio; cancel a second download; check the current-player download uses recording-start time and still works after permanently deleting that saved recording. Check the dialog and keyboard on iPhone and desktop. Automated checks do not establish browser/device download behavior.
 
 Committed audio can be recovered after reopening. **Memory-only emergency audio cannot survive closure, reload or OS process termination unless it is successfully persisted or exported.** Automatic retries for that tail are not implemented. Download initiation does not confirm a usable file reached Files/Downloads; open important exports and check them.
 

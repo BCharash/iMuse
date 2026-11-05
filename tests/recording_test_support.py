@@ -104,7 +104,7 @@ const window = {lastRecording: null};
 const audioPlayer = new Element(), recordingControls = new Element(), status = {};
 const revoked = [];
 const URL = {createObjectURL: () => 'blob:test', revokeObjectURL: url => revoked.push(url)};
-let recordingUrl = null, displayedSessionId = null, activeSession = null, db = null;
+let recordingUrl = null, displayedSessionId = null, displayedRecordingFilename = null, activeSession = null, db = null;
 let recordingStore = {isOpen: () => Boolean(db)};
 let lastRecordingPeakBytes = 0, startRequest = 0, recordingLease = null;
 const microphoneLevelCheck={stop:()=>Promise.resolve()};
