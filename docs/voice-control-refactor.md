@@ -12,6 +12,34 @@ All **57 repository test methods** pass across eleven suites. Voice lifecycle ch
 
 These are characterization tests: they capture the behavior to retain during extraction. They do not prove that every possible race is handled or that current models recognize real speech accurately.
 
+## Wake-detector characterization checkpoint
+
+On 5 November 2026 the user approved characterization of the existing production wake implementation before extraction. **No production code or model assets changed at that checkpoint.** `tests/test_wake_detector.py` added 17 methods; all **79 methods across thirteen suites passed**. Earlier counts in this document describe their dated checkpoints. The subsequent loader-only extraction is described below.
+
+Coverage executes the real recorder audio callback, model initialization, settings handler, inference routing, buffer reset and rearming functions. It protects signed-int16-scale floats, chronological ring wraparound, insufficient input, both recording/paused states, 16/44.1/48 kHz routing, Voicute resampling and detect arguments, busy skips, failures and results arriving after session replacement/disarm. Adapter checks execute the complete Heed and Voicute loading/streaming implementations with controlled external dependencies. Separate Heed checks execute its real filters/mel preprocessing and trigger logic, including raw versus EMA scores, consecutive crossings, strict threshold/refractory boundaries, silence gating and reset.
+
+Observed details to preserve during extraction:
+
+- The recorder owns a three-second ring and a 2,048-sample ScriptProcessor callback. Heed receives the latest 2,048 samples and the original sample rate. Its adapter normalizes/resamples, accumulates 1,600-sample frames at 16 kHz and processes at most one frame per consume call. Voicute requests its window length and receives resampled, still-int16-scale floats.
+- A busy inference skips incoming evaluation calls; the ring continues collecting. The next evaluation uses the latest window, without replaying skipped windows. These tests establish sample behavior, not measured wall-clock responsiveness under browser load.
+- Voicute's adapter configures an internal 2,000 ms cooldown, while recorder routing passes 1,500 ms to `detect()`. Both existing values are characterized; this checkpoint does not establish how the downloaded library combines them.
+
+Existing async limitations are explicit baseline observations in a dedicated test, not new guarantees or fixes:
+
+- After an awaited inference, Heed rechecks enabled/current session identity but does not repeat Voicute's recording/paused state check. This test observes routing into the command callback; it does not establish a user-visible action under full recorder/controller cleanup.
+- A rejected inference from an older session can still replace the shared status text after a newer session starts. The old failure does not disable the newer session in the exercised case.
+- Model readiness compares the selected engine name, not a load-generation token. In a Heed → Voicute → Heed sequence, the first Heed load can overwrite the later Heed load.
+
+Keep any correction to these behaviors separate and explicit rather than silently bundling it into extraction. Automated dependencies are controlled: no real microphone, ONNX inference, downloaded Voicute implementation, browser scheduling or device recognition accuracy is tested. The existing Mac/iPhone acceptance checklist remains required after a production extraction.
+
+The proposed overall extraction is a `js/wake-detector.js` module for adapter selection/loading and inference routing, exposing phrase/readiness, reset, threshold update and asynchronous buffer evaluation with caller-supplied validity checks. The recorder retains its microphone, graph, ring, session/busy guards, rearming timers and status UI; accepted results still enter the existing voice controller. Only model-loading delegation has been extracted so far, as described below. AudioWorklet migration remains a separate change: it would replace main-thread ScriptProcessor delivery, aggregate worklet blocks into the existing detector chunks and require independent lifecycle/timing/device validation.
+
+### Loader-only extraction
+
+The user subsequently approved **the first step only** on 5 November. `js/wake-detector.js` now exports `loadWakeDetector({engineName, threshold, onStatus})`, which selects the existing Heed/Voicute adapter and returns its promise directly. `recorder.js` imports this function instead of importing both adapters. Threshold selection, readiness/status updates, existing stale-load checks and rearming remain recorder-owned. The module adds no cache, async wrapper, microphone acquisition or inference work; the original adapter result, status callback and rejection are preserved.
+
+The existing characterization assertions remain intact. Their fixtures now execute the extracted loader along with recorder initialization; an additional method checks delegation, option/result/rejection identity, the unchanged non-Heed fallback and direct promise identity. **All 80 methods across thirteen suites pass.** Production audio/inference code, adapters, models, thresholds and timers are unchanged. No device recognition or native browser timing acceptance was performed for this checkpoint. Inference extraction is still pending, and the previously identified async limitations remain unchanged.
+
 ## Temporary suspension and grouped Settings
 
 Implemented 5 November 2026 at the user's request, independently of wake-detector extraction. The Audio commands checkbox remains a persisted preference and stays locked for the active recording session. A separate **Suspend audio commands / Resume audio commands** button beside Record/Stop is visible when that preference is enabled. Suspension is transient for the page; it survives starting another recording until resumed, is reset when the preference is disabled, and is not saved in localStorage.

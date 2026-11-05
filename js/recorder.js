@@ -1,7 +1,6 @@
 import { playSpokenResponse, prepareSpokenResponses } from "./audio-response-manager.js";
 import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSelectionLocked, getRequestedMicrophoneConstraints } from "./microphone-manager.js";
-import { loadVoicuteWakeWord } from "./voicute/voicute-adapter.js";
-import { loadHeedWakeWord } from "./heed/heed-adapter.js";
+import { loadWakeDetector } from "./wake-detector.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { createMicrophoneLevelCheck } from "./microphone-level-check.js";
 import { createVoiceController } from "./voice-controller.js";
@@ -536,9 +535,7 @@ async function initializeWakeWord() {
  if(activeSession)setWakeStatus(`Preparing voice commands…`);else refreshIdleWakeStatus();
  const onStatus=message=>{if(activeSession)setWakeStatus(message);else refreshIdleWakeStatus();};
  try {
-  const loaded=engineName==="heed"
-   ?await loadHeedWakeWord({threshold:WAKE_THRESHOLD,onStatus})
-   :await loadVoicuteWakeWord({threshold:WAKE_THRESHOLD,onStatus});
+  const loaded=await loadWakeDetector({engineName,threshold:WAKE_THRESHOLD,onStatus});
   if(selectedWakeEngine!==engineName)return;
   wakeWord=loaded;
   wakeWordPhrase=loaded.phrase;

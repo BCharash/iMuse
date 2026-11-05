@@ -16,11 +16,11 @@ Updated 5 November 2026. Start here; current findings take precedence over older
 
 ## Current checkpoint
 
-Recording preservation's four stages, library/store/recovery extractions, command-controller extraction, Advanced diagnostics and the temporary microphone check/countdown are implemented. The user reported the microphone check/countdown and earlier preservation/refactoring checks worked. The last automated checkpoint is 49 tests across eleven suites; full device acceptance remains bounded by the recording brief.
+Recording preservation's four stages, library/store/recovery extractions, command-controller extraction, Advanced diagnostics and the temporary microphone check/countdown are implemented. The user reported the microphone check/countdown and earlier preservation/refactoring checks worked. The latest automated checkpoint is **80 tests across thirteen suites**, including 18 wake-detector characterization/loader methods; full device acceptance remains bounded by the recording brief.
 
 Readable diagnostics helped the user raise command thresholds after observing intended Go/Stop scores at least 0.90 and unintended scores at most 0.88. This is limited tuning evidence, not proof that intermittent false recognition is resolved. Preserve the user's settings.
 
-**Next intended production work:** describe and characterize a behavior-preserving wake-detector extraction, then obtain approval before editing production code. Keep audio ownership, DSP, models, cadence and thresholds unchanged during extraction. Whisper stays out of the live wake path.
+**Wake-detector refactor:** the user-approved characterization and [first loader-only extraction](voice-control-refactor.md#loader-only-extraction) are complete. Inference routing remains in the recorder as the next separately reviewable step. Keep audio ownership, DSP, models, cadence and thresholds unchanged during extraction. Whisper stays out of the live wake path.
 
 The iPhone installed-PWA capture failure remains unresolved; the Safari tab is the reported working web route. Native feasibility testing is deferred until a suitable cable is available. If native iMuse is chosen, the user wants transcription and multiple cached models while retaining Memora web and web iMuse for other platforms. Recording always takes priority over transcription/naming. These are future requirements, not implemented native features or a production scheduler. The native proposal owns that scope.
 

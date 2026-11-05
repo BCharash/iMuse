@@ -7,6 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DIAGNOSTICS = (ROOT / 'js/voice-diagnostics.js').read_text().replace('export ', '')
 CONTROLLER = (ROOT / 'js/voice-controller.js').read_text()
 CONTROLLER = '\n'.join(line for line in CONTROLLER.splitlines() if not line.startswith('import ')).replace('export ', '')
+WAKE_LOADER = (ROOT / 'js/wake-detector.js').read_text()
+WAKE_LOADER = '\n'.join(line for line in WAKE_LOADER.splitlines() if not line.startswith('import ')).replace('export ', '')
 VOICE = between('// Recorder-owned capabilities:', 'function resetWakeAudioBuffer(')
 FINALIZE = between('function finalizeRecording(', '// Silence duration')
 
@@ -80,7 +82,7 @@ const setWakeStatus=value=>text=value,closeCommandWindow=()=>{},clearWakeDetecto
 let changed,resolveModel,rejectModel;const window={addEventListener:(name,fn)=>changed=fn};
 let progress;const loadHeedWakeWord=({onStatus})=>{progress=onStatus;return new Promise((resolve,reject)=>{resolveModel=resolve;rejectModel=reject;});};
 const loadVoicuteWakeWord=loadHeedWakeWord;
-"""+idle+initialize+handler+r"""
+"""+WAKE_LOADER+idle+initialize+handler+r"""
 (async()=>{
  settings.audioCommands=false;changed({detail:settings});assert(text.includes('disabled for the next recording'),'idle disable refreshes immediately');
  settings.audioCommands=true;changed({detail:settings});assert(text.includes('enabled for the next recording')&&text.includes('Preparing'),'idle enable clears stale disabled status before recording');
