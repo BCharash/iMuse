@@ -67,6 +67,7 @@ window.deviceClass = deviceClass;
 let WAKE_THRESHOLD = getSettings().voicuteThreshold;
 let selectedWakeEngine = getSettings().wakeEngine;
 const WAKE_DETECT_COOLDOWN_MS = 1500;
+let wakeModelLoadGeneration = 0;
 let wakeWord = null;
 let wakeWordPhrase = "Hey Friday";
 let wakeWordLoadError = null;
@@ -532,19 +533,23 @@ function setLifecycleStatus(message) {
 
 async function initializeWakeWord() {
  const engineName=selectedWakeEngine;
+ const generation=++wakeModelLoadGeneration;
+ const isLatestLoad=()=>generation===wakeModelLoadGeneration&&selectedWakeEngine===engineName;
  WAKE_THRESHOLD=engineName==="heed"?getSettings().wakeThreshold:getSettings().voicuteThreshold;
  wakeWordLoadError=null;
  if(activeSession)setWakeStatus(`Preparing voice commands…`);else refreshIdleWakeStatus();
- const onStatus=message=>{if(activeSession)setWakeStatus(message);else refreshIdleWakeStatus();};
+ const onStatus=message=>{if(!isLatestLoad())return;if(activeSession)setWakeStatus(message);else refreshIdleWakeStatus();};
  try {
   const loaded=await loadWakeDetector({engineName,threshold:WAKE_THRESHOLD,onStatus});
-  if(selectedWakeEngine!==engineName)return;
+  if(!isLatestLoad())return;
+  WAKE_THRESHOLD=engineName==="heed"?getSettings().wakeThreshold:getSettings().voicuteThreshold;
+  loaded.engine?.setThreshold?.(WAKE_THRESHOLD);
   wakeWord=loaded;
   wakeWordPhrase=loaded.phrase;
   if(activeSession)setWakeStatus(`Voice commands ready — “${wakeWordPhrase}”.`);else refreshIdleWakeStatus();
   if(activeSession && getSettings().audioCommands)scheduleWakeDetectorArm(activeSession,0);
  }catch(error){
-  if(selectedWakeEngine!==engineName)return;
+  if(!isLatestLoad())return;
   wakeWordLoadError=error;
   if(activeSession)setWakeStatus(`Voice commands unavailable. You can still use the recording buttons.`);else refreshIdleWakeStatus();
  }
@@ -641,11 +646,9 @@ function resetWakeAudioBuffer(current) {
 }
 
 function scheduleWakeDetectorArm(current, delayMs = 650) {
-    current.wakeDetectorEnabled = false;
-    if (current.wakeRearmTimer !== null) {
-        window.clearTimeout(current.wakeRearmTimer);
-        current.wakeRearmTimer = null;
-    }
+    clearWakeDetectorTimers(current);
+    const generation = current.wakeGeneration;
+    const detector = wakeWord;
     if (!getSettings().audioCommands || !wakeWord || !current.wakeRing) {
         setWakeStatus(!getSettings().audioCommands ? "Audio commands disabled." : wakeWordLoadError
             ? "Voice commands unavailable. Use the Record button to resume."
@@ -653,12 +656,13 @@ function scheduleWakeDetectorArm(current, delayMs = 650) {
         return;
     }
     current.wakeRearmTimer = window.setTimeout(() => {
+        if (current.wakeGeneration !== generation) return;
         current.wakeRearmTimer = null;
         if (
             activeSession !== current ||
             current.discard ||
             !["paused", "recording"].includes(current.recorder.state) ||
-            !wakeWord || !getSettings().audioCommands || voiceController.active
+            !wakeWord || wakeWord !== detector || !getSettings().audioCommands || voiceController.active
         ) return;
 
         resetWakeAudioBuffer(current);
@@ -680,10 +684,17 @@ async function runWakeWordInference(current, sampleRate) {
         !current.wakeRing
     ) return;
 
+    const detector = wakeWord;
+    const engineName = selectedWakeEngine;
+    const loadGeneration = wakeModelLoadGeneration;
+    const generation = current.wakeGeneration;
+    const isCurrent = () => activeSession === current && !current.discard &&
+        getSettings().audioCommands && wakeWord === detector && selectedWakeEngine === engineName &&
+        wakeModelLoadGeneration === loadGeneration && current.wakeGeneration === generation;
     current.wakeInferenceBusy = true;
     return evaluateWakeDetector({
-        engineName: selectedWakeEngine,
-        engine: wakeWord.engine,
+        engineName,
+        engine: detector.engine,
         buffer: {
             ring: current.wakeRing,
             position: current.wakeRingPos,
@@ -693,11 +704,11 @@ async function runWakeWordInference(current, sampleRate) {
         getThreshold: () => WAKE_THRESHOLD,
         cooldownMs: WAKE_DETECT_COOLDOWN_MS,
         isEnabled: () => current.wakeDetectorEnabled,
-        isCurrent: () => activeSession === current,
+        isCurrent,
         isListening: () => ["paused", "recording"].includes(current.recorder.state),
         onTrigger: () => { void handleWakeDetected(current); },
         onError: error => {
-            current.wakeDetectorEnabled = false;
+            clearWakeDetectorTimers(current);
             console.warn("Wake-word inference failed:", error);
             setWakeStatus(`Voice detection stopped. Use the recording buttons.`);
         },
@@ -789,6 +800,8 @@ function handleVisibilityChange() {
 }
 
 function clearWakeDetectorTimers(current) {
+    // Invalidate results and callbacks from every earlier arming cycle.
+    current.wakeGeneration = (current.wakeGeneration || 0) + 1;
     current.wakeDetectorEnabled = false;
     if (current.wakeRearmTimer !== null && current.wakeRearmTimer !== undefined) {
         window.clearTimeout(current.wakeRearmTimer);
@@ -1232,6 +1245,7 @@ async function startRecording() {
             wakeRingPos: 0,
             wakeCollectedSamples: 0,
             wakeDetectorEnabled: false,
+            wakeGeneration: 0,
             wakeInferenceBusy: false,
             wakeRearmTimer: null,
             silenceCheckTimer: null,

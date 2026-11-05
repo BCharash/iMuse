@@ -24,13 +24,13 @@ Observed details to preserve during extraction:
 - A busy inference skips incoming evaluation calls; the ring continues collecting. The next evaluation uses the latest window, without replaying skipped windows. These tests establish sample behavior, not measured wall-clock responsiveness under browser load.
 - Voicute's adapter configures an internal 2,000 ms cooldown, while recorder routing passes 1,500 ms to `detect()`. Both existing values are characterized; this checkpoint does not establish how the downloaded library combines them.
 
-Existing async limitations are explicit baseline observations in a dedicated test, not new guarantees or fixes:
+The initial characterization recorded these async limitations. They were preserved during extraction, then corrected in the separately approved build 2026-11-05.3 described below:
 
 - After an awaited inference, Heed rechecks enabled/current session identity but does not repeat Voicute's recording/paused state check. This test observes routing into the command callback; it does not establish a user-visible action under full recorder/controller cleanup.
 - A rejected inference from an older session can still replace the shared status text after a newer session starts. The old failure does not disable the newer session in the exercised case.
 - Model readiness compares the selected engine name, not a load-generation token. In a Heed → Voicute → Heed sequence, the first Heed load can overwrite the later Heed load.
 
-Keep any correction to these behaviors separate and explicit rather than silently bundling it into extraction. Automated dependencies are controlled: no real microphone, ONNX inference, downloaded Voicute implementation, browser scheduling or device recognition accuracy is tested. The existing Mac/iPhone acceptance checklist remains required after a production extraction.
+These observations motivated a separate correction rather than a silent behavior change during extraction. Automated dependencies are controlled: no real microphone, ONNX inference, downloaded Voicute implementation, browser scheduling or device recognition accuracy is tested. The existing Mac/iPhone acceptance checklist remains required after a production change.
 
 The implemented extraction puts adapter selection/loading and inference routing in `js/wake-detector.js`. It returns the original adapter/phrase and evaluates a caller-supplied buffer view with live validity checks; readiness, reset and threshold updates remain coordinated by the recorder through the original adapter. The recorder retains its microphone, graph, ring, session/busy guards, rearming timers and status UI; accepted results still enter the existing voice controller. Both extraction steps are described below. AudioWorklet migration remains a separate change: it would replace main-thread ScriptProcessor delivery, aggregate worklet blocks into the existing detector chunks and require independent lifecycle/timing/device validation.
 
@@ -47,6 +47,18 @@ The user approved stage two after their stage-one check. Production build **2026
 The module does not receive the mutable recorder session, acquire audio, own a timer or update the DOM. All entry guards, buffer collection/reset, adapter reset/threshold changes, readiness, rearming and command actions remain in the recorder/controller. Models, sample scaling, window sizes, resampling math, cadence and cooldowns are unchanged. The three characterized async limitations remain explicit baseline behavior; none was silently fixed.
 
 Existing characterization assertions pass through the extracted implementation. Two additional methods verify the standalone evaluator's live guards/threshold without recorder state, plus trigger/error/busy-clear ordering relative to the original inference promise. **All 83 methods across thirteen suites pass.** No native browser microphone/recognition test was performed for this stage. The next acceptance step is the existing Mac/iPhone checklist below using build **2026-11-05.2**. Asset fingerprinting, AudioWorklet migration, Silero integration and race corrections remain separate work.
+
+### Wake race corrections
+
+After reporting stage two looked good so far, the user separately approved fixes to the characterized async cases. **Build 2026-11-05.3** implements them. The user's report does not specify device/browser or close the full acceptance matrix.
+
+- Every load request increments a page-local generation. Only the latest request may install a model, report progress or publish an error, including Heed → Voicute → Heed sequences. The accepted model receives the latest selected threshold after loading, including when an adapter reuses a cached model.
+- Every clear/rearm invalidates the session's earlier wake generation. A queued callback from an old timer cannot arm detection or erase the newer timer reference. Current inference captures its session, detector object, selected engine, model-load generation and arm generation; after inference these must still match, the session must not be discarded, the preference/detection must remain enabled, and capture must be recording or paused. Both engines now apply this common validity rule.
+- Outdated inference errors are ignored. Current failures still disable detection and show the manual-control fallback. Completion always releases its own session's busy flag, including for obsolete results, without changing a newer session's flag.
+
+The tests that formerly asserted unwanted behavior now assert the corrected outcomes. Six additional methods cover disarm/rearm, cancelled timers, reused cached detector identity, old completion versus a new session's busy inference, rapid load success/error/progress ordering and threshold changes during load. **All 89 methods across thirteen suites pass**, including 26 wake methods. Tests first reproduced the defects on the previous implementation; they remain controlled JavaScript checks rather than native microphone/recognition certification.
+
+No deliberate delay, extra inference or new model is added. In-flight inference is not forcibly cancelled; its stale result/error is ignored when it completes. A pending inference continues to hold its original busy flag until completion. Audio capture, buffering, DSP, threshold values, cooldowns and the audio graph are unchanged. The next device check should use **2026-11-05.3**, exercising normal wake/commands and manual Stop followed promptly by a new recording. Asset fingerprinting, AudioWorklet migration and Silero remain separate work.
 
 ## Temporary suspension and grouped Settings
 

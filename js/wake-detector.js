@@ -10,11 +10,12 @@ export function loadWakeDetector({ engineName, threshold, onStatus }) {
 }
 
 // The caller supplies a buffer view and live guards, never its mutable recording session.
-// Keep the engines' existing post-await checks distinct during this extraction.
+// Both engines apply the same live checks after inference and before acting.
 export async function evaluateWakeDetector({
     engineName, engine, buffer, sampleRate, getThreshold, cooldownMs,
     isEnabled, isCurrent, isListening, onTrigger, onError, onComplete
 }) {
+    const acceptsResult = () => isEnabled() && isCurrent() && isListening();
     try {
         if (engineName === "heed") {
             const needed = 2048;
@@ -23,7 +24,7 @@ export async function evaluateWakeDetector({
             const start = (buffer.position - needed + buffer.ring.length) % buffer.ring.length;
             for (let i = 0; i < needed; i++) raw[i] = buffer.ring[(start + i) % buffer.ring.length];
             const result = await engine.consume(raw, sampleRate);
-            if (result?.triggered && isEnabled() && isCurrent()) {
+            if (result?.triggered && acceptsResult()) {
                 onTrigger();
             }
             return;
@@ -55,7 +56,7 @@ export async function evaluateWakeDetector({
         }
 
         const result = await engine.predict(modelChunk);
-        if (!result || !isEnabled() || !isCurrent() || !isListening()) return;
+        if (!result || !acceptsResult()) return;
 
         const probability = Number(result.prob) || 0;
         const detected = engine.detect(
@@ -68,11 +69,11 @@ export async function evaluateWakeDetector({
             result.sigmoid
         );
 
-        if (detected && isCurrent() && isEnabled()) {
+        if (detected && acceptsResult()) {
             onTrigger();
         }
     } catch (error) {
-        onError(error);
+        if (acceptsResult()) onError(error);
     } finally {
         // Complete within this evaluation, rather than an extra promise continuation,
         // so the recorder's busy flag clears at the original point in the sequence.

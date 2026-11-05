@@ -59,7 +59,7 @@ function loadHeedWakeWord(options){const gate=deferred();loads.push({name:'heed'
 function loadVoicuteWakeWord(options){const gate=deferred();loads.push({name:'voicute',options,...gate});return gate.promise;}
 function seed(state='recording',length=4096){
  const current={stream:{id:'original-microphone'},recorder:{state},discard:false,wakeRing:new Float32Array(length),
- wakeRingPos:0,wakeCollectedSamples:0,wakeInferenceBusy:false,wakeDetectorEnabled:true,wakeRearmTimer:null};
+ wakeRingPos:0,wakeCollectedSamples:0,wakeInferenceBusy:false,wakeDetectorEnabled:true,wakeGeneration:0,wakeRearmTimer:null};
  activeSession=current;return current;
 }
 function append(current,samples){for(const v of samples){current.wakeRing[current.wakeRingPos]=v;current.wakeRingPos=(current.wakeRingPos+1)%current.wakeRing.length;}current.wakeCollectedSamples+=samples.length;}
@@ -111,7 +111,7 @@ class WakeRoutingTests(unittest.TestCase):
    enabled=current=listening=true;const pending=evaluateWakeDetector(options);
    if(guard==='enabled')enabled=false;if(guard==='current')current=false;if(guard==='listening')listening=false;
    late.resolve({triggered:true,word:'wake',prob:.99});await pending;
-   assert(order.join(',')===(name==='heed'&&guard==='listening'?'trigger,complete':'complete'),'live guard with preserved per-engine state rule: '+name+'/'+guard);
+   assert(order.join(',')==='complete','both engines reject invalid live state: '+name+'/'+guard);
   }
  }
 """, WAKE_LOADER, COMMON)
@@ -291,25 +291,101 @@ class WakeRoutingTests(unittest.TestCase):
  loads[0].resolve({phrase:'Hey Friday',engine:{}});await flush();assert(wakeWordPhrase==='Hey Friday','new model becomes ready');
 """)
 
-    def test_current_async_edge_behaviors_are_explicitly_characterized(self):
-        # Baseline observations, not desired guarantees. Review separately before fixing.
+    def test_stale_results_and_failures_cannot_affect_session_or_status(self):
         check(r"""
- for(const name of ['heed','voicute']){
+ for(const name of ['heed','voicute'])for(const fail of [false,true])for(const change of ['replace','disarm','inactive','discard','model','engine','disabled']){
+  settings.audioCommands=true;
+  const current=seed(),engine=install(name),gate=deferred();append(current,new Float32Array(2048));
+  engine.consume=engine.predict=()=>gate.promise;const before=triggers.length,detected=detections.length;
+  const pending=runWakeWordInference(current,16000);
+  if(change==='replace')seed();if(change==='disarm')clearWakeDetectorTimers(current);
+  if(change==='inactive')current.recorder.state='inactive';if(change==='discard')current.discard=true;
+  if(change==='model')install(name);if(change==='engine')selectedWakeEngine=name==='heed'?'voicute':'heed';
+  if(change==='disabled')settings.audioCommands=false;
+  setWakeStatus('current status');const enabled=activeSession.wakeDetectorEnabled;
+  if(fail)gate.reject(Error('obsolete error'));else gate.resolve({triggered:true,word:'wake',prob:.99});await pending;
+  assert(triggers.length===before&&detections.length===detected,'invalid inference cannot detect/trigger: '+name+'/'+change);
+  assert(statuses.at(-1)==='current status'&&activeSession.wakeDetectorEnabled===enabled,'invalid failure cannot change current status or enabled flag: '+name+'/'+change);
+  assert(!current.wakeInferenceBusy,'obsolete operation still releases its own busy flag');
+ }
+""")
+
+    def test_disarm_rearm_rejects_old_inference_and_accepts_new_one(self):
+        check(r"""
+ for(const name of ['heed','voicute'])for(const fail of [false,true]){
   const current=seed(),engine=install(name),gate=deferred();append(current,new Float32Array(2048));
   engine.consume=engine.predict=()=>gate.promise;const before=triggers.length;
-  const pending=runWakeWordInference(current,16000);current.recorder.state='inactive';
-  gate.resolve({triggered:true,word:'wake',prob:.99});await pending;
-  assert(triggers.length===before+(name==='heed'?1:0),'current post-await state checks differ between engines');
+  const pending=runWakeWordInference(current,16000);clearWakeDetectorTimers(current);
+  scheduleWakeDetectorArm(current,0);fireTimer(current.wakeRearmTimer);
+  assert(current.wakeDetectorEnabled&&current.wakeInferenceBusy,'rearm does not fake completion of pending inference');
+  const status=statuses.at(-1);if(fail)gate.reject(Error('old cycle failed'));else gate.resolve({triggered:true,word:'wake',prob:.99});await pending;
+  assert(triggers.length===before&&current.wakeDetectorEnabled&&statuses.at(-1)===status,'previous cycle cannot trigger or disable newly armed cycle');
+  engine.consume=engine.predict=async()=>({triggered:true,word:'wake',prob:.99});
+  append(current,new Float32Array(2048));await runWakeWordInference(current,16000);
+  assert(triggers.length===before+1,'fresh inference in new cycle still accepted');
  }
- const old=seed(),engine=install(),gate=deferred();append(old,new Float32Array(2048));engine.consume=()=>gate.promise;
- const pending=runWakeWordInference(old,16000);const next=seed();setWakeStatus('new session listening');
- gate.reject(Error('old model error'));await pending;
- assert(activeSession===next&&next.wakeDetectorEnabled&&statuses.at(-1).includes('Voice detection stopped'),'old error currently overwrites shared status');
- activeSession=null;wakeWord=null;selectedWakeEngine='heed';const a=initializeWakeWord();
- selectedWakeEngine='voicute';const b=initializeWakeWord();selectedWakeEngine='heed';const c=initializeWakeWord();
- loads[2].resolve({phrase:'new Heed',engine:{}});await c;loads[0].resolve({phrase:'old Heed',engine:{}});await a;
- assert(wakeWordPhrase==='old Heed','A-B-A load check currently compares engine name, not load generation');
- loads[1].resolve({phrase:'obsolete Voicute',engine:{}});await b;
+""")
+
+    def test_cancelled_rearm_callback_cannot_reset_new_timer(self):
+        check(r"""
+ const current=seed();install();scheduleWakeDetectorArm(current);
+ const stale=timers.get(current.wakeRearmTimer).fn;scheduleWakeDetectorArm(current,0);const timer=current.wakeRearmTimer;
+ stale();assert(current.wakeRearmTimer===timer&&!current.wakeDetectorEnabled&&resets===0,'late cancelled callback cannot rearm or erase newer timer');
+ fireTimer(timer);assert(current.wakeDetectorEnabled&&resets===1,'new timer arms normally');
+""")
+
+    def test_new_load_invalidates_inference_even_if_detector_object_is_reused(self):
+        check(r"""
+ for(const name of ['heed','voicute'])for(const fail of [false,true]){
+  const current=seed(),engine=install(name),detector=wakeWord,gate=deferred();append(current,new Float32Array(2048));
+  engine.consume=engine.predict=()=>gate.promise;const before=triggers.length;
+  const pending=runWakeWordInference(current,16000),loading=initializeWakeWord(),load=loads.at(-1);
+  setWakeStatus('new load pending');if(fail)gate.reject(Error('old inference failed'));else gate.resolve({triggered:true,word:'wake',prob:.99});await pending;
+  assert(wakeWord===detector&&triggers.length===before&&current.wakeDetectorEnabled&&statuses.at(-1)==='new load pending','new load generation blocks stale inference despite same detector identity');
+  load.resolve(detector);await loading;fireTimer(current.wakeRearmTimer);
+  engine.consume=engine.predict=async()=>({triggered:true,word:'wake',prob:.99});append(current,new Float32Array(2048));await runWakeWordInference(current,16000);
+  assert(triggers.length===before+1,'reused cached detector works in latest generation');
+ }
+""")
+
+    def test_old_completion_cannot_release_new_sessions_busy_flag(self):
+        check(r"""
+ for(const name of ['heed','voicute'])for(const fail of [false,true]){
+  const old=seed(),engine=install(name),oldGate=deferred(),newGate=deferred();let calls=0;
+  engine.consume=engine.predict=()=>++calls===1?oldGate.promise:newGate.promise;
+  append(old,new Float32Array(2048));const oldPending=runWakeWordInference(old,16000);
+  const current=seed();append(current,new Float32Array(2048));const pending=runWakeWordInference(current,16000),before=triggers.length;
+  setWakeStatus('new session listening');if(fail)oldGate.reject(Error('old session failed'));else oldGate.resolve({triggered:true,word:'wake',prob:.99});await oldPending;
+  assert(current.wakeInferenceBusy&&current.wakeDetectorEnabled&&!old.wakeInferenceBusy&&statuses.at(-1)==='new session listening','old completion only releases its own busy flag');
+  newGate.resolve({triggered:true,word:'wake',prob:.99});await pending;
+  assert(!current.wakeInferenceBusy&&triggers.length===before+1&&triggers.at(-1)===current,'new session inference completes normally');
+ }
+""")
+
+    def test_latest_load_owns_ready_progress_and_failure_across_aba(self):
+        check(r"""
+ for(const staleFails of [false,true]){
+  activeSession=null;wakeWord=null;selectedWakeEngine='heed';const offset=loads.length;
+  const a=initializeWakeWord();selectedWakeEngine='voicute';const b=initializeWakeWord();selectedWakeEngine='heed';const c=initializeWakeWord();
+  const loaded={phrase:'new Heed',engine:{}};loads[offset+2].resolve(loaded);await c;
+  setWakeStatus('new ready status');loads[offset].options.onStatus('obsolete Heed progress');loads[offset+1].options.onStatus('obsolete Voicute progress');
+  assert(statuses.at(-1)==='new ready status','outdated progress ignored');
+  if(staleFails)loads[offset].reject(Error('obsolete Heed failure'));else loads[offset].resolve({phrase:'old Heed',engine:{}});await a;
+  loads[offset+1].reject(Error('obsolete Voicute failure'));await b;
+  assert(wakeWord===loaded&&wakeWordPhrase==='new Heed'&&wakeWordLoadError===null&&statuses.at(-1)==='new ready status','outdated success/error cannot replace latest model/status');
+ }
+""")
+
+    def test_latest_threshold_applies_when_model_finishes_loading(self):
+        check(r"""
+ for(const name of ['heed','voicute']){
+  activeSession=null;wakeWord=null;settings.audioCommands=true;selectedWakeEngine=name;settings.wakeEngine=name;
+  settings.wakeThreshold=.8;settings.voicuteThreshold=.9;
+  const pending=initializeWakeWord(),load=loads.at(-1),applied=[];
+  if(name==='heed')settings.wakeThreshold=.84;else settings.voicuteThreshold=.94;
+  changed({detail:settings});load.resolve({phrase:'latest',engine:{setThreshold:v=>applied.push(v)}});await pending;
+  assert(applied.length===1&&applied[0]===(name==='heed'?.84:.94)&&WAKE_THRESHOLD===applied[0],'ready engine receives current setting, not load-start threshold');
+ }
 """)
 
 

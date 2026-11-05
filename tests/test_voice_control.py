@@ -78,6 +78,7 @@ class VoiceControlTests(unittest.TestCase):
         evaluate(r"""
 globalThis.testResult='pending';const assert=(v,m)=>{if(!v)throw Error(m);};
 let activeSession=null,wakeWord=null,wakeWordLoadError=null,selectedWakeEngine='heed',WAKE_THRESHOLD=.8,wakeWordPhrase='Hey Doc',text='';
+let wakeModelLoadGeneration=0;
 const settings={audioCommands:true,wakeEngine:'heed',wakeThreshold:.8,voicuteThreshold:.9},getSettings=()=>settings;
 const voiceController={suspended:false,active:false,setSuspended(value){this.suspended=value;}};
 const setWakeStatus=value=>text=value,closeCommandWindow=()=>{},clearWakeDetectorTimers=()=>{},syncAudioCommandsSuspension=()=>{},preloadCommandModel=()=>{},scheduleWakeDetectorArm=()=>{};
