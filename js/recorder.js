@@ -1,6 +1,7 @@
 import { playSpokenResponse, prepareSpokenResponses } from "./audio-response-manager.js";
 import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSelectionLocked, getRequestedMicrophoneConstraints } from "./microphone-manager.js";
 import { loadWakeDetector } from "./wake-detector.js";
+import { APP_BUILD, displayBuildInfo } from "./build-info.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { createMicrophoneLevelCheck } from "./microphone-level-check.js";
 import { createVoiceController } from "./voice-controller.js";
@@ -18,6 +19,7 @@ const deleteButton = document.getElementById("deleteButton");
 const status = document.getElementById("status");
 const wakeStatus = document.getElementById("wakeStatus");
 const lifecycleStatus = document.getElementById("lifecycleStatus");
+displayBuildInfo(document.getElementById("appBuild"));
 
 // Assess the device class once during startup. Keep this vocabulary aligned with
 // Memora: every device is classified as either "mobile" or "desktop".
@@ -349,7 +351,7 @@ function getRecordingEvents(sessionId) {
 async function downloadRecordingEvents(id) {
     const events = await getRecordingEvents(id);
     const item = await getSession(id);
-    const report = { sessionId: id, session: item, events };
+    const report = { appBuild: APP_BUILD, sessionId: id, session: item, events };
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");

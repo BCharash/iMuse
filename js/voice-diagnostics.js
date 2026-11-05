@@ -1,4 +1,5 @@
 // Bounded, page-memory-only observation. No model, microphone, recording or storage ownership.
+import { APP_BUILD } from './build-info.js';
 export const VOICE_DIAGNOSTICS_VERSION = '2026-11-04.4';
 export function createVoiceDiagnostics({limit=500, enabledByDefault=true, now=()=>performance.now(), timestamp=()=>new Date().toISOString()}={}) {
     const capacity=Math.max(1,Math.min(500,Math.floor(limit)||500));
@@ -38,7 +39,7 @@ export function createVoiceDiagnostics({limit=500, enabledByDefault=true, now=()
         clear(){buffer=new Array(capacity);start=0;size=0;dropped=0;sequence=0;changed();},
         snapshot(environment={}){
             const events=Array.from({length:size},(_,i)=>copy(buffer[(start+i)%capacity]));
-            return {schemaVersion:1,diagnosticVersion:VOICE_DIAGNOSTICS_VERSION,exportedAt:timestamp(),enabled,capacity,droppedEvents:dropped,environment:copy(environment),events};
+            return {schemaVersion:1,appBuild:APP_BUILD,diagnosticVersion:VOICE_DIAGNOSTICS_VERSION,exportedAt:timestamp(),enabled,capacity,droppedEvents:dropped,environment:copy(environment),events};
         },
         onChange(callback){onChange=callback;changed();}
     };

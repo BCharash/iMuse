@@ -244,6 +244,7 @@ button:active {
 .voice-diagnostics-table th, .voice-diagnostics-table td { text-align: left; padding: .4rem; border-bottom: 1px solid #8884; white-space: nowrap; }
 
 /* Grouped settings navigation and temporary voice-action suspension. */
+.app-build{color:var(--muted);font-size:12px;text-align:center;margin:-6px 0 14px}
 .settings-heading{text-align:center;font-size:18px;margin:24px 0 10px}.settings-launcher{display:flex;max-width:520px;margin:0 auto 14px;padding:6px;gap:6px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}
 .settings-launcher button,.settings-launcher #settingsButton{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:0;margin:0;padding:10px 5px;background:transparent;color:var(--accent-dark);border:1px solid transparent;border-radius:11px;font-size:12px}
 .settings-launcher button[aria-expanded=true],.settings-launcher #settingsButton[aria-expanded=true]{border-color:var(--accent);background:#e9f5fb}.settings-launcher svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.settings-panel>section[hidden]{display:none}

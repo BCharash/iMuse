@@ -4,7 +4,9 @@ import unittest
 from recording_test_support import SOURCE, between, evaluate
 
 ROOT = Path(__file__).resolve().parents[1]
-DIAGNOSTICS = (ROOT / 'js/voice-diagnostics.js').read_text().replace('export ', '')
+BUILD = (ROOT / 'js/build-info.js').read_text().replace('export ', '')
+DIAGNOSTICS = (ROOT / 'js/voice-diagnostics.js').read_text()
+DIAGNOSTICS = BUILD + '\n' + '\n'.join(line for line in DIAGNOSTICS.splitlines() if not line.startswith('import ')).replace('export ', '')
 CONTROLLER = (ROOT / 'js/voice-controller.js').read_text()
 CONTROLLER = '\n'.join(line for line in CONTROLLER.splitlines() if not line.startswith('import ')).replace('export ', '')
 WAKE_LOADER = (ROOT / 'js/wake-detector.js').read_text()
