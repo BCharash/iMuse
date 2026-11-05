@@ -52,6 +52,43 @@ globalThis.testResult='pending';
 })().catch(e=>globalThis.testResult=String(e.stack));
 ''')
 
+    def test_current_playback_creates_download_and_uses_original_start(self):
+        evaluate(r'''
+const assert=(v,m)=>{if(!v)throw Error(m);};
+const controls={hidden:true,children:[],insertBefore(button,before){assert(before===deleteButton,'download next to delete');this.children.unshift(button);}};
+const deleteButton={parentElement:controls};controls.children.push(deleteButton);
+const document={getElementById:id=>controls.children.find(child=>child.id===id),createElement:()=>({events:{},addEventListener(type,fn){this.events[type]=fn;}})};
+const window={lastRecording:null},status={},recordingControls=controls;
+const audioPlayer={hidden:true,load(){}},URL={createObjectURL:()=> 'blob:current',revokeObjectURL(){}};
+let recordingUrl=null,displayedSessionId=null;
+const metadata={startedAt:'2026-11-05T14:32:08Z',downloadStamp:'2026-11-05_14-32-08'};
+const emergencyRecordings=new Map();
+const getSession=async id=>{assert(id==='current','reads current session');return metadata;};
+const boundedStorageRead=promise=>promise;
+let requested,downloaded=true;
+const downloadAudioBlob=async(blob,name)=>{requested={blob,name};return downloaded;};
+''' + NAMING + between('function showPlayback(', 'function audioFileExtension(')
+                 + between('function sessionFilename(', 'function renderRecoverableSessions(') + r'''
+globalThis.testResult='pending';
+(async()=>{
+ const blob={size:12,type:'audio/mp4'};
+ showPlayback(blob,'current');
+ const button=document.getElementById('downloadRecordingButton');
+ assert(button&&controls.hidden===false&&audioPlayer.hidden===false,'current playback exposes download control');
+ await button.events.click();
+ assert(requested.blob===blob&&requested.name==='2026-11-05_14-32-08_iMuse','current audio uses original start time');
+ assert(!button.disabled&&status.textContent.includes('Download started'),'success restores button');
+ showPlayback(blob,'current');
+ assert(controls.children.length===2,'repeated playback does not duplicate control');
+ downloaded=false;await button.events.click();
+ assert(status.textContent.includes('canceled')&&window.lastRecording===blob&&!button.disabled,'cancel retains current audio');
+ emergencyRecordings.set('emergency',{metadata});
+ showPlayback(blob,'emergency');await button.events.click();
+ assert(requested.name==='2026-11-05_14-32-08_iMuse','emergency current download also works without database read');
+ globalThis.testResult='PASS';
+})().catch(e=>globalThis.testResult=String(e.stack));
+''')
+
     def test_actual_download_waits_for_choice_and_keeps_format(self):
         evaluate(r'''
 const assert=(v,m)=>{if(!v)throw Error(m);};

@@ -1062,6 +1062,7 @@ function setReadyUI() {
 }
 
 function showPlayback(blob, sessionId = null) {
+    ensureCurrentDownloadButton();
     window.lastRecording = blob;
     displayedSessionId = sessionId;
     if (recordingUrl) URL.revokeObjectURL(recordingUrl);
