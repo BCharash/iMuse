@@ -233,7 +233,7 @@ button:active {
 .imuse-mic-processing-controls input:disabled { opacity:.45;cursor:not-allowed; }
 .imuse-mic-processing-controls label:has(input:disabled) { opacity:.55; }
 
-/* All advanced controls share one collapsible rounded group. */
+/* Each settings category ends with a collapsible Advanced group. */
 .advanced-settings { border:1px solid var(--border);border-radius:12px;padding:14px;margin:18px 0 0;background:var(--surface);min-width:0; }
 .advanced-settings summary { cursor: pointer; }
 .voice-diagnostic-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
@@ -242,3 +242,9 @@ button:active {
 .voice-diagnostics-scroll { overflow: auto; max-height: 320px; margin-top: .5rem; }
 .voice-diagnostics-table { border-collapse: collapse; width: 100%; font-size: .82rem; }
 .voice-diagnostics-table th, .voice-diagnostics-table td { text-align: left; padding: .4rem; border-bottom: 1px solid #8884; white-space: nowrap; }
+
+/* Grouped settings navigation and temporary voice-action suspension. */
+.settings-heading{text-align:center;font-size:18px;margin:24px 0 10px}.settings-launcher{display:flex;max-width:520px;margin:0 auto 14px;padding:6px;gap:6px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}
+.settings-launcher button,.settings-launcher #settingsButton{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:0;margin:0;padding:10px 5px;background:transparent;color:var(--accent-dark);border:1px solid transparent;border-radius:11px;font-size:12px}
+.settings-launcher button[aria-expanded=true]{border-color:var(--accent);background:#e9f5fb}.settings-launcher svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.settings-panel>section[hidden]{display:none}
+.voice-suspend-button{background:transparent;color:var(--accent-dark);border:1px solid var(--border);padding:9px 14px;font-size:14px}.voice-suspend-button[aria-pressed=true]{background:#fff2d9;border-color:#9b6b21;color:#65420e}.voice-suspend-button[hidden],#audioCommandsSuspensionStatus[hidden]{display:none}#audioCommandsSuspensionStatus{max-width:350px;margin:0;text-align:center}

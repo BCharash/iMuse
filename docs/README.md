@@ -1,6 +1,6 @@
 # iMuse documentation
 
-Updated 4 November 2026. Start here; current findings take precedence over older plans and journal entries.
+Updated 5 November 2026. Start here; current findings take precedence over older plans and journal entries.
 
 | Document | Purpose |
 | --- | --- |
@@ -23,6 +23,8 @@ Readable diagnostics helped the user raise command thresholds after observing in
 **Next intended production work:** describe and characterize a behavior-preserving wake-detector extraction, then obtain approval before editing production code. Keep audio ownership, DSP, models, cadence and thresholds unchanged during extraction. Whisper stays out of the live wake path.
 
 The iPhone installed-PWA capture failure remains unresolved; the Safari tab is the reported working web route. Native feasibility testing is deferred until a suitable cable is available. If native iMuse is chosen, the user wants transcription and multiple cached models while retaining Memora web and web iMuse for other platforms. Recording always takes priority over transcription/naming. These are future requirements, not implemented native features or a production scheduler. The native proposal owns that scope.
+
+The user-approved grouped Settings launcher and temporary Audio commands Suspend/Resume control are implemented. The persisted Audio commands preference remains locked during recording. Suspension blocks voice actions and cancels pending command episodes without stopping capture; see the [voice-control plan](voice-control-refactor.md#temporary-suspension-and-grouped-settings) for semantics, tests and focused device acceptance. Silero remains a separate lab experiment.
 
 ## Document maintenance
 

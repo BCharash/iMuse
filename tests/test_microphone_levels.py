@@ -26,11 +26,11 @@ const window=new Target();
 window.setInterval=(callback,ms)=>{assert(ms===200,'modest UI polling interval');const id=++intervalId;intervals.set(id,callback);return id;};
 window.clearInterval=id=>intervals.delete(id);
 const document=new Target();document.visibilityState='visible';
-const panel=new Target(),button=new Target(),levels=new Target(),toggle=new Target();
+const panel=new Target(),button=new Target(),levels=new Target(),toggle=new Target(),microphoneSection=new Target();microphoneSection.hidden=false;
 const level=new Target(),dial=new Target(),needle=new Target();
 const quietButton=new Target(),noisyButton=new Target(),quietMarker=new Target(),noisyMarker=new Target(),quietValue=new Target(),noisyValue=new Target();
 const checkButton=new Target(),checkStatus=new Target();
-const elements={checkMicrophoneLevel:checkButton,microphoneCheckStatus:checkStatus,microphoneLevelLive:level,microphoneLevelDial:dial,microphoneLevelNeedle:needle,
+const elements={microphoneSettingsSection:microphoneSection,checkMicrophoneLevel:checkButton,microphoneCheckStatus:checkStatus,microphoneLevelLive:level,microphoneLevelDial:dial,microphoneLevelNeedle:needle,
 markQuietRoom:quietButton,markNoisyRoom:noisyButton,quietRoomMarker:quietMarker,noisyRoomMarker:noisyMarker,
 quietRoomValue:quietValue,noisyRoomValue:noisyValue,microphoneLevelsDetail:levels,microphoneLevelsToggle:toggle};
 document.getElementById=id=>elements[id];
@@ -43,8 +43,9 @@ const analyser={fftSize:2048,getFloatTimeDomainData(buffer){reads++;buffer.fill(
 TESTS = r"""
 globalThis.testResult='pending';
 assert(intervals.size===0&&reads===0,'no polling or microphone activity during initialization');
-panel.hidden=false;levels.hidden=false;button.dispatchEvent(new Event('click'));
+panel.hidden=false;levels.hidden=false;window.dispatchEvent(new Event('imuse-settings-section-changed'));
 assert(intervals.size===1&&level.textContent==='Microphone inactive','opening levels with no session does not acquire a microphone');
+microphoneSection.hidden=true;window.dispatchEvent(new Event('imuse-settings-section-changed'));assert(intervals.size===0,'switching to another settings category stops hidden microphone polling');microphoneSection.hidden=false;window.dispatchEvent(new Event('imuse-settings-section-changed'));
 activeSession={recorder:{state:'recording'},stream:{getAudioTracks:()=>[track]},audioContext:{state:'running'},analyser,audioSamples:new Float32Array([0.77])};
 const tick=()=>[...intervals.values()][0]();
 const settle=()=>{for(let i=0;i<40;i++)tick();};
@@ -79,15 +80,15 @@ assert(intervals.size===0&&level.textContent==='—','closing disclosure stops p
 levels.hidden=false;toggle.dispatchEvent(new Event('click'));
 assert(intervals.size===1,'reopening starts one poller');
 assert(level.textContent==='-20.0 dBFS','reopening seeds a fresh reading without stale smoothing');
-button.dispatchEvent(new Event('click'));assert(intervals.size===1,'repeated open events do not duplicate pollers');
+window.dispatchEvent(new Event('imuse-settings-section-changed'));assert(intervals.size===1,'repeated open events do not duplicate pollers');
 document.visibilityState='hidden';document.dispatchEvent(new Event('visibilitychange'));
 assert(intervals.size===0&&level.textContent==='—','background page stops measurement timer');
 const hiddenReads=reads;publishLiveMicrophoneLevel();assert(reads===hiddenReads,'manually requested background report does not sample');
 document.visibilityState='visible';document.dispatchEvent(new Event('visibilitychange'));
 assert(intervals.size===1,'foreground visible levels resume UI polling');
-panel.hidden=true;button.dispatchEvent(new Event('click'));
+panel.hidden=true;window.dispatchEvent(new Event('imuse-settings-section-changed'));
 assert(intervals.size===0,'closing Settings stops timer');
-panel.hidden=false;button.dispatchEvent(new Event('click'));
+panel.hidden=false;window.dispatchEvent(new Event('imuse-settings-section-changed'));
 window.dispatchEvent(new Event('pagehide'));assert(intervals.size===0,'pagehide releases timer');
 window.dispatchEvent(new Event('pageshow'));assert(intervals.size===1,'pageshow resumes only visible levels');
 activeSession=null;tick();assert(level.textContent==='Microphone inactive','ending recording clears stale live reading');
@@ -103,6 +104,22 @@ globalThis.testResult='PASS';
 
 
 class MicrophoneLevelTests(unittest.TestCase):
+    def test_settings_category_navigation(self):
+        nav=SETTINGS[SETTINGS.index('const panel ='):SETTINGS.index('const controls =')]
+        evaluate(r"""
+const assert=(value,message)=>{if(!value)throw Error(message);};
+class Element {constructor(){this.hidden=true;this.handlers={};this.attributes={};}addEventListener(name,fn){this.handlers[name]=fn;}setAttribute(name,value){this.attributes[name]=value;}}
+const elements=new Map(),document={getElementById:id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id);}};
+let changed=0;const window={dispatchEvent:()=>changed++},updateAutomaticOverlapLabel=()=>{};class Event{constructor(type){this.type=type;}}
+""" + nav + r"""
+const el=id=>document.getElementById(id);
+el('microphoneSettingsButton').handlers.click();assert(!panel.hidden&&!el('microphoneSettingsSection').hidden&&el('audioSettingsSection').hidden,'mic button opens only microphone category');
+el('settingsButton').handlers.click();assert(!el('audioSettingsSection').hidden&&el('microphoneSettingsSection').hidden,'voice button switches category');
+el('storageSettingsButton').handlers.click();assert(!el('storageSettingsSection').hidden&&el('audioSettingsSection').hidden,'storage button opens storage controls');
+el('storageSettingsButton').handlers.click();assert(panel.hidden&&el('storageSettingsSection').hidden&&changed===4,'pressing selected category closes settings and notifies visibility observers');
+globalThis.testResult='PASS';
+""")
+
     def test_processing_report_preserves_original_requests(self):
         manager = (Path(__file__).resolve().parents[1] / 'js/microphone-manager.js').read_text()
         manager = '\n'.join(line for line in manager.splitlines() if not line.startswith('import ')).replace('export ', '')

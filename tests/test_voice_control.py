@@ -67,6 +67,37 @@ def check(script):
 
 
 class VoiceControlTests(unittest.TestCase):
+    def test_suspend_blocks_actions_and_keeps_manual_controls(self):
+        check(r"""
+ const current=seed('suspended','recording');const preference=settings.audioCommands;
+ voiceController.setSuspended(true);await handleWakeDetected(current);
+ assert(voiceController.suspended&&current.recorder.pauses===0&&listeners.length===0&&prompts.length===0,'suspended wake cannot pause capture or start command flow');
+ assert(current.wakeDetectorEnabled&&settings.audioCommands===preference&&shutdowns===0,'idle suspension leaves detection and saved preference intact');
+ recordButton.click();await current.pauseTask;assert(current.recorder.state==='paused','manual Pause still works');
+ await voiceController.resume(getVoiceSession(current));assert(current.recorder.resumes===1,'manual Resume still works during suspension');
+ voiceController.setSuspended(false);await handleWakeDetected(current);assert(listeners.length===1,'resume allows a fresh wake episode');
+ voiceController.setSuspended(true);const stale=listeners[0];stale({top:'go',go:.99});stale({top:'stop',stop:.99});await flush();
+ assert(current.recorder.resumes===1&&current.recorder.stops===0&&!voiceController.active,'suspension invalidates old command callbacks');
+ pauseButton.click();assert(current.recorder.stops===1,'manual Stop is independent of voice suspension');
+""")
+
+    def test_suspend_cancels_pending_confirmation_and_go(self):
+        for phase in ['acknowledgement','loading','confirmation','go-shutdown']:
+            with self.subTest(phase=phase):
+                check("const phase="+repr(phase)+r""";
+ const current=seed('pending');
+ if(phase==='acknowledgement')promptGate=deferred();
+ if(phase==='loading')loadGate=deferred();
+ const opening=handleWakeDetected(current);await flush();
+ if(phase==='confirmation'){await opening;listeners[0]({top:'stop',stop:.99});await flush();assert(listeners.length===2,'confirmation listener is ready');}
+ if(phase==='go-shutdown'){await opening;stopGate=deferred();listeners[0]({top:'go',go:.99});await flush();}
+ const stale=[...listeners];voiceController.setSuspended(true);voiceController.setSuspended(false);
+ promptGate?.resolve();loadGate?.resolve();stopGate?.resolve();await opening;await flush();
+ for(const callback of stale){callback({top:'yes',yes:.99});callback({top:'go',go:.99});callback({top:'stop',stop:.99});}await flush();
+ assert(current.recorder.stops===0&&current.recorder.resumes===0&&!voiceController.active,'suspend/resume cannot revive queued Go or Yes or pending startup');
+ assert(current.wakeDetectorEnabled,'wake detection remains available after command cancellation');
+""")
+
     def test_recording_wake_waits_for_pause_prompt_and_go_shutdown(self):
         check(r"""
  const current=seed('recording','recording');promptGate=deferred();

@@ -89,14 +89,14 @@ function appendDiagnosticRow(body,values) {
 export function initializeVoiceDiagnostics() {
     const toggle=document.getElementById('voiceDiagnosticsEnabled'),download=document.getElementById('downloadVoiceDiagnostics');
     const clear=document.getElementById('clearVoiceDiagnostics'),status=document.getElementById('voiceDiagnosticsStatus');
-    const advanced=document.getElementById('advancedSettings'),settings=document.getElementById('settingsPanel');
+    const advanced=document.getElementById('advancedSettings'),settings=document.getElementById('settingsPanel'),audioSection=document.getElementById('audioSettingsSection');
     const settingsButton=document.getElementById('settingsButton');
     const view=document.getElementById('voiceDiagnosticsView');
     const summary=document.getElementById('voiceDiagnosticsSummary'),windows=document.getElementById('voiceDiagnosticsWindows');
     const events=document.getElementById('voiceDiagnosticsEvents'),refresh=document.getElementById('refreshVoiceDiagnostics');
     if(!toggle||!download||!clear||!status||!view||!summary||!windows||!events||!refresh)return;
-    // Settings adds its storage-protection section dynamically; Advanced stays last.
-    if(settings&&advanced)settings.appendChild(advanced);
+    // Keep voice diagnostics at the bottom of the Voice commands category.
+    if(audioSection&&advanced)audioSection.appendChild(advanced);
     function renderView(){
         const snapshot=voiceDiagnostics.snapshot(),report=summarizeVoiceDiagnostics(snapshot);
         summary.textContent=report.windows.length?`${report.goStopWindows} command attempts · ${report.gos} Go and ${report.stops} Stop recognitions. These are model decisions, not verified speech.${snapshot.droppedEvents?' Older data was dropped; some attempts may be incomplete.':''}`:voiceDiagnostics.enabled?'No command attempts logged yet. Open a voice-command listening period; activity appears below.':'Diagnostics are off. Enable collection to log new command attempts.';
@@ -118,7 +118,7 @@ export function initializeVoiceDiagnostics() {
     function render(){
         toggle.checked=voiceDiagnostics.enabled;download.disabled=voiceDiagnostics.size===0;clear.disabled=voiceDiagnostics.size===0;
         status.textContent=`${voiceDiagnostics.enabled?'On':'Off'} · ${voiceDiagnostics.size} / 500 events retained${voiceDiagnostics.dropped?' · '+voiceDiagnostics.dropped+' older events dropped':''}. This page only; download before reloading. No audio is logged.`;
-        if(advanced?.open&&!settings?.hidden)renderView();
+        if(advanced?.open&&!settings?.hidden&&!audioSection?.hidden)renderView();
     }
     voiceDiagnostics.onChange(render);
     toggle.addEventListener('change',()=>voiceDiagnostics.setEnabled(toggle.checked));

@@ -56,7 +56,7 @@ const elements=new Map(),document={createElement:()=>new Element(),getElementByI
 const el=id=>document.getElementById(id);el('advancedSettings').open=true;
 initializeVoiceDiagnostics();const toggle=el('voiceDiagnosticsEnabled');
 assert(toggle.checked&&!el('downloadVoiceDiagnostics').disabled,'default collection and startup event are visible without a second View button');
-assert(el('settingsPanel').children.at(-1)===el('advancedSettings'),'Advanced moves after dynamically added Settings sections');
+assert(el('audioSettingsSection').children.at(-1)===el('advancedSettings'),'voice Advanced remains at the bottom of the voice category');
 assert(el('voiceDiagnosticsSummary').textContent.includes('No command attempts logged yet')&&el('voiceDiagnosticsEvents').children.length===1,'startup entry proves collector/viewer are connected');
 const metadata={windowId:4,sessionId:'session',phase:'go-stop'};
 voiceDiagnostics.record('command-accepted',{...metadata,command:'stop',score:.8,threshold:.7,elapsedMs:4200});

@@ -43,6 +43,8 @@
         <h2 id="recordingHeading" aria-live="polite">New Recording</h2>
         <button id="recordButton" class="record-icon-button" type="button" aria-label="Start recording" title="Start recording"><span class="record-symbol" aria-hidden="true"></span></button>
         <button id="pauseButton" class="stop-icon-button" type="button" disabled aria-label="Stop recording" title="Stop recording"><span class="stop-symbol" aria-hidden="true"></span><span class="stop-caption">Stop</span></button>
+        <button id="suspendAudioCommands" class="voice-suspend-button" type="button" aria-pressed="false" hidden>Suspend audio commands</button>
+        <p id="audioCommandsSuspensionStatus" class="settings-note" role="status" hidden></p>
     </section>
 
     <p id="microphoneStatus" class="microphone-status" role="status">Microphone: inactive (not listening)</p>
@@ -68,9 +70,15 @@
 
 
 
-    <button id="settingsButton" type="button" aria-expanded="false" aria-controls="settingsPanel">Settings</button>
-    <section id="settingsPanel" class="settings-panel" hidden aria-label="Voice control settings">
-        <h2>Settings</h2>
+    <h2 class="settings-heading">Settings</h2>
+    <nav class="settings-launcher" aria-label="Settings categories">
+        <button id="microphoneSettingsButton" type="button" aria-expanded="false" aria-controls="microphoneSettingsSection"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg><span>Microphone</span></button>
+        <button id="settingsButton" type="button" aria-expanded="false" aria-controls="audioSettingsSection"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4zM8 9v2M12 7v6M16 9v2"/></svg><span>Voice commands</span></button>
+        <button id="storageSettingsButton" type="button" aria-expanded="false" aria-controls="storageSettingsSection"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/></svg><span>Storage</span></button>
+    </nav>
+    <section id="settingsPanel" class="settings-panel" hidden aria-label="Settings">
+        <section id="microphoneSettingsSection" hidden aria-labelledby="microphoneSettingsHeading">
+        <h2 id="microphoneSettingsHeading">Microphone</h2>
         <div class="imuse-microphone-group">
         <h3>Recording microphone</h3>
         <label class="microphone-choice-label" for="microphoneChoice">Recording microphone</label>
@@ -79,12 +87,6 @@
             <button id="refreshMicrophones" type="button">Refresh</button>
         </div>
         <p class="settings-note">Selection applies to the next recording. Device names may require microphone permission.</p>
-        <div class="imuse-mic-processing-controls" role="group" aria-label="Microphone processing requests">
-            <label><input type="checkbox" id="autoGainControl"> Automatic gain control</label>
-            <label><input type="checkbox" id="noiseSuppression"> Noise suppression</label>
-            <label><input type="checkbox" id="echoCancellation"> Echo cancellation</label>
-        </div>
-        <p class="settings-note">Processing changes apply to the next recording. The diagnostics below show whether the browser honored each request.</p>
         <div class="imuse-disclosure"><strong>Microphone levels</strong><button type="button" id="microphoneLevelsToggle" aria-expanded="false" aria-controls="microphoneLevelsDetail">View</button></div>
         <div id="microphoneLevelsDetail" class="imuse-disclosure-detail" hidden>
             <button id="checkMicrophoneLevel" type="button">Check microphone level (10 s)</button>
@@ -127,6 +129,17 @@
         </div>
         </div>
         <label class="settings-slider">Pause after no speech (seconds) <output id="silencePauseSecondsValue"></output><input type="range" id="silencePauseSeconds" min="3" max="15" step="1"></label>
+        <details id="microphoneAdvancedSettings" class="advanced-settings"><summary>Advanced microphone settings</summary>
+        <div class="imuse-mic-processing-controls" role="group" aria-label="Microphone processing requests">
+            <label><input type="checkbox" id="autoGainControl"> Automatic gain control</label>
+            <label><input type="checkbox" id="noiseSuppression"> Noise suppression</label>
+            <label><input type="checkbox" id="echoCancellation"> Echo cancellation</label>
+        </div>
+        <p class="settings-note">Processing changes apply to the next recording. The microphone-level details show whether the browser honored each request.</p>
+        </details>
+        </section>
+        <section id="audioSettingsSection" hidden aria-labelledby="audioSettingsHeading">
+        <h2 id="audioSettingsHeading">Voice commands</h2>
         <label class="settings-check"><input type="checkbox" id="audioCommandsToggle"> Audio commands</label>
         <div id="voiceSettings">
             <fieldset class="settings-group">
@@ -147,7 +160,7 @@
         </div>
         <p class="settings-note">Settings are saved on this device. Wake phrases enter the Go/Stop command window during recording or pause.</p>
         <details id="advancedSettings" class="advanced-settings">
-            <summary>Advanced</summary>
+            <summary>Advanced voice settings</summary>
             <label class="settings-check"><input id="voiceDiagnosticsEnabled" type="checkbox" checked> Enable voice diagnostics</label>
             <p id="voiceDiagnosticsStatus" class="settings-note" role="status">On · latest 500 events. This page only; download before reloading. No audio is logged.</p>
             <div class="voice-diagnostic-actions"><button id="downloadVoiceDiagnostics" type="button" disabled>Download diagnostics</button><button id="clearVoiceDiagnostics" type="button" disabled>Clear diagnostics</button></div>
@@ -160,6 +173,12 @@
                 <details><summary>Detailed activity log</summary><p class="settings-note">Many entries per attempt: individual score checks, prompts, and listener startup/shutdown. Use this to investigate a row above.</p><div class="voice-diagnostics-scroll"><table class="voice-diagnostics-table"><thead><tr><th>Time</th><th>Window</th><th>Event</th><th>Details</th><th>After</th></tr></thead><tbody id="voiceDiagnosticsEvents"></tbody></table></div></details>
             </div>
         </details>
+        </section>
+        <section id="storageSettingsSection" hidden aria-labelledby="storageSettingsHeading">
+            <h2 id="storageSettingsHeading">Storage</h2>
+            <div id="storageSettingsBasic"></div>
+            <details id="storageAdvancedSettings" class="advanced-settings"><summary>Advanced storage settings</summary></details>
+        </section>
     </section>
     <section id="savedRecordingsLocation" aria-label="Saved recordings"></section>
 

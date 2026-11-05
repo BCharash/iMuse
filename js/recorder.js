@@ -38,6 +38,7 @@ window.addEventListener("imuse-settings-changed", event => {
     const next = event.detail.wakeEngine;
     const threshold = next === "heed" ? event.detail.wakeThreshold : event.detail.voicuteThreshold;
     if (!event.detail.audioCommands) {
+        voiceController.setSuspended(false);
         closeCommandWindow();
         if (activeSession) clearWakeDetectorTimers(activeSession);
         setWakeStatus("Audio commands disabled.");
@@ -53,6 +54,7 @@ window.addEventListener("imuse-settings-changed", event => {
         WAKE_THRESHOLD = threshold;
         wakeWord?.engine?.setThreshold?.(threshold);
     }
+    syncAudioCommandsSuspension();
     if (event.detail.audioCommands) preloadCommandModel();
     if (event.detail.audioCommands && activeSession && !voiceController.active && wakeWord) {
         scheduleWakeDetectorArm(activeSession, 0);
@@ -181,7 +183,7 @@ function initializePreservationTest() {
         }
     });
     panel.append(heading, note, label, preservationTestButton, preservationTestResult);
-    document.getElementById("advancedSettings").appendChild(panel);
+    document.getElementById("storageAdvancedSettings").appendChild(panel);
     updatePreservationTestControls();
 }
 
@@ -596,6 +598,19 @@ const voiceController = createVoiceController({
     sayResponse, setWakeStatus,
     setStatus: text => { status.textContent = text; }
 });
+function syncAudioCommandsSuspension() {
+    const button=document.getElementById('suspendAudioCommands'),note=document.getElementById('audioCommandsSuspensionStatus');
+    if(!button||!note)return;
+    button.hidden=note.hidden=!getSettings().audioCommands;
+    button.textContent=voiceController.suspended?'Resume audio commands':'Suspend audio commands';
+    button.setAttribute('aria-pressed',String(voiceController.suspended));
+    note.textContent=voiceController.suspended?'Audio command actions suspended. Use the recording buttons.':'Audio commands enabled. You can temporarily suspend their actions here.';
+}
+document.getElementById('suspendAudioCommands')?.addEventListener('click',()=>{
+    if(!getSettings().audioCommands)return;
+    voiceController.setSuspended(!voiceController.suspended);syncAudioCommandsSuspension();
+});
+syncAudioCommandsSuspension();
 function preloadCommandModel() { return voiceController.preload(); }
 function closeCommandWindow(options) { return voiceController.close(options); }
 function resumeAfterCommandShutdown(current) { return voiceController.resume(getVoiceSession(current)); }

@@ -27,8 +27,8 @@ class Element {
     addEventListener(name, handler){this.events[name]=handler;}
     click(){if(!this.disabled)this.events.click?.();}
 }
-const document={createElement:()=>new Element()};
-const panel=new Element(),button=new Element();
+const document={createElement:()=>new Element(),getElementById:id=>id==="storageSettingsButton"?button:storageBasic};
+const panel=new Element(),button=new Element(),storageBasic=new Element();
 let checks=0,requests=0;
 const navigator={storage:{async persisted(){checks++;return false;},async persist(){requests++;return true;}}};
 """
@@ -89,7 +89,7 @@ globalThis.testResult='pending';
     // Settings code ran its nonblocking startup request before the tests.
     await flush();
     assert(checks===1 && requests===1,'one startup check/request in actual Settings integration');
-    assert(panel.children.includes(persistenceSection),'protection is visible in Settings');
+    assert(storageBasic.children.includes(persistenceSection),'protection is visible in Settings');
     assert(persistenceStatus.textContent==='Protected from automatic eviction','Settings reports granted protection');
     assert(persistenceSection.children.length===3,'protection section has only heading, status and short explanation');
     navigator.storage.persisted=async()=>false;

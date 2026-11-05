@@ -43,10 +43,17 @@ function updateAutomaticOverlapLabel() {
 }
 const panel = document.getElementById("settingsPanel");
 const button = document.getElementById("settingsButton");
-button.addEventListener("click", () => {
-    panel.hidden = !panel.hidden;
+const settingsCategories = [
+    [document.getElementById('microphoneSettingsButton'), document.getElementById('microphoneSettingsSection')],
+    [button, document.getElementById('audioSettingsSection')],
+    [document.getElementById('storageSettingsButton'), document.getElementById('storageSettingsSection')]
+];
+for(const [trigger,section] of settingsCategories)trigger.addEventListener('click',()=>{
+    const opening=section.hidden;
+    for(const [otherTrigger,otherSection] of settingsCategories){otherSection.hidden=true;otherTrigger.setAttribute('aria-expanded','false');}
+    section.hidden=!opening;panel.hidden=!opening;trigger.setAttribute('aria-expanded',String(opening));
     updateAutomaticOverlapLabel();
-    button.setAttribute("aria-expanded", String(!panel.hidden));
+    window.dispatchEvent(new Event('imuse-settings-section-changed'));
 });
 const controls = {autoGainControl:"autoGainControl",noiseSuppression:"noiseSuppression",echoCancellation:"echoCancellation",silenceThresholdDb:"silenceThresholdDb",wakeMinimumDb:"wakeMinimumDb",silencePauseSeconds:"silencePauseSeconds",wakeEngine:"wakeEngine",voicuteThreshold:"voicuteThreshold",audioCommands:"audioCommandsToggle",wakeThreshold:"wakeThreshold",commandWindow:"commandWindow",
     goThreshold:"goThreshold",stopThreshold:"stopThreshold",yesThreshold:"yesThreshold",noThreshold:"noThreshold",overlapFactor:"overlapFactor"};
@@ -188,7 +195,7 @@ function stopLiveMicrophoneLevel() {
 }
 function syncLiveMicrophoneLevel() {
     const detail = document.getElementById("microphoneLevelsDetail");
-    if (!liveLevelOutput || panel.hidden || !detail || detail.hidden || document.visibilityState !== "visible") {
+    if (!liveLevelOutput || panel.hidden || document.getElementById("microphoneSettingsSection")?.hidden || !detail || detail.hidden || document.visibilityState !== "visible") {
         stopLiveMicrophoneLevel();
         return;
     }
@@ -198,7 +205,7 @@ function syncLiveMicrophoneLevel() {
     }
 }
 window.addEventListener("imuse-microphone-level", event => renderLiveMicrophoneLevel(event.detail));
-button.addEventListener("click", syncLiveMicrophoneLevel);
+window.addEventListener("imuse-settings-section-changed", syncLiveMicrophoneLevel);
 document.getElementById("microphoneLevelsToggle")?.addEventListener("click", syncLiveMicrophoneLevel);
 document.addEventListener("visibilitychange", syncLiveMicrophoneLevel);
 window.addEventListener("pagehide", stopLiveMicrophoneLevel);
@@ -270,8 +277,8 @@ const persistence = createStoragePersistence(navigator.storage, state => {
     persistenceStatus.textContent = storagePersistenceLabel(state);
 });
 persistenceSection.append(persistenceHeading, persistenceStatus, persistenceNote);
-panel.appendChild(persistenceSection);
-button.addEventListener("click", () => {
+document.getElementById("storageSettingsBasic").appendChild(persistenceSection);
+document.getElementById("storageSettingsButton").addEventListener("click", () => {
     if (!panel.hidden) void persistence.check();
 });
 // One nonblocking request per page load. A denial/error never blocks recording
@@ -341,7 +348,7 @@ const diagnosticsUpdated = document.createElement("span");
 diagnosticsUpdated.style.cssText = "font-size:.8rem;opacity:.8";
 diagnosticsActions.append(diagnosticsRefresh, diagnosticsUpdated);
 diagnosticsDetail.appendChild(diagnosticsActions);
-document.getElementById("advancedSettings").appendChild(diagnosticsSection);
+document.getElementById("storageAdvancedSettings").appendChild(diagnosticsSection);
 // Show up to four significant figures; switch to GB above 500 MB.
 const formatBytes = bytes => {
     if (!Number.isFinite(bytes)) return "Unavailable";
@@ -410,7 +417,7 @@ diagnosticsRefresh.addEventListener("click", refreshRecordingStorageDetails);
 window.addEventListener("imuse-recording-diagnostics", () => {
     if (!panel.hidden) updateRecordingDiagnostics();
 });
-button.addEventListener("click", () => {
+document.getElementById("storageSettingsButton").addEventListener("click", () => {
     if (!panel.hidden) void refreshRecordingStorageDetails();
 });
 updateRecordingDiagnostics();

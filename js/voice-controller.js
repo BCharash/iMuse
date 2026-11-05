@@ -35,6 +35,7 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
     }
 
     let commandActive = false, commandGeneration = 0, commandInterval = null;
+    let suspended = false, suspensionGeneration = 0;
     let commandModel = null, commandStream = null;
     let diagnosticWindow = null, diagnosticListener = null, diagnosticSequence = 0;
     function trace(type, details={}, context=diagnosticWindow) {
@@ -99,13 +100,16 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
     }
 
     // Both voice Go and the manual button must await command shutdown before capture resumes.
-    async function resumeAfterCommandShutdown(current) {
+    async function resumeAfterCommandShutdown(current, {voiceAction = false} = {}) {
+        if(voiceAction && suspended)return;
+        const actionGeneration=suspensionGeneration;
         if (!current.isCurrent || current.discard || current.state !== "paused") return;
         const shutdown = closeCommandWindow({ restorePauseReminder: false });
         try {
             await shutdown;
             if (!current.isCurrent || current.discard || current.state !== "paused" ||
                 current.finalizing) return;
+            if(voiceAction && (suspended || actionGeneration!==suspensionGeneration)){current.armWake(0);return;}
             current.resume();
             setStatus("Resuming recording...");
         } catch (error) {
@@ -120,6 +124,7 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
     // Voice Stop is provisional until an explicit Yes is recognized.
     // The original recorder remains paused and all persisted chunks are untouched.
     async function confirmVoiceStop(current) {
+        if(suspended)return;
         if (!current.isCurrent || current.discard || current.state !== "paused") return;
         commandActive = true;
         const generation = ++commandGeneration;
@@ -157,7 +162,7 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
             trace('listener-start-request',{windowSeconds:seconds,overlap},context);
             await startCommands(commandModel, current.stream, overlap, scores => {
                 const decisionAt=observePrediction(scores,generation,expiresAt,context);
-                if (generation !== commandGeneration || !commandActive || decisionAt >= expiresAt) return;
+                if (suspended || generation !== commandGeneration || !commandActive || decisionAt >= expiresAt) return;
                 const settings = getSettings();
                 if (scores.top === "yes" && scores.yes >= settings.yesThreshold) {
                     trace('command-accepted',{command:"yes",score:scores.yes,threshold:settings.yesThreshold,elapsedMs:decisionAt-context.listenRequestedAtMs},context);
@@ -205,7 +210,7 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
     }
 
     async function handleWakeDetected(current) {
-        if (!getSettings().audioCommands || commandActive || !current.isCurrent || !current.wakeDetectorEnabled) return;
+        if (suspended || !getSettings().audioCommands || commandActive || !current.isCurrent || !current.wakeDetectorEnabled) return;
         commandActive = true;
         // Silence the periodic double beep throughout the wake acknowledgement,
         // model preparation, and Go/Stop listening window.
@@ -247,14 +252,14 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
             trace('listener-start-request',{windowSeconds:seconds,overlap,expiresAtMs:expiresAt},context);
             await startCommands(commandModel, commandStream, overlap, scores => {
                 const decisionAt=observePrediction(scores,generation,expiresAt,context);
-                if (generation !== commandGeneration || !commandActive || decisionAt >= expiresAt) return;
+                if (suspended || generation !== commandGeneration || !commandActive || decisionAt >= expiresAt) return;
                 const settings = getSettings();
                 const command = scores.top === "go" && scores.go >= settings.goThreshold ? "go"
                     : scores.top === "stop" && scores.stop >= settings.stopThreshold ? "stop" : null;
                 if (!command) return;
                 trace('command-accepted',{command,score:scores[command],threshold:command==='go'?settings.goThreshold:settings.stopThreshold,elapsedMs:decisionAt-context.listenRequestedAtMs},context);
                 if (command === "go") {
-                    void resumeAfterCommandShutdown(current);
+                    void resumeAfterCommandShutdown(current, {voiceAction:true});
                 } else {
                     // Do NOT close the command window here: closeCommandWindow() starts
                     // an unawaited recognizer shutdown and restarts pause beeps.
@@ -279,14 +284,30 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
         } catch (error) {
             trace('command-window-error',{message:String(error)},context);
             console.warn("TensorFlow command recognition failed:", error);
+            if(generation!==commandGeneration)return;
             closeCommandWindow();
             if (current.isCurrent) current.armWake(0);
             setWakeStatus(`Voice commands unavailable. Use the recording buttons.`);
         }
     }
 
+    function setSuspended(value) {
+        value=Boolean(value);if(value===suspended)return;
+        suspended=value;++suspensionGeneration;
+        trace(value?'voice-actions-suspended':'voice-actions-resumed');
+        const hadCommandWindow=commandActive;
+        if(hadCommandWindow)closeCommandWindow();
+        const current=getCurrentSession();
+        // Only an interrupted command episode needs wake rearming. The recording
+        // microphone, model settings and ordinary wake analysis stay unchanged.
+        if(hadCommandWindow && current?.isCurrent && !current.discard && !current.finalizing)current.armWake(0);
+        setWakeStatus(suspended?'Audio command actions suspended. Manual recording controls remain available.':getSettings().audioCommands?'Audio command actions enabled.':'Audio commands disabled.');
+    }
+
     return {
         get active() { return commandActive; },
+        get suspended() { return suspended; },
+        setSuspended,
         preload: preloadCommandModel,
         close: closeCommandWindow,
         resume: resumeAfterCommandShutdown,
