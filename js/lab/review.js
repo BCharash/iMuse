@@ -10,10 +10,15 @@ export class ReviewBuffer {
   if(this.pending.length>=32)return false;
   this.pending.push({...metadata,eventSample:this.cursor,start:Math.max(0,this.cursor-3*this.rate),end:this.cursor+2*this.rate,sampleRate:this.rate});return true;
  }
+ extract(start,end) {
+  const capturedStart=Math.max(0,start,this.blocks[0]?.start??this.cursor),capturedEnd=Math.max(capturedStart,Math.min(end,this.cursor));
+  const samples=new Float32Array(capturedEnd-capturedStart);
+  for(const block of this.blocks){const lo=Math.max(capturedStart,block.start),hi=Math.min(capturedEnd,block.start+block.data.length);if(hi>lo)samples.set(block.data.subarray(lo-block.start,hi-block.start),lo-capturedStart);}
+  return {samples,capturedStart,capturedEnd,incomplete:capturedStart!==start||capturedEnd!==end};
+ }
  preceding() {
-  const start=Math.max(0,this.cursor-3*this.rate,this.blocks[0]?.start??this.cursor),samples=new Float32Array(this.cursor-start);
-  for(const block of this.blocks){const lo=Math.max(start,block.start),hi=Math.min(this.cursor,block.start+block.data.length);if(hi>lo)samples.set(block.data.subarray(lo-block.start,hi-block.start),lo-start);}
-  return {samples,shortPreRoll:samples.length<3*this.rate};
+  const result=this.extract(this.cursor-3*this.rate,this.cursor);
+  return {samples:result.samples,shortPreRoll:result.incomplete};
  }
  flush(stopping) {
   for(const entry of [...this.pending]) {

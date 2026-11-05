@@ -1,3 +1,4 @@
+import { detectorSpeechWindow } from './fresh-speech.js';
 import { ReviewBuffer } from './review.js';
 import * as ort from './vendor/ort.min.mjs';
 import { WakeWordDetector } from '../heed/wakeword.js';
@@ -8,12 +9,13 @@ let engineName='heed',options={},vadSession,heed,voicute,resampler,state,buffer=
 let rolling=new Float32Array(0),history=[],position=0,lastWakeEnd=0,serial=Promise.resolve(),title=[],titleCount=0,titleStarted=false,titlePre=[],runGeneration=0;
 const send=data=>self.postMessage(data);
 const vadContext=new SileroV5Context();
-let clips=null,reviewSerial=0,lastNear=-Infinity;
+let clips=null,reviewSerial=0,lastNear=-Infinity,heedWindowSamples=16000,heedConsecutiveFrames=2;
 function markReview(metadata) {
  const event={...metadata,eventId:`${runGeneration}-${++reviewSerial}`,at:new Date().toISOString()};
  if(clips?.mark(event)){
   send({type:'review-event',generation:runGeneration,event});
   if(options.verifyWake){const {samples,shortPreRoll}=clips.preceding();self.postMessage({type:'verify-audio',generation:runGeneration,eventId:event.eventId,samples,shortPreRoll,sentAt:Date.now()},[samples.buffer]);}
+  return event;
  }
  else send({type:'gap',generation:runGeneration,reason:'Review clip queue full; event audio unavailable'});
 }
@@ -27,7 +29,7 @@ async function prepare(message) {
   const meta=await (await fetch(new URL('../heed/wake.json',import.meta.url))).json();
   const session=await ort.InferenceSession.create(new URL('../heed/wake.onnx',import.meta.url).href,{executionProviders:['wasm']});
   await session.run({mel:new ort.Tensor('float32',new Float32Array(40*101),[1,40,101])});
-  heed=new WakeWordDetector(session,meta);heed.threshold=options.threshold;
+  heed=new WakeWordDetector(session,meta);heed.threshold=options.threshold;heedWindowSamples=meta.audio_window_samples||16000;heedConsecutiveFrames=meta.trigger?.consecutive_frames||2;
  }else if(engineName==='voicute') {
   await import('./vendor/voicute.js');voicute=globalThis.VoicuteWakeWord.create();
   await voicute.load(new URL('./models/voicute/model_info.json',import.meta.url).href,new URL('./models/voicute/melspectrogram.onnx',import.meta.url).href);
@@ -57,22 +59,32 @@ async function consume(message) {
   state=result.stateN;const speech=Number(result.output.data[0]);history.push({end:position,prob:speech});while(history.length&&history[0].end<position-SAMPLE_RATE)history.shift();
   collectTitle(frame,speech,message.recording);
   rolling=joinFloat([rolling,frame]);if(rolling.length>32000)rolling=rolling.slice(-32000);
-  let prediction=null;
+  let prediction=null,detectorEnd=position,detectorWindowSamples=0;
   if(engineName==='heed') {
    wakePending=joinFloat([wakePending,frame]);
-   if(wakePending.length>=1600){const part=wakePending.slice(0,1600);wakePending=wakePending.slice(1600);prediction=await heed.step(part);}
+   if(wakePending.length>=1600){const part=wakePending.slice(0,1600);wakePending=wakePending.slice(1600);prediction=await heed.step(part);detectorEnd=position-wakePending.length;detectorWindowSamples=heedWindowSamples;}
   }else if(engineName==='voicute') {
    const count=voicute.audioSamplesNeeded();
    if(rolling.length>=count&&position-lastWakeEnd>=1600){lastWakeEnd=position;const raw=rolling.slice(-count);for(let i=0;i<raw.length;i++)raw[i]*=32767;
-    const r=await voicute.predict(raw);prediction={...r,triggered:!!voicute.detect(r.word,r.prob,r.consFrames,options.threshold,1500,Date.now(),r.sigmoid)};}
+    const r=await voicute.predict(raw);detectorWindowSamples=count;prediction={...r,triggered:!!voicute.detect(r.word,r.prob,r.consFrames,options.threshold,1500,Date.now(),r.sigmoid)};}
   }
   if(engineName==='off'&&position%2048===0)prediction={prob:0,triggered:false};
   if(prediction) {
    const inputDb=rmsDb(rolling.slice(-SAMPLE_RATE));const gate=evaluateSpeechGate(history,position,{enabled:options.requireSpeech,threshold:options.speechThreshold,minimumDb:options.minimumDb,inputDb});
+   const detectedAtMs=Date.now();
    const measurement={type:'measurement',generation:runGeneration,engine:engineName,seconds:position/SAMPLE_RATE,prob:prediction.prob,speech,inputDb:Number.isFinite(inputDb)?inputDb:null,
-    candidate:!!prediction.triggered,accepted:!!prediction.triggered&&gate.pass,...gate,analysisMs:performance.now()-started,transportMs:Date.now()-message.sentAt,gateEnabled:options.requireSpeech,threshold:options.threshold,recentSpeech:history.map(item=>item.prob)};
+    candidate:!!prediction.triggered,accepted:!!prediction.triggered&&gate.pass,...gate,analysisMs:performance.now()-started,transportMs:Date.now()-message.sentAt,gateEnabled:options.requireSpeech,threshold:options.threshold,speechThreshold:options.speechThreshold,recentSpeech:history.map(item=>item.prob)};
    send(measurement);
-   if(prediction.triggered)markReview({...measurement,type:'wake',gateEnabled:options.requireSpeech});
+   if(prediction.triggered){
+    const event=markReview({...measurement,type:'wake',gateEnabled:options.requireSpeech,
+     detectorSampleEnd:detectorEnd,detectorWindowSamples,detectorLagSamples:position-detectorEnd,
+     continuousSpeechTrace:history.map(frame=>({...frame}))});
+    if(event&&options.freshSpeech)try{
+     const requested=detectorSpeechWindow({engine:engineName,end:detectorEnd,windowSamples:detectorWindowSamples,consecutiveFrames:heedConsecutiveFrames});
+     const captured=clips.extract(requested.start,requested.end),window={...requested,capturedStart:captured.capturedStart,capturedEnd:captured.capturedEnd,incomplete:captured.incomplete};
+     self.postMessage({type:'fresh-audio',generation:runGeneration,eventId:event.eventId,samples:captured.samples,window,detectedAtMs},[captured.samples.buffer]);
+    }catch(error){send({type:'fresh-error',generation:runGeneration,eventId:event.eventId,message:String(error.message||error)});}
+   }
    else if(engineName!=='off'&&prediction.prob>=options.nearThreshold&&clips.cursor-lastNear>=5*SAMPLE_RATE){lastNear=clips.cursor;markReview({...measurement,type:'near-wake',gateEnabled:options.requireSpeech});}
   }
  }

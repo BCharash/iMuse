@@ -219,7 +219,7 @@ class WakeWordDetector {constructor(){this.calls=0;}reset(){}async step(){this.c
 
     def test_review_ui_playback_and_saved_labels(self):
         app=(ROOT/'js/lab/app.js').read_text()
-        ui=app[app.index('const $='):app.index('function download(')]
+        ui=app[app.index('const $='):app.index('function download(')].replace('import.meta.url', "'http://localhost/js/lab/'")
         review=(ROOT/'js/lab/review.js').read_text().replace('export ', '')
         evaluate(review + r"""
 globalThis.testResult='pending';

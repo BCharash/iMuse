@@ -1,6 +1,6 @@
 # Wake-word evaluation and offline recorder lab
 
-Updated 4 November 2026. This guide owns wake-model evidence and lab use. Production ownership/refactoring lives in the [voice-control plan](voice-control-refactor.md); future transcription lives in the [native proposal](iMuse%20Swift%20migration%20plan.md). The [detailed lab snapshot](Archive/recorder-lab-guide-2026-11-04.md) retains implementation history and experimental procedures.
+Updated 5 November 2026. This guide owns wake-model evidence and lab use. Production ownership/refactoring lives in the [voice-control plan](voice-control-refactor.md); future transcription lives in the [native proposal](iMuse%20Swift%20migration%20plan.md). The [detailed lab snapshot](Archive/recorder-lab-guide-2026-11-04.md) retains implementation history and experimental procedures.
 
 ## Current conclusions
 
@@ -74,13 +74,14 @@ Build .15 presents review cards with Play and classification together, wrapping 
 
 ## Current lab
 
-Hosted **lab.html**, build **2026-11-04.15**, is separate from production recording. No API key/cloud inference is used.
+Local **lab.html**, build **2026-11-05.1**, is separate from production recording. No API key/cloud inference is used.
 
 | Mode/control | Purpose |
 | --- | --- |
 | Filename suggestions | Tiny.en q8 transcribes up to 15 seconds after Stop; date/time prefix remains and the user applies/edits the suffix |
 | Speech-gated wake testing | Heed/Voicute with optional Silero speech/minimum-level gates; default wake action marks detection |
 | Live analysis unchecked | Native MediaRecorder baseline without detector worker/analysis context; manual titles |
+| Compare fresh, detector-aligned Silero | Default-on report-only comparison at each actual candidate; separate worker, fresh state, shared review label/clip and measured added delay |
 | Compare with Whisper verification | Retained shadow experiment; slow and rejected for production use |
 | Prepare offline models | Cache roughly 79 MiB bundled assets and prepare Tiny; verify offline reload in the same browser |
 
@@ -89,6 +90,28 @@ Full recordings use browser-supported compressed audio, preferably AAC/M4A. Revi
 Live analysis uses AudioWorklet, bounded queues and continuous anti-alias resampling; recording uses its separate native MediaRecorder branch. The current lab allows filename inference to overlap a new recording. **That experimental behavior does not satisfy the production requirement that recording always has priority.** No scheduler change is included here.
 
 Data lives in **imuse-simple-recorder-lab**, separate from production. Incremental chunks support recovery after reload; failed final saves retain memory audio until closure. Abruptly interrupted containers may be incomplete. Starting another recording retains earlier entries. Per-recording deletion and Clear all lab recordings require confirmation and remove this lab's audio/reviews. Export before deletion or browser/app storage removal.
+
+## Fresh, detector-aligned Silero comparison
+
+Implemented locally in build **2026-11-05.1**, at the user's request. The current continuous speech gate still owns live acceptance and any configured Pause/Resume action. The new result is observational only and never changes the recorder. Only actual Heed/Voicute candidates are rechecked, including candidates rejected by the continuous gate; near triggers and manual samples do not consume the fresh lane.
+
+- **Exact sample endpoint:** Heed may have up to 448 newer samples in its pending buffer when its 1600-sample step completes. Snapshot audio ending at `position - wakePending.length`, not at the later processing cursor or message arrival. Voicute ends at the last sample of the exact `audioSamplesNeeded()` input. Copy original normalized 16 kHz PCM before engine-specific filtering/scaling; never feed Silero Voicute's ×32767 copy.
+- **Window:** Heed's nominal input plus the preceding consecutive prediction window(s), using its loaded metadata. Current 16000-sample/2-crossing model requests 17600 samples (1.1 s). Extend the left edge by 320 historical samples to process 35 complete 512-sample blocks: **1.12 s**, with no future-audio wait. Voicute uses its current input-window length, rounded on the left to complete blocks. The raw buffer normally retains three seconds; missing startup/gap history is explicitly incomplete, not zero-filled into a usable verdict.
+- **Fresh state:** separate worker/model session, warmed before microphone acquisition. Reuse the loaded session but zero the `[2,1,128]` recurrent state and 64-sample audio context for every candidate. Carry both normally within the segment. Keep 32 ms fresh scores with absolute sample start/end, threshold and window bounds. The same two-block rule and final one-second lookback apply. Initial threshold remains **0.6**; user-selected values are snapshotted, not silently overwritten.
+- **Continuous baseline:** the live gate is unchanged and uses its existing frame grid/history at the live analysis cursor. Its trace and the detector endpoint/lag are retained. Fresh blocks are aligned to the detector endpoint; up to 28 ms of Heed buffering and a different frame phase can contribute to differences alongside the state reset. This is a comparison of candidate checks, not a controlled proof that state alone caused every difference.
+- **Scheduling/failure:** one fresh request at a time, no queue. Busy candidates are explicitly skipped. A ten-second deadline records a timeout but does not pretend the computing lane has become free; late results are identified. Worker errors, incomplete windows and unavailable preparation are visible without stopping continuous detection or recording. Separate workers avoid adding the replay to the live detector's serial queue, but CPU/memory contention can still affect live timing and produce logged analysis gaps.
+- **Timing:** each card shows fresh processing time and total candidate-result-to-fresh-result delay, including snapshot/dispatch/worker work/return delivery. Dispatch-to-worker-start is also exported. Model preparation is excluded by warming before capture. This is potential added verification delay, not spoken-phrase-end-to-audible-response latency. The fresh check does not wait for the normal two-second review post-roll.
+- **Review and storage:** one actual-action TP/FP/TN/FN label and existing five-second clip serve both methods. Paired summaries use only candidates with completed fresh checks and apply the speech/level gates to both, regardless of the live Require speech checkbox. Incomplete, skipped, error and pending checks remain outside paired denominators. Standalone detector misses remain in ordinary review; fresh checking cannot recover a wake that never became a candidate. Fresh status, timing, both traces and bounds persist with the recording and are included in diagnostics/review exports. Clearing/deleting logs invalidates late updates. Closing a page during a check restores it as interrupted.
+
+Validation: **61 tests pass** across twelve suites, including exact sample endpoints and normalized amplitude for both engines, independent fresh state/context, frame traces/lookback, busy/timeout/error handling and protection against late updates after log clearing. An isolated 390-pixel Chrome check used synthetic microphone input and a marked synthetic candidate while running the real bundled fresh Silero worker. Its 35-block result rendered while recording continued; the shared label/clip and complete trace survived diagnostic export and reload with no runtime exceptions or horizontal overflow. This verifies wiring, not real speech accuracy, added-delay guarantees or iPhone acceptance. Production iMuse code is unchanged by this lab experiment.
+
+### First comparison run
+
+1. Stop and export any existing results, then use **Clear all logged data…** for a clean comparison; full recordings are retained.
+2. Select **Speech-gated wake testing**, leave **Compare fresh, detector-aligned Silero** checked, **Mark detection** selected, Whisper verification off, minimum level gate off, and speech threshold **0.6**. Keep the chosen wake threshold fixed.
+3. Start with a short quiet-room run containing deliberate wake phrases, then separate short music, conversation and noise runs. Include noise between ordinary spoken words. Mark intentional misses promptly.
+4. Stop. On each actual candidate's card compare Continuous and Fresh pass/reject, peak, qualifying blocks and added milliseconds; expand **Speech scores by 32 ms block** when needed. Listen and label the one shared clip according to the actual action. Wait for pending fresh checks before exporting completed results.
+5. Export both diagnostics and review audio + labels. Evaluate genuine phrases rescued versus false activations admitted on the same completed pairs before longer background runs or production decisions. Do not change the recording/pause policies or lower thresholds during this first comparison.
 
 ## Practical evaluation
 
