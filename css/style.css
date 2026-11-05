@@ -172,6 +172,9 @@ button:active {
 .saved-audio-dialog::backdrop { background:rgb(0 0 0 / 35%); }
 .saved-audio-dialog h3 { margin:0 0 12px; }
 .saved-audio-dialog audio { display:block; width:100%; margin-bottom:14px; }
+.recording-download-dialog input { display:block; box-sizing:border-box; width:100%; margin-top:6px; }
+.recording-download-dialog .download-name-preview { overflow-wrap:anywhere; }
+.recording-download-dialog form > div { display:flex; justify-content:flex-end; gap:8px; }
 
 /* Microphone selection is independent of voice-command settings. */
 .microphone-choice-label { display:block; font-size:14px; font-weight:600; margin-top:8px; }

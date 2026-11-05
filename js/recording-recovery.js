@@ -95,19 +95,27 @@ export function createRecordingRecovery({
         try {
             const emergency = emergencyRecordings.get(id);
             if (emergency) {
-                downloadAudioBlob(emergency.blob, sessionFilename(emergency.metadata));
+                if (await downloadAudioBlob(emergency.blob, sessionFilename(emergency.metadata)) === false) {
+                    status.textContent = "Download canceled. Emergency recording retained.";
+                    return;
+                }
                 status.textContent = "Emergency download started. Check the exported audio before closing or reloading iMuse; the emergency copy remains available here.";
                 return;
             }
-            await recordingStorage.run(async () => {
+            const prepared = await recordingStorage.run(async () => {
                 assertSessionIdle(id);
                 const item = await boundedStorageRead(getSession(id));
                 if (!item || item.state === "deleted") throw new Error("This session is unavailable. Restore a deleted recording before loading it.");
                 const chunks = await boundedStorageRead(getChunks(id));
                 const { blob, report } = assembleSavedAudio(item, chunks);
-                downloadAudioBlob(blob, sessionFilename(item));
-                status.textContent = `Download started.${integrityNotice(report)} Check the exported audio before deleting the original.`;
+                return { blob, report, item };
             });
+            // Release the writer lock before waiting for the user's filename choice.
+            if (await downloadAudioBlob(prepared.blob, sessionFilename(prepared.item)) === false) {
+                status.textContent = "Download canceled. Recording retained.";
+                return;
+            }
+            status.textContent = `Download started.${integrityNotice(prepared.report)} Check the exported audio before deleting the original.`;
         } catch (error) {
             console.error("Could not export saved recording:", error);
             status.textContent = `Could not export audio: ${error.message || "unknown error"}`;

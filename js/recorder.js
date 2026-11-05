@@ -1,6 +1,7 @@
 import { playSpokenResponse, prepareSpokenResponses } from "./audio-response-manager.js";
 import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSelectionLocked, getRequestedMicrophoneConstraints } from "./microphone-manager.js";
 import { loadWakeDetector, evaluateWakeDetector } from "./wake-detector.js";
+import { localRecordingStamp, requestDownloadFilename } from "./recording-download.js";
 import { APP_BUILD, displayBuildInfo } from "./build-info.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { createMicrophoneLevelCheck } from "./microphone-level-check.js";
@@ -1081,26 +1082,26 @@ function audioFileExtension(blob) {
     return "audio";
 }
 
-function downloadAudioBlob(blob, filenameBase) {
+async function downloadAudioBlob(blob, filenameBase) {
     if (!blob || !blob.size) throw new Error("There is no audio data to download.");
     const extension = audioFileExtension(blob);
+    const selectedName = await requestDownloadFilename(filenameBase, extension);
+    if (!selectedName) return false;
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${filenameBase}.${extension}`;
+    link.download = `${selectedName}.${extension}`;
     link.style.display = "none";
     document.body.appendChild(link);
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
 }
 
 function sessionFilename(item) {
-    const date = item && item.startedAt ? new Date(item.startedAt) : new Date();
-    const stamp = Number.isNaN(date.getTime())
-        ? new Date().toISOString().replace(/[:.]/g, "-")
-        : date.toISOString().replace(/[:.]/g, "-");
-    return `iMuse-recording-${stamp}`;
+    const stamp = item?.downloadStamp || localRecordingStamp(item?.startedAt);
+    return `${stamp}_iMuse`;
 }
 
 function exportSavedSession(id, button) {
@@ -1114,14 +1115,20 @@ function ensureCurrentDownloadButton() {
     button.id = "downloadRecordingButton";
     button.type = "button";
     button.textContent = "Download audio file";
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
+        button.disabled = true;
         try {
             if (!window.lastRecording) throw new Error("No recording is currently loaded.");
-            const item = displayedSessionId ? null : null;
-            downloadAudioBlob(window.lastRecording, sessionFilename({ startedAt: new Date().toISOString() }));
-            status.textContent = "Download started. Check the exported audio before deleting the original.";
+            const blob = window.lastRecording;
+            const id = displayedSessionId;
+            const item = emergencyRecordings.get(id)?.metadata || (id ? await boundedStorageRead(getSession(id)) : null);
+            if (!item) throw new Error("The recording's start time is unavailable. Download it from Saved recordings.");
+            const downloaded = await downloadAudioBlob(blob, sessionFilename(item));
+            status.textContent = downloaded ? "Download started. Check the exported audio before deleting the original." : "Download canceled. Recording retained.";
         } catch (error) {
             status.textContent = `Could not download audio: ${error.message || "unknown error"}`;
+        } finally {
+            button.disabled = false;
         }
     });
     deleteButton.parentElement.insertBefore(button, deleteButton);
@@ -1201,10 +1208,12 @@ async function startRecording() {
         newSessionId = id;
         const actualMimeType = recorder.mimeType || recorderChoice.requestedMimeType || "";
         const formatLabel = describeAudioFormat(actualMimeType) || recorderChoice.formatLabel;
+        const startedAt = new Date();
         const metadata = {
             id,
             state: "recording",
-            startedAt: new Date().toISOString(),
+            startedAt: startedAt.toISOString(),
+            downloadStamp: localRecordingStamp(startedAt),
             mimeType: actualMimeType,
             chunkCount: 0,
             bytesStored: 0,

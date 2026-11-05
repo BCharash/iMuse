@@ -191,7 +191,8 @@ assert 'import { createRecordingLibrary } from "./recording-library.js";' in SOU
 assert 'import { createRecordingStore, RECORDING_DB_NAME } from "./recording-store.js";' in SOURCE
 assert 'import { createRecordingRecovery } from "./recording-recovery.js";' in SOURCE
 FUNCTIONS = (
-    INTEGRITY_SOURCE
+    (Path(__file__).resolve().parents[1] / "js/recording-download.js").read_text().replace("export ", "")
+    + INTEGRITY_SOURCE
     + RECOVERY_SOURCE
     + LIBRARY_SOURCE
     + between("function boundedStorageRead(", "function updatePreservationTestControls(")

@@ -17,6 +17,8 @@ Updated 5 November 2026. Start here; current findings take precedence over older
 
 ## Current checkpoint
 
+Build **2026-11-05.4** adds download-only filename editing with a fixed local start-time prefix and an editable description. Saved-list titles are unchanged; Whisper naming and a broader file-save workflow remain future work. Automated validation passes 93 methods across fourteen suites; browser/device download acceptance remains pending. See [download naming](recording-investigation.md#download-naming).
+
 Recording preservation's four stages, library/store/recovery extractions, command-controller extraction, Advanced diagnostics and the temporary microphone check/countdown are implemented. The user reported the microphone check/countdown and earlier preservation/refactoring checks worked. The latest automated checkpoint is **89 tests across thirteen suites**, including 26 wake-detector methods and build-identity coverage; full device acceptance remains bounded by the recording brief.
 
 Production build identification uses **YYYY-MM-DD.N**, starting at **2026-11-05.1**, below the Settings selector rectangle and in voice/recording diagnostic exports. The [build guide](build-versioning.md) defines when to increment it and why this display does not certify cache consistency across all assets.
