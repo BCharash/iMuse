@@ -1687,3 +1687,14 @@ At the user's request, keep all Silero controls in one rounded group immediately
 The user reported newly quiet receiver playback for the stopped announcement in Safari and installed iMuse, with normal headset playback and no MacBook symptom. Source comparison with the pre-Silero checkpoint found unchanged prompt/output/microphone/command files and an unchanged stop sequence; no root cause is established. Correct an existing gap by awaiting command-listener and AudioContext shutdown before playing the announcement. A bounded timeout/failure suppresses that prompt while preserving saved audio. Do not force a speaker route or raise volume speculatively. Tests establish shutdown ordering and retained finalization, not actual iPhone routing.
 
 Diagnostics now presents independent Voice recognition results and Detailed voice diagnostics sections. Each owns Show/Hide, Copy and Download for its displayed readable rows. Full JSON remains a separate detail export. A single Clear all voice diagnostics removes their shared event history. Browser checks exercise export contents, independent visibility, shared clear and narrow/desktop layout. The implementation suite passes 106 methods across fifteen suites. See the recording investigation for the exact remaining device check.
+
+
+# DJ031 — Spontaneous return of iPhone speaker output; observation checkpoint
+
+**Date:** 11 November 2026. **Status:** User observes; no causal fix established.
+
+The user reported that the original stopped prompt now plays normally through the iPhone speaker. Prior evidence: headset output remained normal; other sites and other iMuse prompts were normal; waiting for shutdown did not fix receiver routing; disabling Audio commands did not fix it; every option in the isolated output check still used the receiver. These negative results remain valid and do not establish a Silero or general Safari cause.
+
+A temporary .6 substitution mapped stopped to recording.wav, but the user distinctly heard the original stopped message/intonation while speaker output was normal. Thus the substitution did not produce a verified A/B test. The .6 label does not establish every module or audio asset refreshed, and a cache/session explanation remains a hypothesis.
+
+The user reverted the isolated output test (`0639a27` → `eebb6f4`) and the temporary audio swap (`6569436` → `95291db`). Live checkout verification shows build 2026-11-11.5 and the original recording-stopped.wav mapping. Retain scoped diagnostics, Silero settings and the earlier shutdown-ordering correction; no further audio change is authorized by this documentation checkpoint. The active investigation owns recurrence instructions. No site data was cleared. Last retained implementation validation is 106 tests across fifteen suites; documentation validation checks file coverage and links, without rerunning microphone/model tests.

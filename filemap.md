@@ -2,6 +2,8 @@
 
 Updated 11 November 2026. Paths are relative to the repository root. Click a filename to open it, or search this page for its exact name. Every tracked repository file is listed individually, including models, vendor runtimes and archived tools; this map also lists itself. Git internals, local OS files and generated Python caches are excluded.
 
+Current iPhone stop-message observation status and recurrence handoff: [recording investigation](docs/recording-investigation.md#iphone-stop-announcement-output-regression). The temporary isolated output check and audio substitution were reverted and are not part of this file inventory.
+
 ## Find the right file quickly
 
 | What you want to find | Start here |
