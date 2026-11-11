@@ -4,7 +4,8 @@ const FILES = Object.freeze({
     yes: "audio/yes.wav",
     recording: "audio/recording.wav",
     newRecording: "audio/new-recording.wav",
-    stopped: "audio/recording-stopped.wav",
+    // Temporary iPhone routing comparison: known-good audio at the same stop point.
+    stopped: "audio/recording.wav",
     confirmStop: "audio/confirm-stop-recording.wav"
 });
 const cache = new Map();
