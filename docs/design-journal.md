@@ -1687,12 +1687,3 @@ At the user's request, keep all Silero controls in one rounded group immediately
 The user reported newly quiet receiver playback for the stopped announcement in Safari and installed iMuse, with normal headset playback and no MacBook symptom. Source comparison with the pre-Silero checkpoint found unchanged prompt/output/microphone/command files and an unchanged stop sequence; no root cause is established. Correct an existing gap by awaiting command-listener and AudioContext shutdown before playing the announcement. A bounded timeout/failure suppresses that prompt while preserving saved audio. Do not force a speaker route or raise volume speculatively. Tests establish shutdown ordering and retained finalization, not actual iPhone routing.
 
 Diagnostics now presents independent Voice recognition results and Detailed voice diagnostics sections. Each owns Show/Hide, Copy and Download for its displayed readable rows. Full JSON remains a separate detail export. A single Clear all voice diagnostics removes their shared event history. Browser checks exercise export contents, independent visibility, shared clear and narrow/desktop layout. The implementation suite passes 106 methods across fifteen suites. See the recording investigation for the exact remaining device check.
-
-
-# DJ031 — Isolated output-routing comparison after failed shutdown candidate
-
-**Date:** 11 November 2026. **Status:** Output-check build 2026-11-11.1 prepared; iPhone observations pending.
-
-The user confirmed the .5 candidate still plays the stop message quietly through the receiver and that disabling Audio commands does not fix it. Retain that negative result. Active command recognition and speech gating are not necessary for reproduction. No recent differences were found in the pre-Silero prompt/player/capture ownership files; source inspection cannot establish a known-working acoustic baseline.
-
-Prepare an independent audio-output-check.html with before-capture playback, capture-only and capture-plus-analysis comparisons, and an explicit optional post-release playback-intent request that restores the previous audio-session type. It reuses the unchanged stop-message player, discards capture chunks and does not touch stored recordings. The report includes user-labeled output observations; session metadata alone cannot identify the audible route. No production routing override was introduced. Automated lifecycle checks and a synthetic-microphone Chrome run verify wiring, not iPhone behavior. Latest suite: 108 methods across sixteen suites.
