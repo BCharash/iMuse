@@ -1665,3 +1665,13 @@ The user deferred asset fingerprinting/version-maintenance upgrades and further 
 The user authorized pause-only speech checking initially, a warmed model, independent recording/pause controls and advanced speech tuning. Silero checks whether speech evidence accompanies a wake candidate; speech alone does not resume capture. Go/Stop/Yes/No and RMS automatic silence pause remain unchanged. The worker reuses the existing pinned local model/runtime, has no microphone ownership, bounds pending audio and resets history across state/generation/gap boundaries. Readiness/failure does not block Record. No deliberate post-pause wait or fresh-state candidate replay was added.
 
 All 103 automated methods across fifteen suites pass. Isolated Chrome ran the real model on digital silence and a prerecorded spoken prompt, checked Settings behavior/layout at 390 and 880 pixels and observed no microphone requests. This does not establish acoustic accuracy, device speed or background behavior. The separate lab remains available; its comparison and queue experiments are unchanged. See the [production speech reference](voice-control-refactor.md#state-specific-silero-speech-checking) for settings, fallback behavior, ownership and focused device checks.
+
+
+# DJ029 — Speech controls and clearer diagnostics
+
+**Date:** 11 November 2026. **Status:** Implemented candidate 2026-11-11.2.
+
+At the user's request, keep all Silero controls in one rounded group immediately below wake-word recognition. Show the recommended starting policy (recording off, pause on) and tuning (0.60, two blocks, 1,000 ms), and provide a restore action limited to those five preferences. Diagnostics now offers Show/Hide and Copy alongside Download/Clear. The viewer starts hidden, while collection retains its existing setting. Rename and explain the summary as Voice recognition results and the detailed timeline as Detailed troubleshooting log, describing how each helps investigate unexpected/missed voice actions. Recognition policy and thresholds are otherwise unchanged.
+
+
+**Placement correction, build 2026-11-11.3:** the user clarified Silero is adjusted less frequently. Final order is Wake-word recognition → Voice command recognition → Speech detection — Silero. All Silero controls remain together; recognition behavior is unchanged.

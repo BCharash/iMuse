@@ -119,8 +119,24 @@ export function initializeVoiceDiagnostics() {
     function render(){
         toggle.checked=voiceDiagnostics.enabled;download.disabled=voiceDiagnostics.size===0;clear.disabled=voiceDiagnostics.size===0;
         status.textContent=`${voiceDiagnostics.enabled?'On':'Off'} · ${voiceDiagnostics.size} / 500 events retained${voiceDiagnostics.dropped?' · '+voiceDiagnostics.dropped+' older events dropped':''}. This page only; download before reloading. No audio is logged.`;
-        if(advanced?.open&&!settings?.hidden&&!audioSection?.hidden)renderView();
+        if(!view.hidden&&advanced?.open&&!settings?.hidden&&!audioSection?.hidden)renderView();
     }
+    const show = document.getElementById('toggleVoiceDiagnostics');
+    const copy = document.getElementById('copyVoiceDiagnostics');
+    show?.addEventListener('click', () => {
+        view.hidden = !view.hidden;
+        show.textContent = view.hidden ? 'Show diagnostics' : 'Hide diagnostics';
+        show.setAttribute('aria-expanded', String(!view.hidden));
+        if (!view.hidden) renderView();
+    });
+    copy?.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(JSON.stringify(voiceDiagnostics.snapshot(), null, 2));
+            status.textContent = 'Diagnostics copied. Paste them into your support conversation.';
+        } catch (_) {
+            status.textContent = 'Clipboard access unavailable. Use Download diagnostics instead.';
+        }
+    });
     voiceDiagnostics.onChange(render);
     toggle.addEventListener('change',()=>voiceDiagnostics.setEnabled(toggle.checked));
     clear.addEventListener('click',()=>voiceDiagnostics.clear());
