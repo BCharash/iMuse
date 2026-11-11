@@ -1675,3 +1675,6 @@ At the user's request, keep all Silero controls in one rounded group immediately
 
 
 **Placement correction, build 2026-11-11.3:** the user clarified Silero is adjusted less frequently. Final order is Wake-word recognition → Voice command recognition → Speech detection — Silero. All Silero controls remain together; recognition behavior is unchanged.
+
+
+**Settings clarification, build 2026-11-11.4:** keep recording/pause switches in the main Silero group below command recognition. Return threshold, minimum blocks and lookback to Advanced voice settings. Remove the restore action; show recommended values in parentheses beside each of the five controls. Recognition behavior and saved preferences are unchanged.

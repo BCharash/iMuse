@@ -18,7 +18,7 @@ Updated 11 November 2026. Start here; current findings take precedence over olde
 
 ## Current checkpoint
 
-**Settings usability candidate 2026-11-11.3:** all Silero controls sit together last, below voice command recognition, with visible recommended starting values and a Silero-only restore button. Advanced diagnostics gains Show/Hide and Copy, with plain-language explanations of recognition results and troubleshooting details.
+**Settings usability candidate 2026-11-11.4:** the main Silero group sits below command recognition and contains only recording/pause switches and status. Threshold, minimum blocks and lookback are under Advanced voice settings. Each Silero control shows its recommended value in parentheses; no restore button is present. Diagnostics offers Show/Hide, Copy, Download and Clear, with explanations of recognition results and troubleshooting details.
 
 **Production candidate 2026-11-11.1:** state-specific Silero speech checking is implemented, with pause on/recording off by default, a dedicated Settings group and advanced tuning. The warmed worker uses the existing microphone stream only in enabled states; it checks wake acceptance without changing Go/Stop/Yes/No or automatic silence pause. All 103 automated methods pass across fifteen suites; isolated Chrome exercised the real model, no-microphone preparation and responsive Settings. Device/acoustic acceptance is pending. See [production speech checking](voice-control-refactor.md#state-specific-silero-speech-checking).
 

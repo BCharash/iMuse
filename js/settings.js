@@ -111,12 +111,7 @@ for (const [key,id] of Object.entries(controls)) {
         window.dispatchEvent(new CustomEvent("imuse-settings-changed",{detail:getSettings()}));
     });
 }
-document.getElementById("restoreSpeechRecommendations")?.addEventListener("click", () => {
-    for (const key of ["speechDuringRecord", "speechDuringPause", "speechThreshold", "speechMinFrames", "speechLookbackMs"]) settings[key] = defaults[key];
-    try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch (error) { console.warn("iMuse settings could not be saved", error); }
-    render();
-    window.dispatchEvent(new CustomEvent("imuse-settings-changed", { detail: getSettings() }));
-});
+
 render();
 
 window.addEventListener("load", updateAutomaticOverlapLabel);
