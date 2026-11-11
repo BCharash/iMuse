@@ -2,7 +2,7 @@
 
 Updated 11 November 2026. This is the current recording reference. The four preservation stages and interface cleanup are implemented; no further preservation stage is underway. The [roadmap](iMuse%20next%20steps.md) owns future priorities. Detailed experiment/stage history is [archived](Archive/recording-investigation-stages-2026-11-03.md).
 
-**Earlier accepted wake checkpoint: build 2026-11-05.3.** The user tested the wake refactor and separately approved race corrections, reported they worked as expected and called the work a success. That wake-refactor checkpoint passed **89 methods across thirteen suites**; the accepted download checkpoint passed **94 methods across fourteen suites**. Production Silero candidate 2026-11-11.1 adds state-specific wake gating, with 103 methods across fifteen suites passing; [device speech acceptance](voice-control-refactor.md#state-specific-silero-speech-checking) remains pending. Model loading/inference delegate through `js/wake-detector.js`; readiness, microphone/audio graph, buffers, session/busy guards and timers remain recorder-owned. At that wake-refactor checkpoint, models and audio delivery were unchanged. Device/browser and individual scenarios were not specified; the report does not establish platform-wide recognition accuracy, latency or background capture. Current behavior is in the [voice-control guide](voice-control-refactor.md#wake-race-corrections), with detailed staged history [archived](Archive/voice-control-history-2026-11-05.md).
+**Earlier accepted wake checkpoint: build 2026-11-05.3.** The user tested the wake refactor and separately approved race corrections, reported they worked as expected and called the work a success. That wake-refactor checkpoint passed **89 methods across thirteen suites**; the accepted download checkpoint passed **94 methods across fourteen suites**. Production Silero candidate 2026-11-11.1 adds state-specific wake gating, with 106 methods across fifteen suites passing; [device speech acceptance](voice-control-refactor.md#state-specific-silero-speech-checking) remains pending. Model loading/inference delegate through `js/wake-detector.js`; readiness, microphone/audio graph, buffers, session/busy guards and timers remain recorder-owned. At that wake-refactor checkpoint, models and audio delivery were unchanged. Device/browser and individual scenarios were not specified; the report does not establish platform-wide recognition accuracy, latency or background capture. Current behavior is in the [voice-control guide](voice-control-refactor.md#wake-race-corrections), with detailed staged history [archived](Archive/voice-control-history-2026-11-05.md).
 
 ## Current code ownership
 
@@ -62,6 +62,16 @@ Persistent storage reduces automatic-eviction risk where granted. It is not a ba
 
 Web Locks protection covers cooperating updated pages in the same storage scope. Load the current build in all tabs before testing. A browser without usable Web Locks refuses recording/storage mutations with an explanation. Suspension can delay timers; a permanently stalled write cannot be forced to complete by the watchdog. Long-file getAll/Blob assembly and total memory remain unbounded by the pending threshold.
 
+## iPhone stop-announcement output regression
+
+**Candidate 2026-11-11.5; device result pending.** On 11 November the user reported that “Recording stopped” newly plays softly through the iPhone receiver, in both Safari tab and installed app, while headset playback remains normal and MacBook is unaffected. Treat this as a newly reported regression, distinct from the unresolved background-capture problem. The user did not specify whether manual Stop, spoken Stop or both reproduce it.
+
+Source comparison from the pre-Silero checkpoint (`025dbee`) through the reported build found no changes to the stop WAV, spoken-response player, microphone manager, command adapter or controller stop sequence. Silero owns no microphone/output. This does not exclude indirect timing effects and does not identify the root cause or the exact first affected build.
+
+An existing shutdown-ordering gap was identified: microphone tracks were stopped synchronously, but command-listener shutdown and AudioContext closure were requested without awaiting completion before the stop announcement. The candidate observes both shutdowns, waits for actual completion before the announcement, and logs `stopped-audio-ready` with completion status and elapsed time. A two-second deadline or cleanup failure suppresses only that announcement; it does not prevent already-recorded audio from being finalized, retained or exported. It does not impose a fixed delay, change volume, force an audio route or change headset behavior intentionally. A newer capture/level-check owner suppresses the old announcement.
+
+Automated tests cover pending listener/context completion, completed storage while announcement waits, timeout/failure observation and finalization ownership release. These do not reproduce iPhone output routing. Verify the candidate on the same iPhone in Safari and installed mode: manual and spoken Stop, built-in output, then headset; compare stop-message loudness and resulting audio files. If still affected, capture the detailed voice diagnostics/JSON around Stop and compare with the last known-working deployment before further routing experiments. No new background-capture or keep-alive change is part of this candidate.
+
 ## Evidence and user-reported results
 
 ### Microphone-level evaluation
@@ -113,7 +123,7 @@ From the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-The last verified implementation checkpoint has **fifteen suites and 103 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
+The last verified implementation checkpoint has **fifteen suites and 106 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
 
 The suites execute production functions with controlled DOM/storage/lock/timer mocks. They do not prove native player rendering, actual IndexedDB behavior, browser permission decisions, container decoding, background capture or multi-hour memory reliability.
 

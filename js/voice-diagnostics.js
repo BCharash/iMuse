@@ -87,12 +87,41 @@ function appendDiagnosticRow(body,values) {
     for(const value of values){const cell=document.createElement('td');cell.textContent=String(value);row.append(cell);}
     body.append(row);
 }
+function recognitionRows(snapshot) {
+    return summarizeVoiceDiagnostics(snapshot).windows.slice(-30).reverse().map(window => [
+        diagnosticTime(window.at), window.id, phaseText(window.phase), window.error ? 'Error: '+window.error : window.result,
+        scoreText(window.score)+' / '+scoreText(window.threshold), secondsText(window.elapsedMs), scoreText(window.peakStop)
+    ]);
+}
+function activityRows(snapshot) {
+    return snapshot.events.slice(-500).reverse().map(event => {
+        let detail=event.message||'';
+        if(event.type==='command-prediction') {
+            const words=event.phase==='yes-no'?['yes','no']:['go','stop'];
+            detail=`Top match: ${event.scores?.top||'—'} (${scoreText(event.scores?.topScore)}) · `+words.map(word=>`${word} ${scoreText(event.scores?.[word])} / threshold ${scoreText(event.thresholds?.[word])}`).join(' · ');
+        } else if(event.type==='command-accepted') detail=`${event.command} · score ${scoreText(event.score)} / threshold ${scoreText(event.threshold)}`;
+        else if(event.prompt) detail=({confirmStop:'Confirm stop recording',pause:'Pause',yes:'Acknowledgement',newRecording:'New recording',recording:'Recording',stopped:'Stopped'})[event.prompt]||event.prompt;
+        else if(event.windowSeconds) detail=event.windowSeconds+' s listening window';
+        else if(event.cancelled) detail='Cancelled before startup completed';
+        return [diagnosticTime(event.at),event.windowId??'—',eventNames[event.type]||event.type.replaceAll('-',' '),detail,secondsText(event.elapsedMs)];
+    });
+}
+function readableReport(title, headings, rows) {
+    return title+'\n'+[headings,...rows].map(row=>row.map(value=>String(value).replace(/[\t\r\n]+/g,' ')).join('\t')).join('\n')+'\n';
+}
+export function voiceRecognitionReport(snapshot) {
+    return readableReport('Voice recognition results', ['Time','Window','Listening for','Result','Accepted score / threshold','After','Highest Stop score'], recognitionRows(snapshot));
+}
+export function voiceDiagnosticReport(snapshot) {
+    return readableReport('Detailed voice diagnostics', ['Time','Window','Event','Details','After'], activityRows(snapshot));
+}
 export function initializeVoiceDiagnostics() {
     const toggle=document.getElementById('voiceDiagnosticsEnabled'),download=document.getElementById('downloadVoiceDiagnostics');
     const clear=document.getElementById('clearVoiceDiagnostics'),status=document.getElementById('voiceDiagnosticsStatus');
     const advanced=document.getElementById('advancedSettings'),settings=document.getElementById('settingsPanel'),audioSection=document.getElementById('audioSettingsSection');
     const settingsButton=document.getElementById('settingsButton');
     const view=document.getElementById('voiceDiagnosticsView');
+    const detailView=document.getElementById('voiceDiagnosticsDetailView');
     const summary=document.getElementById('voiceDiagnosticsSummary'),windows=document.getElementById('voiceDiagnosticsWindows');
     const events=document.getElementById('voiceDiagnosticsEvents'),refresh=document.getElementById('refreshVoiceDiagnostics');
     if(!toggle||!download||!clear||!status||!view||!summary||!windows||!events||!refresh)return;
@@ -100,43 +129,45 @@ export function initializeVoiceDiagnostics() {
     if(audioSection&&advanced)audioSection.appendChild(advanced);
     function renderView(){
         const snapshot=voiceDiagnostics.snapshot(),report=summarizeVoiceDiagnostics(snapshot);
-        summary.textContent=report.windows.length?`${report.goStopWindows} command attempts · ${report.gos} Go and ${report.stops} Stop recognitions. These are model decisions, not verified speech.${snapshot.droppedEvents?' Older data was dropped; some attempts may be incomplete.':''}`:voiceDiagnostics.enabled?'No command attempts logged yet. Open a voice-command listening period; activity appears below.':'Diagnostics are off. Enable collection to log new command attempts.';
+        summary.textContent=report.windows.length?`${report.goStopWindows} listening periods · ${report.gos} Go and ${report.stops} Stop recognitions. These are model decisions, not verified speech.${snapshot.droppedEvents?' Older data was dropped; some attempts may be incomplete.':''}`:voiceDiagnostics.enabled?'No voice recognition results yet. Say the wake phrase to open a Go/Stop listening period.':'Diagnostics are off. Enable collection to log new voice recognition results.';
         windows.replaceChildren();events.replaceChildren();
-        for(const window of report.windows.slice(-30).reverse())appendDiagnosticRow(windows,[diagnosticTime(window.at),window.id,phaseText(window.phase),window.error?'Error: '+window.error:window.result,scoreText(window.score)+' / '+scoreText(window.threshold),secondsText(window.elapsedMs),scoreText(window.peakStop)]);
-        for(const event of snapshot.events.slice(-500).reverse()) {
-            let detail=event.message||'';
-            if(event.type==='command-prediction'){
-                const words=event.phase==='yes-no'?['yes','no']:['go','stop'];
-                detail=`Top match: ${event.scores?.top||'—'} (${scoreText(event.scores?.topScore)}) · `+words.map(word=>`${word} ${scoreText(event.scores?.[word])} / threshold ${scoreText(event.thresholds?.[word])}`).join(' · ');
-            }
-            else if(event.type==='command-accepted')detail=`${event.command} · score ${scoreText(event.score)} / threshold ${scoreText(event.threshold)}`;
-            else if(event.prompt)detail=({confirmStop:'Confirm stop recording',pause:'Pause',yes:'Acknowledgement',newRecording:'New recording',recording:'Recording',stopped:'Stopped'})[event.prompt]||event.prompt;
-            else if(event.windowSeconds)detail=event.windowSeconds+' s listening window';
-            else if(event.cancelled)detail='Cancelled before startup completed';
-            appendDiagnosticRow(events,[diagnosticTime(event.at),event.windowId??'—',eventNames[event.type]||event.type.replaceAll('-',' '),detail,secondsText(event.elapsedMs)]);
-        }
+        for (const row of recognitionRows(snapshot)) appendDiagnosticRow(windows,row);
+        for (const row of activityRows(snapshot)) appendDiagnosticRow(events,row);
     }
     function render(){
         toggle.checked=voiceDiagnostics.enabled;download.disabled=voiceDiagnostics.size===0;clear.disabled=voiceDiagnostics.size===0;
         status.textContent=`${voiceDiagnostics.enabled?'On':'Off'} · ${voiceDiagnostics.size} / 500 events retained${voiceDiagnostics.dropped?' · '+voiceDiagnostics.dropped+' older events dropped':''}. This page only; download before reloading. No audio is logged.`;
-        if(!view.hidden&&advanced?.open&&!settings?.hidden&&!audioSection?.hidden)renderView();
+        if((!view.hidden||detailView&&!detailView.hidden)&&advanced?.open&&!settings?.hidden&&!audioSection?.hidden)renderView();
     }
-    const show = document.getElementById('toggleVoiceDiagnostics');
-    const copy = document.getElementById('copyVoiceDiagnostics');
-    show?.addEventListener('click', () => {
-        view.hidden = !view.hidden;
-        show.textContent = view.hidden ? 'Show diagnostics' : 'Hide diagnostics';
-        show.setAttribute('aria-expanded', String(!view.hidden));
-        if (!view.hidden) renderView();
-    });
-    copy?.addEventListener('click', async () => {
-        try {
-            await navigator.clipboard.writeText(JSON.stringify(voiceDiagnostics.snapshot(), null, 2));
-            status.textContent = 'Diagnostics copied. Paste them into your support conversation.';
-        } catch (_) {
-            status.textContent = 'Clipboard access unavailable. Use Download diagnostics instead.';
-        }
-    });
+    function wireVisibility(id, target, label) {
+        const button=document.getElementById(id);
+        button?.addEventListener('click',()=>{
+            if(!target)return;
+            target.hidden=!target.hidden;
+            button.textContent=(target.hidden?'Show ':'Hide ')+label;
+            button.setAttribute('aria-expanded',String(!target.hidden));
+            if(!target.hidden)renderView();
+        });
+    }
+    wireVisibility('toggleRecognitionResults',view,'results');
+    wireVisibility('toggleVoiceDiagnostics',detailView,'diagnostics');
+    function wireCopy(id, report, label) {
+        document.getElementById(id)?.addEventListener('click',async()=>{
+            try {await navigator.clipboard.writeText(report(voiceDiagnostics.snapshot()));status.textContent=label+' copied.';}
+            catch(_){status.textContent='Clipboard access unavailable. Use Download '+label.toLowerCase()+' instead.';}
+        });
+    }
+    wireCopy('copyRecognitionResults',voiceRecognitionReport,'Results');
+    wireCopy('copyVoiceDiagnostics',voiceDiagnosticReport,'Diagnostics');
+    function saveReport(text,filename,type='text/plain') {
+        const blob=new Blob([text],{type}),url=URL.createObjectURL(blob),link=document.createElement('a');
+        link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
+    }
+    document.getElementById('downloadRecognitionResults')?.addEventListener('click',()=>saveReport(
+        voiceRecognitionReport(voiceDiagnostics.snapshot()),`iMuse-voice-recognition-results-${Date.now()}.txt`));
+    document.getElementById('downloadVoiceDiagnosticsJSON')?.addEventListener('click',()=>saveReport(
+        JSON.stringify(voiceDiagnostics.snapshot({userAgent:navigator.userAgent,platform:navigator.platform,hardwareConcurrency:navigator.hardwareConcurrency,visibility:document.visibilityState}),null,2),
+        `iMuse-voice-diagnostics-${Date.now()}.json`,'application/json'));
     voiceDiagnostics.onChange(render);
     toggle.addEventListener('change',()=>voiceDiagnostics.setEnabled(toggle.checked));
     clear.addEventListener('click',()=>voiceDiagnostics.clear());
@@ -144,9 +175,6 @@ export function initializeVoiceDiagnostics() {
     advanced?.addEventListener('toggle',render);
     settingsButton?.addEventListener('click',render);
     if(voiceDiagnostics.size===0)voiceDiagnostics.record('diagnostics-ready',{diagnosticVersion:VOICE_DIAGNOSTICS_VERSION});
-    download.addEventListener('click',()=>{
-        const data=voiceDiagnostics.snapshot({userAgent:navigator.userAgent,platform:navigator.platform,hardwareConcurrency:navigator.hardwareConcurrency,visibility:document.visibilityState});
-        const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
-        link.href=url;link.download=`iMuse-voice-diagnostics-${Date.now()}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
-    });
+    download.addEventListener('click',()=>saveReport(voiceDiagnosticReport(voiceDiagnostics.snapshot()),
+        `iMuse-voice-diagnostics-${Date.now()}.txt`));
 }

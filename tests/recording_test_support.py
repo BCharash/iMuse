@@ -152,6 +152,8 @@ function downloadAudioBlob(blob, name) {
 }
 function logRecordingEvent() {} function closeCommandWindow() {}
 function cleanupAudioMonitor() {} function stopStream() {}
+function microphoneCheckBusy(){return false;}
+const voiceDiagnostics={record(){}};
 function publishRecordingDiagnostics() {} function publishMicrophoneCheckState() {} function setAudioCommandsToggleLocked() {}
 function setMicrophoneSelectionLocked() {} function setSilencePauseLocked() {}
 function releaseScreenWakeLock() {} function setWakeStatus() {}
@@ -192,6 +194,7 @@ assert 'import { createRecordingStore, RECORDING_DB_NAME } from "./recording-sto
 assert 'import { createRecordingRecovery } from "./recording-recovery.js";' in SOURCE
 FUNCTIONS = (
     (Path(__file__).resolve().parents[1] / "js/recording-download.js").read_text().replace("export ", "")
+    + (Path(__file__).resolve().parents[1] / "js/stopped-audio.js").read_text().replace("export ", "")
     + INTEGRITY_SOURCE
     + RECOVERY_SOURCE
     + LIBRARY_SOURCE

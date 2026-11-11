@@ -4,6 +4,7 @@ import { loadWakeDetector, evaluateWakeDetector } from "./wake-detector.js";
 import { localRecordingStamp, requestDownloadFilename } from "./recording-download.js";
 import { createSpeechDetection } from "./speech-detection.js";
 import { speechPolicyEnabled } from "./speech-detection-core.js";
+import { waitForStoppedAudio } from "./stopped-audio.js";
 import { APP_BUILD, displayBuildInfo } from "./build-info.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { createMicrophoneLevelCheck } from "./microphone-level-check.js";
@@ -1071,8 +1072,10 @@ function cleanupAudioMonitor(current) {
         try { current.audioSource.disconnect(); } catch (_) {}
         current.audioSource = null;
     }
+    let audioShutdown = Promise.resolve(true);
     if (current.audioContext && current.audioContext.state !== "closed") {
-        current.audioContext.close().catch(() => {});
+        try { audioShutdown = Promise.resolve(current.audioContext.close()).then(() => true, () => false); }
+        catch (_) { audioShutdown = Promise.resolve(false); }
     }
     current.audioContext = null;
     current.analyser = null;
@@ -1081,6 +1084,7 @@ function cleanupAudioMonitor(current) {
     current.wakeRing = null;
     current.wakeRingPos = 0;
     current.wakeCollectedSamples = 0;
+    return audioShutdown;
 }
 
 function clearPlayback() {
@@ -1497,8 +1501,11 @@ async function startRecording() {
                 lastRecordingPeakBytes = current.peakPendingBytes;
                 current.resolvePauseAnnouncement?.();
                 current.resolvePauseAnnouncement = null;
-                closeCommandWindow({ restorePauseReminder: false });
-                cleanupAudioMonitor(current);
+                const audioCleanupAt = Date.now();
+                const commandShutdown = closeCommandWindow({ restorePauseReminder: false });
+                const audioShutdown = cleanupAudioMonitor(current);
+                // Observe both immediately so a rejected shutdown cannot go unhandled.
+                const stoppedAudioReady = waitForStoppedAudio([commandShutdown, audioShutdown]);
                 stopStream(stream);
                 if (activeSession === current) activeSession = null;
                 publishRecordingDiagnostics();
@@ -1530,8 +1537,13 @@ async function startRecording() {
                 status.textContent = "Finishing audio storage…";
                 await recordingRecovery.finalize(current);
                 setReadyUI();
-                // Announce stop only after the session has left the active recording state.
-                void sayResponse("stopped");
+                const outputReady = await stoppedAudioReady;
+                const newerCapture = Boolean(activeSession) || Boolean(microphoneLevelCheck.state && microphoneLevelCheck.state.phase !== "idle");
+                voiceDiagnostics.record('stopped-audio-ready', {
+                    sessionId: id, outputReady, newerCapture, elapsedMs: Date.now() - audioCleanupAt,
+                    message: outputReady ? 'Capture audio cleanup completed before stop announcement.' : 'Stop announcement skipped: capture audio cleanup failed or timed out.'
+                });
+                if (outputReady && !newerCapture) void sayResponse("stopped");
                 await renderRecoverableSessions();
             } finally {
                 recordingRecovery.finish(current);

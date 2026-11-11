@@ -254,3 +254,7 @@ button:active {
 .voice-suspend-button{background:transparent;color:var(--accent-dark);border:1px solid var(--border);padding:9px 14px;font-size:14px}.voice-suspend-button[aria-pressed=true]{background:#fff2d9;border-color:#9b6b21;color:#65420e}.voice-suspend-button[hidden],#audioCommandsSuspensionStatus[hidden]{display:none}#audioCommandsSuspensionStatus{max-width:350px;margin:0;text-align:center}
 
 .settings-launcher #settingsButton[data-enabled=true] .settings-option-caption{font-weight:700}.settings-enabled-badge{display:inline-block;padding:0 5px;border-radius:8px;background:var(--accent-dark);color:white;font-size:10px;font-weight:600;line-height:1.6;vertical-align:middle}.settings-enabled-badge[hidden]{display:none}
+
+.voice-diagnostics-section { grid-template-columns:minmax(0,1fr); margin-top:14px; }
+.voice-diagnostics-section > div { min-width:0; }
+.voice-diagnostics-section h4 { margin:0; }

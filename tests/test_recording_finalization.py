@@ -267,6 +267,38 @@ class RecordingFinalizationTests(unittest.TestCase):
     def test_finalization_and_integrity(self):
         evaluate(MOCKS + FUNCTIONS + EXTRA + 'function errorHandler(event) {' + error_body + '}\n' + TESTS)
 
+    def test_stop_announcement_waits_for_listener_and_context_shutdown(self):
+        evaluate(MOCKS + FUNCTIONS + EXTRA + r"""
+globalThis.testResult='pending';
+(async()=>{
+ const current=healthy('output-order');
+ let listenerDone,contextDone;const spoken=[];
+ const listener=new Promise(resolve=>listenerDone=resolve),context=new Promise(resolve=>contextDone=resolve);
+ closeCommandWindow=()=>listener;cleanupAudioMonitor=()=>context;sayResponse=name=>{spoken.push(name);return Promise.resolve();};
+ const ending=stopHandler();await flush();
+ assert(metadataStore.get(current.id).state==='completed'&&spoken.length===0,'storage finalizes while announcement waits for cleanup');
+ listenerDone(true);await flush();assert(spoken.length===0,'listener completion alone does not permit announcement');
+ contextDone(true);await ending;assert(spoken.join(',')==='stopped','announce only after both shutdowns complete');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack));
+""")
+
+    def test_stuck_or_failed_audio_cleanup_suppresses_only_announcement(self):
+        evaluate(MOCKS + FUNCTIONS + EXTRA + r"""
+globalThis.testResult='pending';
+(async()=>{
+ const current=healthy('output-timeout');const spoken=[];
+ closeCommandWindow=()=>new Promise(()=>{});cleanupAudioMonitor=()=>Promise.resolve(true);sayResponse=name=>spoken.push(name);
+ const ending=stopHandler();await flush();
+ assert(metadataStore.get(current.id).state==='completed','saved audio finalization is independent of stuck listener');
+ for(const callback of [...timers.values()])callback();await ending;
+ assert(spoken.length===0&&current.finalizationFinished&&!writingSessions.has(current.id),'timeout releases finalization ownership without announcing during capture');
+ const failed=await waitForStoppedAudio([Promise.reject(Error('shutdown failed')),Promise.resolve(true)]);
+ assert(failed===false,'failed cleanup is observed without unhandled rejection');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack));
+""")
+
     def test_recovery_component(self):
         evaluate(MOCKS + INTEGRITY_SOURCE + RECOVERY_SOURCE + COMPONENT_TESTS)
 

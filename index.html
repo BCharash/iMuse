@@ -184,15 +184,25 @@
             <label class="settings-check"><input id="voiceDiagnosticsEnabled" type="checkbox" checked> Enable voice diagnostics</label>
             <p id="voiceDiagnosticsStatus" class="settings-note" role="status">On · latest 500 events. This page only; download before reloading. No audio is logged.</p>
             <p class="settings-note">Voice diagnostics help explain missed or unexpected voice actions. They record recognition scores and timing, not audio.</p>
-            <div class="voice-diagnostic-actions"><button id="toggleVoiceDiagnostics" type="button" aria-expanded="false" aria-controls="voiceDiagnosticsView">Show diagnostics</button><button id="copyVoiceDiagnostics" type="button">Copy diagnostics</button><button id="downloadVoiceDiagnostics" type="button" disabled>Download diagnostics</button><button id="clearVoiceDiagnostics" type="button" disabled>Clear diagnostics</button></div>
-            <p class="settings-note">Keeps the latest 500 score/timing events. Download JSON to keep a copy before reloading.</p>
+            <button id="clearVoiceDiagnostics" type="button" disabled>Clear all voice diagnostics</button>
+            <p class="settings-note">Both sections use the same retained history. Clear removes that history from both. No audio is logged.</p>
+            <section class="settings-group voice-diagnostics-section" aria-label="Voice recognition results">
+                <h4>Voice recognition results</h4>
+                <p class="settings-note">A readable summary of what iMuse accepted while listening for Go/Stop or Yes/No. Copy and Download results contain this summary (up to 30 recent listening periods).</p>
+                <div class="voice-diagnostic-actions"><button id="toggleRecognitionResults" type="button" aria-expanded="false" aria-controls="voiceDiagnosticsView">Show results</button><button id="copyRecognitionResults" type="button">Copy results</button><button id="downloadRecognitionResults" type="button">Download results</button></div>
             <div id="voiceDiagnosticsView" hidden>
                 <p id="voiceDiagnosticsSummary" class="settings-note"></p>
                 <button id="refreshVoiceDiagnostics" type="button">Refresh view</button>
-                <h4>Voice recognition results</h4><p class="settings-note">Each row shows what iMuse heard while listening for Go/Stop or Yes/No, whether it accepted a word, and how its score compared with your threshold. Use this when a command is missed or triggered unexpectedly.</p>
                 <div class="voice-diagnostics-scroll"><table class="voice-diagnostics-table"><thead><tr><th>Time</th><th>Window</th><th>Listening for</th><th>Result</th><th>Accepted score / threshold</th><th>After</th><th>Highest Stop score</th></tr></thead><tbody id="voiceDiagnosticsWindows"></tbody></table></div>
-                <details><summary>Detailed troubleshooting log</summary><p class="settings-note">Step-by-step technical details behind the results above, including speech checks, scores, spoken responses and when listening started or stopped. Useful when sharing a problem for investigation; normal recording does not require reviewing this log.</p><div class="voice-diagnostics-scroll"><table class="voice-diagnostics-table"><thead><tr><th>Time</th><th>Window</th><th>Event</th><th>Details</th><th>After</th></tr></thead><tbody id="voiceDiagnosticsEvents"></tbody></table></div></details>
+
             </div>
+            </section>
+            <section class="settings-group voice-diagnostics-section" aria-label="Detailed voice diagnostics">
+                <h4>Detailed voice diagnostics</h4>
+                <p class="settings-note">The individual events behind recognition, including speech checks, scores, prompts and listening start/stop. Copy and Download diagnostics contain this readable log (up to 500 events); Download JSON provides the complete structured data for investigation.</p>
+                <div class="voice-diagnostic-actions"><button id="toggleVoiceDiagnostics" type="button" aria-expanded="false" aria-controls="voiceDiagnosticsDetailView">Show diagnostics</button><button id="copyVoiceDiagnostics" type="button">Copy diagnostics</button><button id="downloadVoiceDiagnostics" type="button" disabled>Download diagnostics</button><button id="downloadVoiceDiagnosticsJSON" type="button">Download JSON</button></div>
+                <div id="voiceDiagnosticsDetailView" hidden><div class="voice-diagnostics-scroll"><table class="voice-diagnostics-table"><thead><tr><th>Time</th><th>Window</th><th>Event</th><th>Details</th><th>After</th></tr></thead><tbody id="voiceDiagnosticsEvents"></tbody></table></div></div>
+            </section>
         </details>
         </section>
         <section id="storageSettingsSection" hidden aria-labelledby="storageSettingsHeading">

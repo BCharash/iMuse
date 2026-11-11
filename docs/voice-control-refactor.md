@@ -4,7 +4,7 @@ Updated 11 November 2026. This is the current production reference. **Build 2026
 
 ## Current checkpoint
 
-Command coordination, wake-model loading and inference routing are extracted. The latest implementation check passed **103 methods across fifteen suites**, including production speech-gate coverage; see the [tests guide](../tests/README.md). The user accepted stage one, stage two and the subsequent race fixes. Do not restart these completed extractions. Build 2026-11-11.1 adds state-specific Silero checking described below. AudioWorklet migration, wake-model tuning and asset fingerprinting remain separate work.
+Command coordination, wake-model loading and inference routing are extracted. The latest implementation check passed **106 methods across fifteen suites**, including production speech-gate coverage; see the [tests guide](../tests/README.md). The user accepted stage one, stage two and the subsequent race fixes. Do not restart these completed extractions. Build 2026-11-11.1 adds state-specific Silero checking described below. AudioWorklet migration, wake-model tuning and asset fingerprinting remain separate work.
 
 ## State-specific Silero speech checking
 
@@ -20,7 +20,7 @@ The existing normalized microphone tap feeds the speech worker independently of 
 
 Advanced diagnostics records a `speech-gate` event for each completed current candidate decision: state, pass/reject, threshold, qualifying blocks/peak, lookback, and bypass reason when applicable. This adds no raw audio logging or persistent speech history.
 
-Automated verification: 103 methods across fifteen suites. An isolated Chrome check used the real local ONNX/WASM model to reject digital silence and accept a bundled spoken prompt, confirmed zero microphone requests during preparation/UI changes, and checked the Settings layout at 390 and 880 pixels. This is wiring/model execution evidence, not false-positive/negative rates, iPhone performance, screen-lock capture or microphone/device acceptance.
+Automated verification: 106 methods across fifteen suites. An isolated Chrome check used the real local ONNX/WASM model to reject digital silence and accept a bundled spoken prompt, confirmed zero microphone requests during preparation/UI changes, and checked the Settings layout at 390 and 880 pixels. This is wiring/model execution evidence, not false-positive/negative rates, iPhone performance, screen-lock capture or microphone/device acceptance.
 
 Focused device checks: enable Audio commands; verify paused defaults and ready status; record without speech gating, pause and deliberately say the wake phrase, then complete the usual command sequence. Test both engines, both state switches, both switches off, immediate post-pause phrases, suspension, repeated pause/resume and starting/stopping another recording. Confirm recorded audio/export remains intact. Observe threshold/decision diagnostics during quiet, noise, conversation and intended phrases before changing defaults. The separate lab remains available for detailed labeling/comparison.
 
@@ -99,7 +99,9 @@ Stop still accepts one winning score at or above the configured threshold, witho
 
 ### Using Advanced diagnostics
 
-Build 2026-11-11.2 adds Show/Hide diagnostics and Copy diagnostics alongside Download/Clear. The viewer starts hidden; Show/Hide changes only visibility, not collection. Copy places the retained diagnostic snapshot (JSON, no audio) on the clipboard, with a Download fallback message if clipboard access fails. Voice recognition results summarizes what was accepted during Go/Stop or Yes/No listening; Detailed troubleshooting log explains the score checks, speech-gate decisions, prompts and listener lifecycle behind those results. These sections help investigate missed or unexpected actions and are not required for normal recording.
+Build 2026-11-11.5 separates **Voice recognition results** (up to 30 summarized listening periods) from **Detailed voice diagnostics** (up to 500 individual events). Each section has independently scoped Show/Hide, Copy and Download controls. Copy and Download use the same formatted rows as that section's display and produce readable text; the detail section additionally offers Download JSON for the full structured snapshot and environment metadata. The structured export can contain more history than the 30-row results view. Each button group sits directly below its section title/explanation. Both views start hidden; visibility does not change collection. One **Clear all voice diagnostics** action clears the shared underlying history and both views. Clipboard failures offer Download as the fallback. No audio is logged.
+
+The stop announcement now waits for listener and AudioContext shutdown, with a bounded failure/timeout path. See the [iPhone regression investigation](recording-investigation.md#iphone-stop-announcement-output-regression); this is a tested ordering correction, not a verified receiver-routing fix.
 
 1. Open **Settings → Voice commands → Advanced voice settings** for voice diagnostics. **Settings → Storage → Advanced storage settings** holds Recording and storage diagnostics plus the opt-in Recording preservation test. Voice diagnostics are checked by default on each load; failure testing remains off.
 2. **Command attempts** appears directly when Advanced opens; there is no extra View button. One row describes a listening period and the command accepted, score/threshold and elapsed time. A Yes/No confirmation is a separate row. The summary counts recognized Go and Stop commands without claiming the speech was intentional.

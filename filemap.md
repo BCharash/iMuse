@@ -114,9 +114,10 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [js/speech-detection-core.js](js/speech-detection-core.js) | Production speech state policy, score decisions, 16 kHz streaming resampling and Silero 64-sample context. |
 | [js/speech-detection-worker.js](js/speech-detection-worker.js) | Dedicated production continuous Silero worker; loads pinned local assets and resets recurrent state/history per listening interval. |
 | [js/speech-detection.js](js/speech-detection.js) | Warmed speech-worker lifecycle, bounded pending packets, timeout/error handling and stale-result cancellation; owns no microphone. |
+| [js/stopped-audio.js](js/stopped-audio.js) | Waits for capture-side audio shutdown before the stop announcement, with bounded timeout/failure handling independent of audio preservation. |
 | [js/storage-persistence.js](js/storage-persistence.js) | Browser storage-persistence requests/status and Storage Settings presentation. |
 | [js/voice-controller.js](js/voice-controller.js) | Wake-to-command episodes, listening-window/countdown, Go/Stop and Yes/No sequencing through recorder capabilities. |
-| [js/voice-diagnostics.js](js/voice-diagnostics.js) | Bounded page-memory voice-event log, readable Advanced viewer and diagnostic export. |
+| [js/voice-diagnostics.js](js/voice-diagnostics.js) | Bounded page-memory voice-event log, separate results/detail views and matching readable exports plus full JSON. |
 | [js/wake-detector.js](js/wake-detector.js) | Loads the selected wake adapter and routes inference; recorder retains microphone, buffers and timing ownership. |
 
 ## Heed wake engine

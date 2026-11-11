@@ -75,6 +75,20 @@ assert(report.windows[3].result==='Partial window'&&report.windows[3].sessionId=
 globalThis.testResult='PASS';
 """)
 
+    def test_readable_exports_match_the_two_views(self):
+        evaluate(SOURCE + r"""
+const assert=(v,m)=>{if(!v)throw Error(m);};
+const snapshot={events:[
+ {type:'command-accepted',windowId:1,sessionId:'a',phase:'go-stop',command:'stop',score:.9,threshold:.8,at:'2026-11-11T12:00:00Z',elapsedMs:100},
+ {type:'speech-gate',message:'paused: speech rejected',at:'2026-11-11T12:00:01Z'}]};
+const results=voiceRecognitionReport(snapshot),details=voiceDiagnosticReport(snapshot);
+assert(results.startsWith('Voice recognition results')&&results.includes('Accepted Stop')&&results.includes('0.90 / 0.80'),'results export contains formatted summary');
+assert(!results.includes('speech rejected')&&details.includes('speech rejected')&&details.includes('Command accepted'),'details export contains events absent from summary');
+assert(recognitionRows(snapshot)[0].every(value=>results.includes(String(value))),'displayed summary cells are all exported');
+assert(activityRows(snapshot).every(row=>row.every(value=>details.includes(String(value)))),'displayed event cells are all exported');
+globalThis.testResult='PASS';
+""")
+
     def test_advanced_readable_view_refresh_clear_and_disable(self):
         evaluate(r"""
 const assert=(value,message)=>{if(!value)throw Error(message);};
@@ -85,7 +99,7 @@ const el=id=>document.getElementById(id);el('advancedSettings').open=true;
 initializeVoiceDiagnostics();const toggle=el('voiceDiagnosticsEnabled');
 assert(toggle.checked&&!el('downloadVoiceDiagnostics').disabled,'default collection and startup event are visible without a second View button');
 assert(el('audioSettingsSection').children.at(-1)===el('advancedSettings'),'voice Advanced remains at the bottom of the voice category');
-assert(el('voiceDiagnosticsSummary').textContent.includes('No command attempts logged yet')&&el('voiceDiagnosticsEvents').children.length===1,'startup entry proves collector/viewer are connected');
+assert(el('voiceDiagnosticsSummary').textContent.includes('No voice recognition results yet')&&el('voiceDiagnosticsEvents').children.length===1,'startup entry proves collector/viewer are connected');
 const metadata={windowId:4,sessionId:'session',phase:'go-stop'};
 voiceDiagnostics.record('command-accepted',{...metadata,command:'stop',score:.8,threshold:.7,elapsedMs:4200});
 assert(el('voiceDiagnosticsWindows').children[0].children[3].textContent==='Accepted Stop','live state boundary updates readable window result');
