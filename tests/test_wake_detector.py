@@ -16,7 +16,8 @@ def module_source(path):
 
 WAKE_LOADER = module_source('js/wake-detector.js')
 ROUTING = (
-    WAKE_LOADER
+    module_source('js/speech-detection-core.js')
+    + WAKE_LOADER
     + between('const WAKE_DETECT_COOLDOWN_MS =', 'let wakeWord =')
     + between('async function initializeWakeWord()', '// Recorder-owned capabilities:')
     + between('function resetWakeAudioBuffer(', 'async function requestScreenWakeLock(')
@@ -55,6 +56,9 @@ function refreshIdleWakeStatus(){statuses.push('idle');}
 function handleWakeDetected(current){triggers.push(current);}
 function closeCommandWindow(){closeCalls++;}
 function syncAudioCommandsSuspension(){}function preloadCommandModel(){}
+function prepareSpeechDetection(){}
+const speechDetector={reset(){},feed(){return null;},decide:async()=>({valid:true,pass:true})};
+const speechEvents=[];const voiceDiagnostics={record(type,details){speechEvents.push({type,...details});}};
 function loadHeedWakeWord(options){const gate=deferred();loads.push({name:'heed',options,...gate});return gate.promise;}
 function loadVoicuteWakeWord(options){const gate=deferred();loads.push({name:'voicute',options,...gate});return gate.promise;}
 function seed(state='recording',length=4096){
@@ -92,6 +96,41 @@ def check(script, source=ROUTING + SETTINGS, harness=HARNESS):
 
 
 class WakeRoutingTests(unittest.TestCase):
+    def test_production_speech_gate_rejects_or_accepts_both_engines(self):
+        check(r"""
+ settings.speechDuringPause=true;
+ for(const name of ['heed','voicute'])for(const pass of [false,true]){
+  const current=seed('paused'),engine=install(name);append(current,new Float32Array(2048));
+  engine.consume=engine.predict=async()=>({triggered:true,word:'wake',prob:.99});
+  speechDetector.decide=async()=>({valid:true,pass});const before=triggers.length;
+  await runWakeWordInference(current,16000);await flush();
+  assert(triggers.length===before+(pass?1:0),'speech decision applies before command window: '+name);
+  assert(speechEvents.at(-1).type==='speech-gate'&&speechEvents.at(-1).message.includes(pass?'speech accepted':'speech rejected'),'readable speech decision logged');
+ }
+ settings.speechDuringPause=false;speechDetector.decide=()=>{throw Error('disabled speech gate must not run');};
+ const current=seed('paused'),engine=install();append(current,new Float32Array(2048));engine.consume=async()=>({triggered:true});
+ const before=triggers.length;await runWakeWordInference(current,16000);
+ assert(triggers.length===before+1,'both state controls off preserve previous wake flow');
+""")
+
+    def test_delayed_speech_result_cannot_cross_state_session_or_arm(self):
+        check(r"""
+ settings.speechDuringPause=true;
+ for(const change of ['state','session','arm','suspend','commands','invalid']){
+  const current=seed('paused'),engine=install(),gate=deferred();append(current,new Float32Array(2048));
+  engine.consume=async()=>({triggered:true});speechDetector.decide=()=>gate.promise;
+  const before=triggers.length;await runWakeWordInference(current,16000);
+  if(change==='state')current.recorder.state='recording';
+  if(change==='session')seed();
+  if(change==='arm')current.wakeGeneration++;
+  if(change==='suspend')voiceController.suspended=true;
+  if(change==='commands')voiceController.active=true;
+  gate.resolve({valid:change!=='invalid',pass:true});await flush();
+  assert(triggers.length===before&&!current.speechWakeRequest,'stale speech rejected and request released: '+change);
+  voiceController.suspended=false;voiceController.active=false;
+ }
+""")
+
     def test_extracted_evaluator_uses_live_callbacks_without_recorder_state(self):
         check(r"""
  for(const name of ['heed','voicute']){

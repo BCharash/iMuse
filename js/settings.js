@@ -1,9 +1,9 @@
 import { createStoragePersistence, storagePersistenceLabel } from "./storage-persistence.js";
 
-// Stage 1: configuration only. The existing wake-word implementation remains
-// unchanged until the Heed/TensorFlow integration is tested in later stages.
+// Persisted recognition preferences; recording/microphone ownership stays in recorder.js.
 const KEY = "imuse.voice-settings.v1";
 const defaults = Object.freeze({audioCommands:false, wakeEngine:"voicute", wakeThreshold:0.67, voicuteThreshold:0.90, commandWindow:5, silencePauseSeconds:5, silenceThresholdDb:-36.5, wakeMinimumDb:-40, autoGainControl:false, noiseSuppression:true, echoCancellation:true,
+    speechDuringRecord:false, speechDuringPause:true, speechThreshold:0.6, speechMinFrames:2, speechLookbackMs:1000,
     goThreshold:0.60, stopThreshold:0.85, yesThreshold:0.85, noThreshold:0.55, overlapFactor:"auto"});
 const allowedOverlap = new Set(["auto", "0.5", "0.75", "0.9"]);
 const clamp = (value,min,max,fallback) => Number.isFinite(Number(value)) ? Math.min(max,Math.max(min,Number(value))) : fallback;
@@ -11,6 +11,11 @@ export function loadSettings() {
     let stored = {};
     try { stored = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (_) { /* storage unavailable */ }
     return {audioCommands:stored.audioCommands === true,
+        speechDuringRecord:stored.speechDuringRecord === true,
+        speechDuringPause:stored.speechDuringPause !== false,
+        speechThreshold:clamp(stored.speechThreshold,.1,.95,defaults.speechThreshold),
+        speechMinFrames:Math.round(clamp(stored.speechMinFrames,1,6,defaults.speechMinFrames)),
+        speechLookbackMs:Math.round(clamp(stored.speechLookbackMs,250,2000,defaults.speechLookbackMs)),
         wakeEngine:stored.wakeEngine === "heed" ? "heed" : "voicute",
         voicuteThreshold:clamp(stored.voicuteThreshold,.3,.95,defaults.voicuteThreshold),
         wakeThreshold:clamp(stored.wakeThreshold,.3,.99,defaults.wakeThreshold),
@@ -55,7 +60,7 @@ for(const [trigger,section] of settingsCategories)trigger.addEventListener('clic
     updateAutomaticOverlapLabel();
     window.dispatchEvent(new Event('imuse-settings-section-changed'));
 });
-const controls = {autoGainControl:"autoGainControl",noiseSuppression:"noiseSuppression",echoCancellation:"echoCancellation",silenceThresholdDb:"silenceThresholdDb",wakeMinimumDb:"wakeMinimumDb",silencePauseSeconds:"silencePauseSeconds",wakeEngine:"wakeEngine",voicuteThreshold:"voicuteThreshold",audioCommands:"audioCommandsToggle",wakeThreshold:"wakeThreshold",commandWindow:"commandWindow",
+const controls = {speechDuringRecord:"speechDuringRecord",speechDuringPause:"speechDuringPause",speechThreshold:"speechThreshold",speechMinFrames:"speechMinFrames",speechLookbackMs:"speechLookbackMs",autoGainControl:"autoGainControl",noiseSuppression:"noiseSuppression",echoCancellation:"echoCancellation",silenceThresholdDb:"silenceThresholdDb",wakeMinimumDb:"wakeMinimumDb",silencePauseSeconds:"silencePauseSeconds",wakeEngine:"wakeEngine",voicuteThreshold:"voicuteThreshold",audioCommands:"audioCommandsToggle",wakeThreshold:"wakeThreshold",commandWindow:"commandWindow",
     goThreshold:"goThreshold",stopThreshold:"stopThreshold",yesThreshold:"yesThreshold",noThreshold:"noThreshold",overlapFactor:"overlapFactor"};
 let silencePauseLocked = false;
 let microphoneProcessingLocked = false;
@@ -87,11 +92,12 @@ function render() {
     for (const [key,id] of Object.entries(controls)) {
         const el=document.getElementById(id);if (!el) continue;
         if (el.type === "checkbox") el.checked = settings[key]; else el.value=String(settings[key]);
-        const output=document.getElementById(key+"Value");if (output) output.textContent = ["wakeThreshold","voicuteThreshold","goThreshold","stopThreshold","yesThreshold","noThreshold"].includes(key) ? Number(settings[key]).toFixed(2) : String(settings[key]);
+        const output=document.getElementById(key+"Value");if (output) output.textContent = ["speechThreshold","wakeThreshold","voicuteThreshold","goThreshold","stopThreshold","yesThreshold","noThreshold"].includes(key) ? Number(settings[key]).toFixed(2) : String(settings[key]);
     }
     document.getElementById("heedThresholdRow").hidden = settings.wakeEngine !== "heed";
     document.getElementById("voicuteThresholdRow").hidden = settings.wakeEngine !== "voicute";
     document.getElementById("voiceSettings").querySelectorAll("input,select").forEach(el => el.disabled = !settings.audioCommands);
+    document.querySelectorAll("#speechAdvancedSettings input").forEach(el => el.disabled = !settings.audioCommands);
     setSilencePauseLocked(silencePauseLocked);
     setMicrophoneProcessingLocked(microphoneProcessingLocked);
 }

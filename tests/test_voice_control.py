@@ -25,6 +25,8 @@ MANUAL = between('recordButton.addEventListener("click",', 'deleteButton.addEven
 HARNESS = r"""
 const assert=(value,message)=>{if(!value)throw Error(message);};
 const console={warn(){},error(){}};
+const speechDetector={reset(){}};
+function prepareSpeechDetection(){}
 const order=[],listeners=[],prompts=[],arms=[],metadata=[];
 let clock=0,activeSession=null,loadGate=null,startGate=null,stopGate=null,loadError=null,stopError=null;
 let loads=0,shutdowns=0,promptGate=null,promptOK=true,beeps=0;
@@ -77,6 +79,7 @@ class VoiceControlTests(unittest.TestCase):
         initialize=between('async function initializeWakeWord()', '// Recorder-owned capabilities:')
         evaluate(r"""
 globalThis.testResult='pending';const assert=(v,m)=>{if(!v)throw Error(m);};
+const speechDetector={reset(){}};function prepareSpeechDetection(){}
 let activeSession=null,wakeWord=null,wakeWordLoadError=null,selectedWakeEngine='heed',WAKE_THRESHOLD=.8,wakeWordPhrase='Hey Doc',text='';
 let wakeModelLoadGeneration=0;
 const settings={audioCommands:true,wakeEngine:'heed',wakeThreshold:.8,voicuteThreshold:.9},getSettings=()=>settings;

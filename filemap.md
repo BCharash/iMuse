@@ -1,6 +1,6 @@
 # iMuse file map
 
-Updated 5 November 2026. Paths are relative to the repository root. Click a filename to open it, or search this page for its exact name. Every tracked repository file is listed individually, including models, vendor runtimes and archived tools; this map also lists itself. Git internals, local OS files and generated Python caches are excluded.
+Updated 11 November 2026. Paths are relative to the repository root. Click a filename to open it, or search this page for its exact name. Every tracked repository file is listed individually, including models, vendor runtimes and archived tools; this map also lists itself. Git internals, local OS files and generated Python caches are excluded.
 
 ## Find the right file quickly
 
@@ -14,6 +14,7 @@ Updated 5 November 2026. Paths are relative to the repository root. Click a file
 | Recovery, finalization and emergency audio | [js/recording-recovery.js](js/recording-recovery.js) |
 | Microphone ownership and selection | [js/microphone-manager.js](js/microphone-manager.js) |
 | Voice commands and listening windows | [js/voice-controller.js](js/voice-controller.js) |
+| Pause/record speech gating | [js/speech-detection.js](js/speech-detection.js) |
 | Wake model selection/loading | [js/wake-detector.js](js/wake-detector.js) |
 | Production appearance | [css/style.css](css/style.css) |
 | Lab queue and fresh-Silero comparison | [js/lab/app.js](js/lab/app.js) |
@@ -43,7 +44,7 @@ iMuse/
 
 Production starts at `index.html`, which loads `js/settings.js` and `js/recorder.js`. The recorder connects capture, storage/recovery, voice control and the main player. Saved audio lives in browser IndexedDB, not in a repository folder. The current player also retains an audio Blob and its default filename independently of that database.
 
-The current lab starts at `lab.html` and uses separate workers and storage. Its queue-limit findings belong to the lab; they do not establish the same defect in production. Bundled Whisper and Silero are lab dependencies, not implemented production transcription or speech gating.
+The current lab starts at `lab.html` and uses separate workers and storage. Its queue-limit findings belong to the lab; they do not establish the same defect in production. Bundled Whisper remains lab-only. Production state-specific Silero now shares the pinned VAD runtime/model assets, using its own worker and lifecycle; it does not import lab UI, queues or comparison logic.
 
 ## Jump to a folder
 
@@ -110,6 +111,9 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [js/recording-storage-coordinator.js](js/recording-storage-coordinator.js) | Serializes storage operations and manages exclusive writer ownership using Web Locks. |
 | [js/recording-store.js](js/recording-store.js) | Production IndexedDB schema/version and session/chunk/diagnostic reads, writes, restore and deletion transactions. |
 | [js/settings.js](js/settings.js) | Settings controls, persisted preferences, validation, microphone reports/meter and settings-change notifications. |
+| [js/speech-detection-core.js](js/speech-detection-core.js) | Production speech state policy, score decisions, 16 kHz streaming resampling and Silero 64-sample context. |
+| [js/speech-detection-worker.js](js/speech-detection-worker.js) | Dedicated production continuous Silero worker; loads pinned local assets and resets recurrent state/history per listening interval. |
+| [js/speech-detection.js](js/speech-detection.js) | Warmed speech-worker lifecycle, bounded pending packets, timeout/error handling and stale-result cancellation; owns no microphone. |
 | [js/storage-persistence.js](js/storage-persistence.js) | Browser storage-persistence requests/status and Storage Settings presentation. |
 | [js/voice-controller.js](js/voice-controller.js) | Wake-to-command episodes, listening-window/countdown, Go/Stop and Yes/No sequencing through recorder capabilities. |
 | [js/voice-diagnostics.js](js/voice-diagnostics.js) | Bounded page-memory voice-event log, readable Advanced viewer and diagnostic export. |
@@ -147,7 +151,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 
 | File | Function |
 | --- | --- |
-| [js/lab/SOURCES.md](js/lab/SOURCES.md) | Pinned lab dependency/model sources, versions, licenses and offline packaging requirements. |
+| [js/lab/SOURCES.md](js/lab/SOURCES.md) | Pinned dependency/model sources, versions, licenses and offline packaging; selected VAD assets are shared with production. |
 | [js/lab/app.js](js/lab/app.js) | Lab UI/orchestration: recording, analysis queue forwarding, fresh comparison, review display, naming and offline preparation. |
 | [js/lab/capture.js](js/lab/capture.js) | Lab MediaRecorder lifecycle, chunk persistence, stop/finalization and failure retention. |
 | [js/lab/core.js](js/lab/core.js) | Shared lab audio/math utilities, streaming resampling, Silero context/gates, naming and diagnostic helpers. |
@@ -195,8 +199,8 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [js/lab/vendor/licenses/whisper-MIT.txt](js/lab/vendor/licenses/whisper-MIT.txt) | Whisper MIT license notice. |
 | [js/lab/vendor/ort-wasm-simd-threaded.mjs](js/lab/vendor/ort-wasm-simd-threaded.mjs) | Matching ONNX Runtime WASM loader for lab wake/Silero inference. |
 | [js/lab/vendor/ort-wasm-simd-threaded.wasm](js/lab/vendor/ort-wasm-simd-threaded.wasm) | Matching compiled WASM runtime for lab wake/Silero inference. |
-| [js/lab/vendor/ort.min.mjs](js/lab/vendor/ort.min.mjs) | Pinned ONNX Runtime Web JavaScript bundle for lab wake/Silero models. |
-| [js/lab/vendor/silero_vad_v5.onnx](js/lab/vendor/silero_vad_v5.onnx) | Bundled Silero v5 speech-presence model; does not recognize a wake phrase. |
+| [js/lab/vendor/ort.min.mjs](js/lab/vendor/ort.min.mjs) | Pinned ONNX Runtime Web bundle for lab wake/Silero and production speech detection. |
+| [js/lab/vendor/silero_vad_v5.onnx](js/lab/vendor/silero_vad_v5.onnx) | Bundled Silero v5 speech-presence model used by the lab and production speech gate; does not recognize a wake phrase. |
 | [js/lab/vendor/transformers.min.js](js/lab/vendor/transformers.min.js) | Pinned Transformers.js bundle used by lab Whisper inference. |
 | [js/lab/vendor/voicute.js](js/lab/vendor/voicute.js) | Pinned third-party Voicute wake-engine implementation for the lab. |
 | [js/lab/vendor/whisper/ort-wasm-simd-threaded.jsep.mjs](js/lab/vendor/whisper/ort-wasm-simd-threaded.jsep.mjs) | Whisper/Transformers.js matching ONNX Runtime WASM loader, separate from wake/Silero runtime. |
@@ -255,6 +259,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [tests/test_recording_download.py](tests/test_recording_download.py) | Local timestamps, portable names, dialog preview/confirmation/cancellation, single-dialog ownership, actual download format and URL behavior, current-playback button creation/start-time naming and retained downloads without database metadata, and saved/emergency cancellation outside the writer lock. |
 | [tests/test_recording_finalization.py](tests/test_recording_finalization.py) | Complete recovery module and recorder wiring: integrity/error/delay handling, fullest-copy retention, truthful status, confirmed discard with failure retention and current-player isolation. |
 | [tests/test_recording_storage.py](tests/test_recording_storage.py) | Complete store module plus recorder wiring: ordering, counters, ownership, competing startup/deletion, abort/restore, diagnostic cleanup, schema and blocked/failed opens. |
+| [tests/test_speech_detection.py](tests/test_speech_detection.py) | Production speech policy, settings, worker warm-up/lifecycle, bounded queue/timeout cancellation and streaming context/resampling regression checks. |
 | [tests/test_storage_persistence.py](tests/test_storage_persistence.py) | Grants/refusals/unsupported APIs, errors/timeouts and automatic Settings refresh. |
 | [tests/test_voice_control.py](tests/test_voice_control.py) | Complete voice controller, recorder session bridge, real pause/manual handlers and finalization entry: prompt/listener ordering, Go shutdown, Stop confirmation, timeout/thresholds, failures, stale sessions, narrow session capabilities, preserved deadline semantics, and TensorFlow clone/override/startup teardown. |
 | [tests/test_voice_diagnostics.py](tests/test_voice_diagnostics.py) | Default-on 500-event bounded memory, safe copies/no raw audio, overflow, human-readable window summaries/partial data, automatic display/Settings refresh/clear/disable controls, observer failures, runtime build label and build metadata in voice/recording diagnostic exports. |

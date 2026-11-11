@@ -1,6 +1,6 @@
 # iMuse documentation
 
-Updated 5 November 2026. Start here; current findings take precedence over older plans and journal entries.
+Updated 11 November 2026. Start here; current findings take precedence over older plans and journal entries.
 
 | Document | Purpose |
 | --- | --- |
@@ -18,9 +18,11 @@ Updated 5 November 2026. Start here; current findings take precedence over older
 
 ## Current checkpoint
 
-**Current accepted download checkpoint: build 2026-11-05.6.** The user reported that the fix worked: the current player remains downloadable after permanent deletion of its saved recording. Download prompts offer a fixed local recording-start prefix and an editable description, initially `iMuse`. Naming applies to that download only. The current player retains its audio and default filename until cleared/replaced; no additional deletion message is shown. Saved-list titles are unchanged; Whisper naming and a broader file-save workflow remain future work. Automated validation passes **94 methods across fourteen suites**. Device/browser details of the successful user check were not specified; it is not complete device acceptance. See [download naming](recording-investigation.md#download-naming).
+**Production candidate 2026-11-11.1:** state-specific Silero speech checking is implemented, with pause on/recording off by default, a dedicated Settings group and advanced tuning. The warmed worker uses the existing microphone stream only in enabled states; it checks wake acceptance without changing Go/Stop/Yes/No or automatic silence pause. All 103 automated methods pass across fifteen suites; isolated Chrome exercised the real model, no-microphone preparation and responsive Settings. Device/acoustic acceptance is pending. See [production speech checking](voice-control-refactor.md#state-specific-silero-speech-checking).
 
-Recording preservation's four stages, library/store/recovery extractions, command-controller extraction, Advanced diagnostics and the temporary microphone check/countdown are implemented. The user reported the microphone check/countdown and earlier preservation/refactoring checks worked. The latest automated checkpoint is **94 tests across fourteen suites**, including download behavior, 26 wake-detector methods and build-identity coverage; full device acceptance remains bounded by the recording brief.
+**Current accepted download checkpoint: build 2026-11-05.6.** The user reported that the fix worked: the current player remains downloadable after permanent deletion of its saved recording. Download prompts offer a fixed local recording-start prefix and an editable description, initially `iMuse`. Naming applies to that download only. The current player retains its audio and default filename until cleared/replaced; no additional deletion message is shown. Saved-list titles are unchanged; Whisper naming and a broader file-save workflow remain future work. That download implementation checkpoint passed **94 methods across fourteen suites**. Device/browser details of the successful user check were not specified; it is not complete device acceptance. See [download naming](recording-investigation.md#download-naming).
+
+Recording preservation's four stages, library/store/recovery extractions, command-controller extraction, Advanced diagnostics and the temporary microphone check/countdown are implemented. The user reported the microphone check/countdown and earlier preservation/refactoring checks worked. The latest automated checkpoint is **103 tests across fifteen suites**, including download behavior, 28 wake-detector methods and build-identity coverage; full device acceptance remains bounded by the recording brief.
 
 Production build identification uses **YYYY-MM-DD.N**, starting at **2026-11-05.1**, below the Settings selector rectangle and in voice/recording diagnostic exports. The [build guide](build-versioning.md) defines when to increment it and why this display does not certify cache consistency across all assets.
 
@@ -32,7 +34,7 @@ Conventional asset fingerprinting/build automation, with readable source filenam
 
 The iPhone installed-PWA capture failure remains unresolved; the Safari tab is the reported working web route. Native feasibility testing is deferred until a suitable cable is available. If native iMuse is chosen, the user wants transcription and multiple cached models while retaining Memora web and web iMuse for other platforms. Recording always takes priority over transcription/naming. These are future requirements, not implemented native features or a production scheduler. The native proposal owns that scope.
 
-The user-approved grouped Settings launcher and temporary Audio commands Suspend/Resume control are implemented. The persisted Audio commands preference remains locked during recording. Suspension blocks voice actions and cancels pending command episodes without stopping capture; see the [voice-control plan](voice-control-refactor.md#temporary-suspension-and-grouped-settings) for semantics, tests and focused device acceptance. Silero remains a separate lab experiment.
+The user-approved grouped Settings launcher and temporary Audio commands Suspend/Resume control are implemented. The persisted Audio commands preference remains locked during recording. Suspension blocks voice actions and cancels pending command episodes without stopping capture; see the [voice-control plan](voice-control-refactor.md#temporary-suspension-and-grouped-settings) for semantics, tests and focused device acceptance. The lab’s fresh-Silero comparison remains separate from the production continuous speech gate.
 
 ## Document maintenance
 

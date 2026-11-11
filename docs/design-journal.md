@@ -1654,3 +1654,14 @@ The user chose local recording-start time for download filenames, with a fixed `
 Build .4 introduced the dialog; .5 connected creation of the main player's Download button. Testing then established that audio remained playable after permanent deletion but Download failed because it still looked up deleted database metadata. Build .6 keeps a filename snapshot with the player's audio Blob, removes that lookup, and clears/replaces both together. The user requested no extra deletion message and subsequently reported “okay that worked.” The retained player can download independently of the deleted saved copy until cleared/replaced or the page is lost. Emergency Discard retains its separate explicit cleanup semantics. Device/browser details of this acceptance were not specified.
 
 The user deferred asset fingerprinting/version-maintenance upgrades and further live lab work. Future browser/native saving and Memora integration remain open choices, with Memora intended to retain browser capability. Documentation now links a root-level file map covering all repository files, while subject guides remain authoritative for behavior and acceptance evidence.
+
+
+---
+
+# DJ028 — State-specific production Silero speech gate
+
+**Date:** 11 November 2026. **Status:** Implemented candidate 2026-11-11.1; device/acoustic acceptance pending.
+
+The user authorized pause-only speech checking initially, a warmed model, independent recording/pause controls and advanced speech tuning. Silero checks whether speech evidence accompanies a wake candidate; speech alone does not resume capture. Go/Stop/Yes/No and RMS automatic silence pause remain unchanged. The worker reuses the existing pinned local model/runtime, has no microphone ownership, bounds pending audio and resets history across state/generation/gap boundaries. Readiness/failure does not block Record. No deliberate post-pause wait or fresh-state candidate replay was added.
+
+All 103 automated methods across fifteen suites pass. Isolated Chrome ran the real model on digital silence and a prerecorded spoken prompt, checked Settings behavior/layout at 390 and 880 pixels and observed no microphone requests. This does not establish acoustic accuracy, device speed or background behavior. The separate lab remains available; its comparison and queue experiments are unchanged. See the [production speech reference](voice-control-refactor.md#state-specific-silero-speech-checking) for settings, fallback behavior, ownership and focused device checks.

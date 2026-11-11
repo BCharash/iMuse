@@ -2,6 +2,8 @@ import { playSpokenResponse, prepareSpokenResponses } from "./audio-response-man
 import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSelectionLocked, getRequestedMicrophoneConstraints } from "./microphone-manager.js";
 import { loadWakeDetector, evaluateWakeDetector } from "./wake-detector.js";
 import { localRecordingStamp, requestDownloadFilename } from "./recording-download.js";
+import { createSpeechDetection } from "./speech-detection.js";
+import { speechPolicyEnabled } from "./speech-detection-core.js";
 import { APP_BUILD, displayBuildInfo } from "./build-info.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { createMicrophoneLevelCheck } from "./microphone-level-check.js";
@@ -37,6 +39,8 @@ function assessDeviceClass() {
 
 const deviceClass = assessDeviceClass();
 window.addEventListener("imuse-settings-changed", event => {
+    speechDetector.reset();
+    prepareSpeechDetection();
     const next = event.detail.wakeEngine;
     const threshold = next === "heed" ? event.detail.wakeThreshold : event.detail.voicuteThreshold;
     if (!event.detail.audioCommands) {
@@ -90,6 +94,17 @@ let displayedSessionId = null;
 let displayedRecordingFilename = null;
 let startRequest = 0;
 let lastRecordingPeakBytes = 0;
+const speechDetector = createSpeechDetection({ onStatus: message => {
+    const label = document.getElementById("speechDetectionStatus");
+    if (label) label.textContent = message;
+} });
+function prepareSpeechDetection() {
+    const settings = getSettings();
+    if (settings.audioCommands && (settings.speechDuringPause || settings.speechDuringRecord)) {
+        void speechDetector.prepare().catch(() => {});
+    }
+}
+
 const recordingRecovery = createRecordingRecovery({
     recordingStorage, status, getSession, getChunks, putSession, putSessionNow,
     assertSessionIdle, showPlayback, downloadAudioBlob, sessionFilename,
@@ -679,7 +694,7 @@ async function runWakeWordInference(current, sampleRate) {
     if (
         !wakeWord ||
         !current.wakeDetectorEnabled ||
-        current.wakeInferenceBusy ||
+        current.wakeInferenceBusy || current.speechWakeRequest ||
         activeSession !== current ||
         current.discard ||
         !["paused", "recording"].includes(current.recorder.state) ||
@@ -693,6 +708,8 @@ async function runWakeWordInference(current, sampleRate) {
     const isCurrent = () => activeSession === current && !current.discard &&
         getSettings().audioCommands && wakeWord === detector && selectedWakeEngine === engineName &&
         wakeModelLoadGeneration === loadGeneration && current.wakeGeneration === generation;
+    const state = current.recorder.state;
+    const speechTicket = current.speechTicket;
     current.wakeInferenceBusy = true;
     return evaluateWakeDetector({
         engineName,
@@ -708,7 +725,11 @@ async function runWakeWordInference(current, sampleRate) {
         isEnabled: () => current.wakeDetectorEnabled,
         isCurrent,
         isListening: () => ["paused", "recording"].includes(current.recorder.state),
-        onTrigger: () => { void handleWakeDetected(current); },
+        onTrigger: () => {
+            if (current.recorder.state !== state) return;
+            if (!speechPolicyEnabled(getSettings(), state)) { void handleWakeDetected(current); return; }
+            void acceptSpeechCheckedWake(current, state, speechTicket, isCurrent);
+        },
         onError: error => {
             clearWakeDetectorTimers(current);
             console.warn("Wake-word inference failed:", error);
@@ -716,6 +737,25 @@ async function runWakeWordInference(current, sampleRate) {
         },
         onComplete: () => { current.wakeInferenceBusy = false; }
     });
+}
+
+async function acceptSpeechCheckedWake(current, state, ticket, isCurrent) {
+    const request = {};
+    current.speechWakeRequest = request;
+    try {
+        const settings = getSettings();
+        const decision = await speechDetector.decide(ticket, settings);
+        if (!decision.valid || !isCurrent() || current.recorder.state !== state ||
+            !current.wakeDetectorEnabled || voiceController.active || voiceController.suspended ||
+            current.speechWakeRequest !== request) return;
+        const message = decision.bypassed
+            ? `${state}: speech check bypassed (${decision.reason}). Normal wake recognition continues.`
+            : `${state}: ${decision.pass ? 'speech accepted' : 'speech rejected'} — ${decision.qualifying} qualifying blocks, peak ${Number(decision.peak || 0).toFixed(2)} / threshold ${settings.speechThreshold}.`;
+        voiceDiagnostics.record('speech-gate', { sessionId: current.id, state, ...decision, message });
+        if (decision.pass) void handleWakeDetected(current);
+    } finally {
+        if (current.speechWakeRequest === request) current.speechWakeRequest = null;
+    }
 }
 
 async function requestScreenWakeLock() {
@@ -812,6 +852,7 @@ function clearWakeDetectorTimers(current) {
 }
 
 async function setupSilenceMonitor(current) {
+    prepareSpeechDetection();
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) {
         console.warn("Web Audio is unavailable; automatic silence pause is disabled.");
@@ -826,7 +867,7 @@ async function setupSilenceMonitor(current) {
         source.connect(analyser);
 
         // Keep one shared microphone stream. This silent Web Audio branch feeds
-        // a rolling buffer for Voicute only; inference runs only while paused.
+        // the existing wake buffer and optional state-specific speech analysis.
         const wakeProcessor = context.createScriptProcessor(2048, 1, 1);
         const wakeSilentGain = context.createGain();
         wakeSilentGain.gain.value = 0;
@@ -847,6 +888,12 @@ async function setupSilenceMonitor(current) {
         wakeProcessor.onaudioprocess = event => {
             if (activeSession !== current || current.discard || !current.wakeRing) return;
             const input = event.inputBuffer.getChannelData(0);
+            const speechEnabled = speechPolicyEnabled(getSettings(), current.recorder.state) && !voiceController.suspended;
+            if (speechEnabled) {
+                current.speechTicket = speechDetector.feed(input, context.sampleRate, `${current.id}:${current.recorder.state}`);
+            } else if (current.speechTicket) {
+                speechDetector.reset(); current.speechTicket = null;
+            }
             for (let i = 0; i < input.length; i++) {
                 current.wakeRing[current.wakeRingPos] = input[i] * 32767;
                 current.wakeRingPos = (current.wakeRingPos + 1) % current.wakeRing.length;
@@ -1002,6 +1049,9 @@ function stopPausedBeep(current) {
 }
 
 function cleanupAudioMonitor(current) {
+    if (activeSession === current) speechDetector.reset();
+    current.speechTicket = null;
+    current.speechWakeRequest = null;
     if (current.silenceCheckTimer !== null && current.silenceCheckTimer !== undefined) {
         window.clearInterval(current.silenceCheckTimer);
         current.silenceCheckTimer = null;
@@ -1389,6 +1439,7 @@ async function startRecording() {
         recorder.addEventListener("pause", async () => {
             logRecordingEvent(current, "recorder-pause", { reason: current.pauseReason || "unspecified" });
             if (activeSession !== current || current.discard) return;
+            speechDetector.reset(); current.speechTicket = null; current.speechWakeRequest = null;
             if (current.activeSinceMs !== null) {
                 current.recordedMs += Math.max(0, performance.now() - current.activeSinceMs);
                 current.activeSinceMs = null;
@@ -1416,6 +1467,7 @@ async function startRecording() {
         recorder.addEventListener("resume", async () => {
             logRecordingEvent(current, "recorder-resume");
             if (activeSession !== current || current.discard) return;
+            speechDetector.reset(); current.speechTicket = null; current.speechWakeRequest = null;
             current.activeSinceMs = performance.now();
             current.metadata.state = "recording";
             current.metadata.lastUpdatedAt = new Date().toISOString();
@@ -1608,6 +1660,7 @@ window.addEventListener("pagehide", () => {
     }
 });
 
+prepareSpeechDetection();
 initializeVoiceDiagnostics();
 initializePreservationTest();
 initialize();

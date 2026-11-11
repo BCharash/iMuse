@@ -1,6 +1,6 @@
 # Wake-word evaluation and offline recorder lab
 
-Updated 5 November 2026. This guide owns wake-model evidence and lab use. Production ownership/refactoring lives in the [voice-control plan](voice-control-refactor.md); future transcription lives in the [native proposal](iMuse%20Swift%20migration%20plan.md). The [detailed lab snapshot](Archive/recorder-lab-guide-2026-11-04.md) retains implementation history and experimental procedures.
+Updated 11 November 2026. This guide owns wake-model evidence and lab use. Production ownership/refactoring lives in the [voice-control plan](voice-control-refactor.md); future transcription lives in the [native proposal](iMuse%20Swift%20migration%20plan.md). The [detailed lab snapshot](Archive/recorder-lab-guide-2026-11-04.md) retains implementation history and experimental procedures.
 
 ## Current conclusions
 
@@ -90,6 +90,10 @@ Full recordings use browser-supported compressed audio, preferably AAC/M4A. Revi
 Live analysis uses AudioWorklet, bounded queues and continuous anti-alias resampling; recording uses its separate native MediaRecorder branch. The current lab allows filename inference to overlap a new recording. **That experimental behavior does not satisfy the production requirement that recording always has priority.** No scheduler change is included here.
 
 Data lives in **imuse-simple-recorder-lab**, separate from production. Incremental chunks support recovery after reload; failed final saves retain memory audio until closure. Abruptly interrupted containers may be incomplete. Starting another recording retains earlier entries. Per-recording deletion and Clear all lab recordings require confirmation and remove this lab's audio/reviews. Export before deletion or browser/app storage removal.
+
+## Production integration boundary
+
+On 11 November the user authorized state-specific production Silero checking. Candidate **2026-11-11.1** evaluates during pause by default, with recording evaluation off; its dedicated worker and Settings are described in [production speech checking](voice-control-refactor.md#state-specific-silero-speech-checking). It reuses the pinned local model/runtime and corrected audio contract, without importing lab orchestration, review rendering, queues or the fresh-comparison policy. No lab decision/default changed. Earlier “production unchanged” statements describe their dated experiments. Device/acoustic acceptance of production remains pending.
 
 ## Fresh, detector-aligned Silero comparison
 

@@ -1,8 +1,8 @@
 # Recording reliability and iPhone background capture
 
-Updated 5 November 2026. This is the current recording reference. The four preservation stages and interface cleanup are implemented; no further preservation stage is underway. The [roadmap](iMuse%20next%20steps.md) owns future priorities. Detailed experiment/stage history is [archived](Archive/recording-investigation-stages-2026-11-03.md).
+Updated 11 November 2026. This is the current recording reference. The four preservation stages and interface cleanup are implemented; no further preservation stage is underway. The [roadmap](iMuse%20next%20steps.md) owns future priorities. Detailed experiment/stage history is [archived](Archive/recording-investigation-stages-2026-11-03.md).
 
-**Earlier accepted wake checkpoint: build 2026-11-05.3.** The user tested the wake refactor and separately approved race corrections, reported they worked as expected and called the work a success. That wake-refactor checkpoint passed **89 methods across thirteen suites**; the latest download checkpoint passed **94 methods across fourteen suites**. Model loading/inference delegate through `js/wake-detector.js`; readiness, microphone/audio graph, buffers, session/busy guards and timers remain recorder-owned. Models and audio delivery are unchanged. Device/browser and individual scenarios were not specified; the report does not establish platform-wide recognition accuracy, latency or background capture. Current behavior is in the [voice-control guide](voice-control-refactor.md#wake-race-corrections), with detailed staged history [archived](Archive/voice-control-history-2026-11-05.md).
+**Earlier accepted wake checkpoint: build 2026-11-05.3.** The user tested the wake refactor and separately approved race corrections, reported they worked as expected and called the work a success. That wake-refactor checkpoint passed **89 methods across thirteen suites**; the accepted download checkpoint passed **94 methods across fourteen suites**. Production Silero candidate 2026-11-11.1 adds state-specific wake gating, with 103 methods across fifteen suites passing; [device speech acceptance](voice-control-refactor.md#state-specific-silero-speech-checking) remains pending. Model loading/inference delegate through `js/wake-detector.js`; readiness, microphone/audio graph, buffers, session/busy guards and timers remain recorder-owned. At that wake-refactor checkpoint, models and audio delivery were unchanged. Device/browser and individual scenarios were not specified; the report does not establish platform-wide recognition accuracy, latency or background capture. Current behavior is in the [voice-control guide](voice-control-refactor.md#wake-race-corrections), with detailed staged history [archived](Archive/voice-control-history-2026-11-05.md).
 
 ## Current code ownership
 
@@ -113,7 +113,7 @@ From the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-The last verified implementation checkpoint has **fourteen suites and 94 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
+The last verified implementation checkpoint has **fifteen suites and 103 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
 
 The suites execute production functions with controlled DOM/storage/lock/timer mocks. They do not prove native player rendering, actual IndexedDB behavior, browser permission decisions, container decoding, background capture or multi-hour memory reliability.
 

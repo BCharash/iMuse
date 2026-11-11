@@ -149,6 +149,13 @@
                 <label id="voicuteThresholdRow">Voicute threshold <output id="voicuteThresholdValue"></output><input type="range" id="voicuteThreshold" min="0.3" max="0.95" step="0.01"></label>
                 <label id="heedThresholdRow">Heed threshold <output id="wakeThresholdValue"></output><input type="range" id="wakeThreshold" min="0.3" max="0.99" step="0.01"></label>
             </fieldset>
+            <fieldset class="settings-group" id="speechSettings">
+                <legend>Speech detection — Silero</legend>
+                <label class="settings-check"><input type="checkbox" id="speechDuringRecord"> Evaluate speech during recording</label>
+                <label class="settings-check"><input type="checkbox" id="speechDuringPause" checked> Evaluate speech during pause</label>
+                <p class="settings-note">Requires speech evidence before accepting a wake phrase in the selected states. Speech alone does not resume recording. The model stays loaded between pauses.</p>
+                <p id="speechDetectionStatus" class="settings-note" role="status">Not prepared — enable Audio commands to prepare speech detection.</p>
+            </fieldset>
             <fieldset class="settings-group">
                 <legend>Voice command recognition</legend>
                 <label>Command listening window (seconds) <output id="commandWindowValue"></output><input type="range" id="commandWindow" min="2" max="15" step="1"></label>
@@ -162,6 +169,13 @@
         <p class="settings-note">Settings are saved on this device. Wake phrases enter the Go/Stop command window during recording or pause.</p>
         <details id="advancedSettings" class="advanced-settings">
             <summary>Advanced voice settings</summary>
+            <fieldset class="settings-group" id="speechAdvancedSettings">
+                <legend>Speech detection tuning</legend>
+                <label>Speech threshold <output id="speechThresholdValue"></output><input type="range" id="speechThreshold" min="0.1" max="0.95" step="0.01"></label>
+                <label>Minimum speech blocks <output id="speechMinFramesValue"></output><input type="range" id="speechMinFrames" min="1" max="6" step="1"></label>
+                <label>Speech lookback (milliseconds) <output id="speechLookbackMsValue"></output><input type="range" id="speechLookbackMs" min="250" max="2000" step="50"></label>
+                <p class="settings-note">Each block contains 32 ms of audio. Lower thresholds accept weaker speech evidence. Defaults: 0.60, two qualifying blocks in the preceding 1,000 ms. Both state controls off bypasses speech checking. If speech detection is unavailable, normal wake recognition continues.</p>
+            </fieldset>
             <label class="settings-check"><input id="voiceDiagnosticsEnabled" type="checkbox" checked> Enable voice diagnostics</label>
             <p id="voiceDiagnosticsStatus" class="settings-note" role="status">On · latest 500 events. This page only; download before reloading. No audio is logged.</p>
             <div class="voice-diagnostic-actions"><button id="downloadVoiceDiagnostics" type="button" disabled>Download diagnostics</button><button id="clearVoiceDiagnostics" type="button" disabled>Clear diagnostics</button></div>

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "cache": "imuse-simple-lab-v1",
-  "bytes": 82578245,
+  "bytes": 82578450,
   "assets": [
     {
       "path": "js/heed/filter-coeffs.js",
@@ -30,8 +30,8 @@
     },
     {
       "path": "js/lab/SOURCES.md",
-      "bytes": 3060,
-      "sha256": "dd72bc3512890c3d22e52b694886bdc1a253907831afbd08a06dd06054c712b5"
+      "bytes": 3265,
+      "sha256": "4f05bf6a6b7d0dc872eb5fcc4e194f47a01fbeee57ebc9aaf4bbcdca0f298349"
     },
     {
       "path": "js/lab/app.js",

@@ -1,6 +1,6 @@
 # Offline lab dependencies
 
-These assets support only `lab.html`. Model execution is local; no API key or cloud inference is used. First offline preparation caches approximately 80 MiB. Keep license notices with redistribution. `manifest.json` records byte counts and SHA-256 checksums; regenerate it with `python3 scripts/build-lab-manifest.py` after edits.
+These assets support `lab.html`. Production Silero (build 2026-11-11.1) also reuses the pinned wake/VAD ONNX Runtime loader/WASM, Silero v5 model and their license notices from this directory; its own worker/lifecycle remains outside the lab. Model execution is local; no API key or cloud inference is used. First offline preparation caches approximately 80 MiB. Keep license notices with redistribution. `manifest.json` records byte counts and SHA-256 checksums; regenerate it with `python3 scripts/build-lab-manifest.py` after edits.
 
 | Asset | Source/version |
 | --- | --- |
