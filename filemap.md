@@ -68,6 +68,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | --- | --- |
 | [.gitattributes](.gitattributes) | Git text-file and line-ending normalization rules. |
 | [.gitignore](.gitignore) | Files excluded from Git; currently macOS .DS_Store files. |
+| [audio-output-check.html](audio-output-check.html) | Independent iPhone output-routing check page: before/after capture comparisons, optional playback intent and manually labeled reports; no saved-recording access. |
 | [favicon.ico](favicon.ico) | Browser favicon in ICO format. |
 | [filemap.md](filemap.md) | This searchable, linked guide to every repository file. |
 | [index.html](index.html) | Production iMuse page: recording/player controls, Settings and Saved recordings; loads settings.js and recorder.js. |
@@ -98,6 +99,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | File | Function |
 | --- | --- |
 | [js/app.js](js/app.js) | Legacy transcription-button hookup to window.transcribeRecording; not loaded by current index.html. |
+| [js/audio-output-check.js](js/audio-output-check.js) | Isolated capture/analysis cleanup, existing stop-message playback, temporary optional audio-session request and output-report export. |
 | [js/audio-response-manager.js](js/audio-response-manager.js) | Loads/caches prerecorded spoken prompts and serializes their playback. |
 | [js/audio.js](js/audio.js) | Audio decoding and mono 16 kHz resampling helper intended for Whisper; not wired into current production recording. |
 | [js/build-info.js](js/build-info.js) | Single production build identifier and Settings build-label helper. |
@@ -251,6 +253,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | --- | --- |
 | [tests/README.md](tests/README.md) | Test command, suite purposes, runner requirements and limitations of automated versus device checks. |
 | [tests/recording_test_support.py](tests/recording_test_support.py) | Shared Python-to-JavaScript engine bridge, source extraction and controlled DOM/storage/recorder fixtures. |
+| [tests/test_audio_output_check.py](tests/test_audio_output_check.py) | Independent output-check playback/cleanup, session-type restoration and canceled microphone-permission ownership tests. |
 | [tests/test_emergency_recordings.py](tests/test_emergency_recordings.py) | Emergency retention and recorder/library integration; a separate test exercises the complete library module directly, including dialog ownership and deletion/restore/bulk cancellation. |
 | [tests/test_fresh_speech.py](tests/test_fresh_speech.py) | Detector-aligned windows, raw sample bounds/amplitude for both engines, independent fresh state/context and traces, and bounded comparison lane with busy/timeout/error/late-result protections. |
 | [tests/test_microphone_level_check.py](tests/test_microphone_level_check.py) | Ten-second temporary capture, cancellation/late permission and context results, cleanup/retry, manager ownership guards and recording startup handoff. |

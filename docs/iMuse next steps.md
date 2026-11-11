@@ -4,6 +4,8 @@ Updated 11 November 2026. This is the active work queue. **Build 2026-11-05.3 is
 
 ## Current priorities
 
+**Audio follow-up:** shutdown waiting did not resolve the iPhone receiver routing, and the issue reproduces with Audio commands off. Use the separate [output check](../audio-output-check.html) before any production audio-session override. This follow-up leaves production routing unchanged.
+
 **Current candidate: 2026-11-11.5.** Verify iPhone stop-announcement output after the shutdown-ordering correction (Safari/installed, built-in/headset, manual/spoken Stop). The reported quiet receiver playback remains unresolved until device evidence. Diagnostics now separates matching readable results/detail exports; see the [investigation](recording-investigation.md#iphone-stop-announcement-output-regression).
 
 **Next acceptance: production Silero candidate 2026-11-11.1.** The user authorized state-specific integration on 11 November. Pause-only defaults, advanced tuning, warmed local worker, bounded audio flow and wake-only gating are implemented. Complete the [focused speech checks](voice-control-refactor.md#state-specific-silero-speech-checking) on the affected desktop/iPhone paths; real-model synthetic-audio Chrome checks do not establish acoustic rates. Lab comparison/queue experiments remain separate and available.
