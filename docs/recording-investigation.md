@@ -2,6 +2,8 @@
 
 Updated 12 November 2026. Current production source: **2026-11-12.11**. Preservation stages and component extractions are complete. Use the [active roadmap](iMuse%20next%20steps.md) for future work and the [journal](design-journal.md) for dated decisions.
 
+Refresh recordings rereads the library without reloading the app. While running it shows Refreshing… and disables repeat activation. The adjacent status reports an updated list, no changes, or a read failure. An empty result stays visible after a manual refresh so its feedback is not lost. Capture and stored audio are unaffected.
+
 ## Current code ownership
 
 [recording-library.js](../js/recording-library.js) now owns the Saved/Recently Deleted lists, selection and confirmation controls, saved-player dialog and its object URL. It receives callbacks for reading sessions, recovery/export, deletion/restore, diagnostics and pausing current playback. Constructing it does not acquire a microphone, open a database, or render the page.

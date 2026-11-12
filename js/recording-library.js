@@ -9,6 +9,32 @@ export function createRecordingLibrary({
     let recoveryPanel = null;
     let savedPlayback = null;
     let savedPlaybackRequest = 0;
+    let refreshing = false, refreshMessage = "", lastListSnapshot = null;
+    let refreshControl = null, refreshStatus = null;
+    function updateRefreshFeedback() {
+        if (refreshControl) {
+            refreshControl.disabled = refreshing;
+            refreshControl.textContent = refreshing ? "Refreshing…" : "Refresh recordings";
+        }
+        if (refreshStatus) refreshStatus.textContent = refreshMessage;
+    }
+    async function refreshRecordings() {
+        if (refreshing) return;
+        refreshing = true;
+        refreshMessage = "Checking saved recordings…";
+        updateRefreshFeedback();
+        try {
+            const result = await renderRecoverableSessions();
+            refreshMessage = result.error ? "Could not refresh recordings. Try again."
+                : result.changed ? "Recordings list updated." : "Recordings are up to date. No changes.";
+        } catch (error) {
+            console.error("Could not refresh recordings:", error);
+            refreshMessage = "Could not refresh recordings. Try again.";
+        } finally {
+            refreshing = false;
+            updateRefreshFeedback();
+        }
+    }
 
     function closeSavedPlayback() {
         if (!savedPlayback) return;
@@ -90,6 +116,10 @@ export function createRecordingLibrary({
         const sessions = [...available.values()].sort((a, b) => (b.startedAt || "").localeCompare(a.startedAt || ""));
         const deletedSessions = allSessions.filter(item => item.state === "deleted" && !emergencyRecordings.has(item.id))
             .sort((a, b) => (b.deletedAt || "").localeCompare(a.deletedAt || ""));
+        const snapshot = JSON.stringify({sessions, deletedSessions,
+            emergencies: [...emergencyRecordings].map(([id, item]) => [id, item.blob.size, item.unsavedBytes])});
+        const changed = snapshot !== lastListSnapshot;
+        if (!readError) lastListSnapshot = snapshot;
         panel.replaceChildren();
         const heading = document.createElement("h2");
         heading.textContent = "Saved recordings";
@@ -98,11 +128,14 @@ export function createRecordingLibrary({
         const refresh = document.createElement("button");
         refresh.type = "button";
         refresh.textContent = "Refresh recordings";
-        refresh.addEventListener("click", () => {
-            void renderRecoverableSessions().catch(error => console.error(error));
-        });
-        panel.appendChild(refresh);
-        panel.hidden = !sessions.length && !deletedSessions.length && !readError;
+        refresh.addEventListener("click", () => { void refreshRecordings(); });
+        refreshControl = refresh;
+        refreshStatus = document.createElement("span");
+        refreshStatus.setAttribute("role", "status");
+        refreshStatus.style.marginLeft = "0.75rem";
+        panel.append(refresh, refreshStatus);
+        updateRefreshFeedback();
+        panel.hidden = !sessions.length && !deletedSessions.length && !readError && !refreshMessage;
         if (readError) {
             const notice = document.createElement("p");
             notice.textContent = "Saved recordings could not be read. Any available emergency audio is listed below. Browser data has not been cleared.";
@@ -330,6 +363,7 @@ export function createRecordingLibrary({
             }
             panel.appendChild(section);
         }
+        return {changed, error:readError};
     }
 
     async function loadRecording(id, button) {

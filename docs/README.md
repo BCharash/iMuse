@@ -2,7 +2,7 @@
 
 Updated 12 November 2026. Start here; current findings take precedence over older plans and journal entries.
 
-Current candidate: **2026-11-12.11** prepares spoken prompts at startup for manual and voice controls, while skipping wake-model loading when Audio commands is off. Warm model reuse remains; enabled-model UI blocking is still open. See [voice control](voice-control-refactor.md) and [recording reliability](recording-investigation.md).
+Current candidate: **2026-11-12.12** prepares spoken prompts at startup for manual and voice controls, while skipping wake-model loading when Audio commands is off. Warm model reuse remains; enabled-model UI blocking is still open. See [voice control](voice-control-refactor.md) and [recording reliability](recording-investigation.md).
 
 | Document | Purpose |
 | --- | --- |
@@ -20,7 +20,7 @@ Current candidate: **2026-11-12.11** prepares spoken prompts at startup for manu
 
 ## Current checkpoint
 
-Production source: **2026-11-12.11**. Latest implementation validation: **114 methods across sixteen suites**. This documentation review does not rerun runtime tests or change the production build.
+Production source: **2026-11-12.12**. Latest implementation validation: **114 methods across sixteen suites**. This documentation review does not rerun runtime tests or change the production build.
 
 - All six spoken prompts prepare at startup, including with Audio commands off. Buffered playback preserves complete prompts; the user confirmed the iPhone Yes/volume-preview correction. Other prompts still need device acceptance.
 - Wake-model loading waits until Audio commands is enabled. Loading is guarded against duplicate requests; ready models are reused. Enabled-model startup can still interrupt screen interaction.
