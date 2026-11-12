@@ -100,7 +100,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | File | Function |
 | --- | --- |
 | [js/app.js](js/app.js) | Legacy transcription-button hookup to window.transcribeRecording; not loaded by current index.html. |
-| [js/audio-response-manager.js](js/audio-response-manager.js) | Loads/caches prerecorded prompts and serializes playback; temporary optional observer records actual player/audio-session snapshots without changing routing. |
+| [js/audio-response-manager.js](js/audio-response-manager.js) | Loads/caches prerecorded spoken prompts and serializes their playback. |
 | [js/audio.js](js/audio.js) | Audio decoding and mono 16 kHz resampling helper intended for Whisper; not wired into current production recording. |
 | [js/build-info.js](js/build-info.js) | Single production build identifier and Settings build-label helper. |
 | [js/microphone-level-check.js](js/microphone-level-check.js) | Temporary microphone-level check: deadline, cancellation, cleanup and handoff to Record. |
@@ -258,7 +258,6 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [tests/test_fresh_speech.py](tests/test_fresh_speech.py) | Detector-aligned windows, raw sample bounds/amplitude for both engines, independent fresh state/context and traces, and bounded comparison lane with busy/timeout/error/late-result protections. |
 | [tests/test_microphone_level_check.py](tests/test_microphone_level_check.py) | Ten-second temporary capture, cancellation/late permission and context results, cleanup/retry, manager ownership guards and recording startup handoff. |
 | [tests/test_microphone_levels.py](tests/test_microphone_levels.py) | Passive RMS math, dial range/clamping, measured Q/N references, inactive/paused/unavailable states, separate buffers, visible-only polling and original microphone requests versus browser reports. |
-| [tests/test_prompt_playback.py](tests/test_prompt_playback.py) | Temporary prompt telemetry checks: actual event/finish state, cleanup, failure reasons and observer isolation without routing changes. |
 | [tests/test_preservation_failure_control.py](tests/test_preservation_failure_control.py) | Opt-in fault control, default-off behavior, final tail retention and a normal next recording. |
 | [tests/test_recorder_lab.py](tests/test_recorder_lab.py) | New recorder lab: warmed Whisper worker limits, bounded shadow verification/strict phrase matching/latency/deadlines, immediate pre-roll dispatch, opening-sentence phrase filenames, review clip bounds/WAV and gap/Stop handling, TP/FP/TN/FN comparisons, review playback guards and saved labels, continuous anti-alias resampling, speech/level gates, failed writes/late tails, actual encoder-start fallback, model-before-microphone ordering/cancellation, idempotent cleanup, final data after microphone loss, silent AudioWorklet packets, scripts and offline asset integrity. |
 | [tests/test_recording_download.py](tests/test_recording_download.py) | Local timestamps, portable names, dialog preview/confirmation/cancellation, single-dialog ownership, actual download format and URL behavior, current-playback button creation/start-time naming and retained downloads without database metadata, and saved/emergency cancellation outside the writer lock. |

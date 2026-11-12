@@ -4,8 +4,6 @@ Updated 12 November 2026. This is the current production reference. **Build 2026
 
 ## Current checkpoint
 
-Build 2026-11-12.3 adds temporary prompt-playback/capture-state observations to the bounded voice log, plus a manually chosen output-test label in Advanced. These do not select an output or change prompt volume, routing or audio files. Readable prompt-end details now explicitly distinguish completion from failure; full snapshots/reasons are retained in JSON. The [iPhone investigation](recording-investigation.md#iphone-stop-announcement-output-regression) owns the paired-run instructions and removal boundary.
-
 Build 2026-11-12.2 puts Heed first in the dropdown and uses it when no valid saved engine choice exists. Explicit saved Voicute and Heed choices are preserved; the Audio commands default remains off.
 
 Build 2026-11-12.1 changes only the Heed model/phrase integration and recommended slider labels: Hey iMuse replaces Hey Doc, default Heed threshold is 0.75, saved user thresholds are preserved. Export metadata is retained exactly (Hey Eyemews / 0.738), with the selected application threshold overriding that export recommendation. Current lab and TensorFlow diagnostic labels/defaults follow the new model. Voicute selection/defaults and recognition scheduling/DSP/trigger behavior remain unchanged. See [model provenance](../js/heed/README.md#hey-imuse-model-12-november-2026).
