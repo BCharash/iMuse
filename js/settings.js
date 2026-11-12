@@ -1,3 +1,4 @@
+import { playSpokenResponse } from "./audio-response-manager.js";
 import { createStoragePersistence, storagePersistenceLabel } from "./storage-persistence.js";
 
 // Persisted recognition preferences; recording/microphone ownership stays in recorder.js.
@@ -113,6 +114,47 @@ for (const [key,id] of Object.entries(controls)) {
         if (key !== "audioPromptVolume") window.dispatchEvent(new CustomEvent("imuse-settings-changed",{detail:getSettings()}));
     });
 }
+
+// Preview only after the adjustment settles, never while a pointer is dragging.
+const promptVolumeSlider = document.getElementById("audioPromptVolume");
+let promptPreviewTimer, promptPreviewController;
+let promptVolumeDragging = false, promptVolumeChanged = false;
+function cancelPromptPreview() {
+    clearTimeout(promptPreviewTimer);
+    promptPreviewController?.abort();
+}
+function schedulePromptPreview() {
+    clearTimeout(promptPreviewTimer);
+    if (promptVolumeDragging || !promptVolumeChanged) return;
+    promptPreviewTimer = setTimeout(() => {
+        promptVolumeChanged = false;
+        if (panel.hidden || document.getElementById("audioSettingsSection").hidden) return;
+        promptPreviewController = new AbortController();
+        void playSpokenResponse("yes", {
+            volume:settings.audioPromptVolume / 100, signal:promptPreviewController.signal
+        }).catch(error => console.warn("Volume preview unavailable:", error));
+    }, 500);
+}
+promptVolumeSlider.addEventListener("input", () => {
+    cancelPromptPreview();
+    promptVolumeChanged = true;
+    schedulePromptPreview();
+});
+promptVolumeSlider.addEventListener("pointerdown", () => {
+    promptVolumeDragging = true;
+    cancelPromptPreview();
+});
+window.addEventListener("pointerup", () => {
+    if (!promptVolumeDragging) return;
+    promptVolumeDragging = false;
+    schedulePromptPreview();
+});
+window.addEventListener("pointercancel", () => {
+    promptVolumeDragging = false;
+    promptVolumeChanged = false;
+    cancelPromptPreview();
+});
+window.addEventListener("pagehide", cancelPromptPreview);
 
 render();
 
