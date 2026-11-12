@@ -68,7 +68,11 @@ def evaluate(code):
 
 MOCKS = r"""
 const assert = (value, message) => { if (!value) throw Error(message); };
-const console = {error(){}};
+const console = {error(){},warn(){}};
+class AbortController {
+ constructor(){const listeners=new Set();this.signal={aborted:false,addEventListener:(type,fn)=>listeners.add(fn),removeEventListener:(type,fn)=>listeners.delete(fn)};this.listeners=listeners;}
+ abort(){if(this.signal.aborted)return;this.signal.aborted=true;for(const fn of this.listeners)fn();}
+}
 const FINALIZATION_NOTICE_MS = 10000, STORAGE_READ_TIMEOUT_MS = 2000;
 const timers = new Map();
 let timerSequence = 0;

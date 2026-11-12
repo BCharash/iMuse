@@ -12,3 +12,26 @@ export async function waitForStoppedAudio(operations, {
         ]);
     } finally { clearTimer(timer); }
 }
+
+// Capture has stopped; retain the microphone only through the announcement.
+// Cancellation also prevents a queued prompt from playing after release.
+export async function announceStoppedAndRelease({operations, announce, release, enabled = true,
+    timeoutMs = 8000, setTimer = setTimeout, clearTimer = clearTimeout}) {
+    const controller = new AbortController();
+    let timer;
+    try {
+        await Promise.race([
+            (async () => {
+                const ready = await waitForStoppedAudio(operations);
+                if (ready && enabled && !controller.signal.aborted) await announce(controller.signal);
+            })(),
+            new Promise(resolve => { timer = setTimer(() => { controller.abort(); resolve(); }, timeoutMs); })
+        ]);
+    } catch (error) {
+        console.warn("Stop announcement unavailable:", error);
+    } finally {
+        clearTimer(timer);
+        controller.abort();
+        release();
+    }
+}

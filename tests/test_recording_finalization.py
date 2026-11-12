@@ -299,6 +299,41 @@ globalThis.testResult='pending';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack));
 """)
 
+    def test_stop_prompt_precedes_storage_completion_and_holds_microphone(self):
+        evaluate(MOCKS + FUNCTIONS + EXTRA + r"""
+globalThis.testResult='pending';
+(async()=>{
+ const current=healthy('parallel-stop');let finishPrompt,finishStorage;
+ const spoken=[];let micReleased=0,ready=0;
+ stopStream=()=>micReleased++;setReadyUI=()=>ready++;
+ current.writeQueue=new Promise(resolve=>finishStorage=resolve);
+ sayResponse=name=>{spoken.push(name);return new Promise(resolve=>finishPrompt=resolve);};
+ const ending=stopHandler();await flush();
+ assert(spoken.join(',')==='stopped','stop is announced without waiting for saving');
+ assert(micReleased===0&&ready===0&&writingSessions.has(current.id),'microphone and next-record lock retained during prompt');
+ finishPrompt(true);await flush();
+ assert(micReleased===1&&ready===0,'prompt completion releases microphone independently of saving');
+ finishStorage();await ending;
+ assert(ready===1&&!writingSessions.has(current.id),'Record becomes ready only after both owners finish');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack));
+""")
+
+    def test_stop_prompt_timeout_cancels_and_releases_microphone(self):
+        evaluate(MOCKS + FUNCTIONS + EXTRA + r"""
+globalThis.testResult='pending';
+(async()=>{
+ const current=healthy('stuck-prompt');let signal,micReleased=0;
+ stopStream=()=>micReleased++;
+ sayResponse=(name,value)=>{signal=value;return new Promise(()=>{});};
+ const ending=stopHandler();await flush();
+ assert(signal&&!signal.aborted&&micReleased===0,'microphone retained during playing prompt');
+ for(const callback of [...timers.values()])callback();await ending;
+ assert(signal.aborted&&micReleased===1&&!writingSessions.has(current.id),'deadline cancels playback and releases capture ownership');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack));
+""")
+
     def test_recovery_component(self):
         evaluate(MOCKS + INTEGRITY_SOURCE + RECOVERY_SOURCE + COMPONENT_TESTS)
 

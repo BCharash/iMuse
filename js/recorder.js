@@ -4,7 +4,7 @@ import { loadWakeDetector, evaluateWakeDetector } from "./wake-detector.js";
 import { localRecordingStamp, requestDownloadFilename } from "./recording-download.js";
 import { createSpeechDetection } from "./speech-detection.js";
 import { speechPolicyEnabled } from "./speech-detection-core.js";
-import { waitForStoppedAudio } from "./stopped-audio.js";
+import { announceStoppedAndRelease } from "./stopped-audio.js";
 import { APP_BUILD, displayBuildInfo } from "./build-info.js";
 import { getSettings, effectiveOverlap, setSilencePauseLocked } from "./settings.js";
 import { createMicrophoneLevelCheck } from "./microphone-level-check.js";
@@ -613,11 +613,11 @@ function getVoiceSession(current) {
 }
 
 // Spoken responses remain serialized by the dedicated audio manager.
-async function sayResponse(name) {
+async function sayResponse(name, signal) {
     const context={prompt:name,sessionId:activeSession?.id};
     voiceDiagnostics.record('prompt-start',context);
     let result;
-    try { result = await playSpokenResponse(name); }
+    try { result = await playSpokenResponse(name, {volume:(getSettings().audioPromptVolume ?? 100) / 100, signal}); }
     catch (error) { voiceDiagnostics.record('prompt-error',{...context,message:String(error)}); throw error; }
     voiceDiagnostics.record('prompt-end',{...context,ok:result.ok});
     if (!result.ok) {
@@ -1114,7 +1114,7 @@ function setReadyUI() {
     refreshIdleWakeStatus();
     setAudioCommandsToggleLocked(false);
     setMicrophoneSelectionLocked(false); setSilencePauseLocked(false);
-    setRecordingControlState("idle");
+    setRecordingControlState(writingSessions.size ? "finalizing" : "idle");
 }
 
 function showPlayback(blob, sessionId = null, metadata = null) {
@@ -1493,6 +1493,7 @@ async function startRecording() {
             current.stopHandled = true;
             current.metadata.receivedChunkCount = current.sequence;
             armFinalizationWatchdog(current);
+            let microphoneReleased;
             try {
                 if (current.activeSinceMs !== null) {
                     current.recordedMs += Math.max(0, performance.now() - current.activeSinceMs);
@@ -1501,12 +1502,15 @@ async function startRecording() {
                 lastRecordingPeakBytes = current.peakPendingBytes;
                 current.resolvePauseAnnouncement?.();
                 current.resolvePauseAnnouncement = null;
-                const audioCleanupAt = Date.now();
+                setRecordingControlState("finalizing");
                 const commandShutdown = closeCommandWindow({ restorePauseReminder: false });
                 const audioShutdown = cleanupAudioMonitor(current);
-                // Observe both immediately so a rejected shutdown cannot go unhandled.
-                const stoppedAudioReady = waitForStoppedAudio([commandShutdown, audioShutdown]);
-                stopStream(stream);
+                microphoneReleased = announceStoppedAndRelease({
+                    operations: [commandShutdown, audioShutdown],
+                    enabled: !current.discard && !current.deleteRequested,
+                    announce: signal => sayResponse("stopped", signal),
+                    release: () => stopStream(stream)
+                });
                 if (activeSession === current) activeSession = null;
                 publishRecordingDiagnostics();
                 setAudioCommandsToggleLocked(false);
@@ -1515,6 +1519,7 @@ async function startRecording() {
                 setWakeStatus("Wake-word detector idle");
                 if (current.discard) {
                     try { await current.writeQueue; } catch (_) { /* best effort; session is being deleted */ }
+                    await microphoneReleased;
                     writingSessions.delete(id);
                     try { await deleteSessionData(id); } catch (error) { console.error("Could not delete discarded session:", error); }
                     return;
@@ -1522,6 +1527,7 @@ async function startRecording() {
                 if (current.deleteRequested) {
                     try {
                         await current.writeQueue;
+                        await microphoneReleased;
                         writingSessions.delete(id);
                         await moveSessionToRecentlyDeleted(id);
                         status.textContent = "Recording moved to Recently Deleted. It can be restored.";
@@ -1530,25 +1536,21 @@ async function startRecording() {
                         console.error("Could not preserve deleted recording:", error);
                         status.textContent = "Could not move recording to Recently Deleted. Check saved recordings before leaving this page.";
                     }
-                    setReadyUI();
                     return;
                 }
                 setRecordingControlState("finalizing");
                 status.textContent = "Finishing audio storage…";
                 await recordingRecovery.finalize(current);
-                setReadyUI();
-                const outputReady = await stoppedAudioReady;
-                const newerCapture = Boolean(activeSession) || Boolean(microphoneLevelCheck.state && microphoneLevelCheck.state.phase !== "idle");
-                voiceDiagnostics.record('stopped-audio-ready', {
-                    sessionId: id, outputReady, newerCapture, elapsedMs: Date.now() - audioCleanupAt,
-                    message: outputReady ? 'Capture audio cleanup completed before stop announcement.' : 'Stop announcement skipped: capture audio cleanup failed or timed out.'
-                });
-                if (outputReady && !newerCapture) void sayResponse("stopped");
                 await renderRecoverableSessions();
             } finally {
+                // Saving and the announcement run independently. Both owners must
+                // finish before another recording can acquire the microphone.
+                if (microphoneReleased) await microphoneReleased;
+                else stopStream(stream);
                 recordingRecovery.finish(current);
                 await recordingLease?.release();
                 writingSessions.delete(id);
+                setReadyUI();
                 publishMicrophoneCheckState();
                 // The preceding render may still have shown a finishing session.
                 void renderRecoverableSessions().catch(error => console.error(error));

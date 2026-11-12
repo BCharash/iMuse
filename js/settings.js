@@ -2,7 +2,7 @@ import { createStoragePersistence, storagePersistenceLabel } from "./storage-per
 
 // Persisted recognition preferences; recording/microphone ownership stays in recorder.js.
 const KEY = "imuse.voice-settings.v1";
-const defaults = Object.freeze({audioCommands:false, wakeEngine:"heed", wakeThreshold:0.75, voicuteThreshold:0.90, commandWindow:5, silencePauseSeconds:5, silenceThresholdDb:-36.5, wakeMinimumDb:-40, autoGainControl:false, noiseSuppression:true, echoCancellation:true,
+const defaults = Object.freeze({audioCommands:false, audioPromptVolume:100, wakeEngine:"heed", wakeThreshold:0.75, voicuteThreshold:0.90, commandWindow:5, silencePauseSeconds:5, silenceThresholdDb:-36.5, wakeMinimumDb:-40, autoGainControl:false, noiseSuppression:true, echoCancellation:true,
     speechDuringRecord:false, speechDuringPause:true, speechThreshold:0.6, speechMinFrames:2, speechLookbackMs:1000,
     goThreshold:0.60, stopThreshold:0.85, yesThreshold:0.85, noThreshold:0.55, overlapFactor:"auto"});
 const allowedOverlap = new Set(["auto", "0.5", "0.75", "0.9"]);
@@ -11,6 +11,7 @@ export function loadSettings() {
     let stored = {};
     try { stored = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (_) { /* storage unavailable */ }
     return {audioCommands:stored.audioCommands === true,
+        audioPromptVolume:Math.round(clamp(stored.audioPromptVolume,0,100,defaults.audioPromptVolume)),
         speechDuringRecord:stored.speechDuringRecord === true,
         speechDuringPause:stored.speechDuringPause !== false,
         speechThreshold:clamp(stored.speechThreshold,.1,.95,defaults.speechThreshold),
@@ -60,7 +61,7 @@ for(const [trigger,section] of settingsCategories)trigger.addEventListener('clic
     updateAutomaticOverlapLabel();
     window.dispatchEvent(new Event('imuse-settings-section-changed'));
 });
-const controls = {speechDuringRecord:"speechDuringRecord",speechDuringPause:"speechDuringPause",speechThreshold:"speechThreshold",speechMinFrames:"speechMinFrames",speechLookbackMs:"speechLookbackMs",autoGainControl:"autoGainControl",noiseSuppression:"noiseSuppression",echoCancellation:"echoCancellation",silenceThresholdDb:"silenceThresholdDb",wakeMinimumDb:"wakeMinimumDb",silencePauseSeconds:"silencePauseSeconds",wakeEngine:"wakeEngine",voicuteThreshold:"voicuteThreshold",audioCommands:"audioCommandsToggle",wakeThreshold:"wakeThreshold",commandWindow:"commandWindow",
+const controls = {audioPromptVolume:"audioPromptVolume",speechDuringRecord:"speechDuringRecord",speechDuringPause:"speechDuringPause",speechThreshold:"speechThreshold",speechMinFrames:"speechMinFrames",speechLookbackMs:"speechLookbackMs",autoGainControl:"autoGainControl",noiseSuppression:"noiseSuppression",echoCancellation:"echoCancellation",silenceThresholdDb:"silenceThresholdDb",wakeMinimumDb:"wakeMinimumDb",silencePauseSeconds:"silencePauseSeconds",wakeEngine:"wakeEngine",voicuteThreshold:"voicuteThreshold",audioCommands:"audioCommandsToggle",wakeThreshold:"wakeThreshold",commandWindow:"commandWindow",
     goThreshold:"goThreshold",stopThreshold:"stopThreshold",yesThreshold:"yesThreshold",noThreshold:"noThreshold",overlapFactor:"overlapFactor"};
 let silencePauseLocked = false;
 let microphoneProcessingLocked = false;
@@ -92,7 +93,7 @@ function render() {
     for (const [key,id] of Object.entries(controls)) {
         const el=document.getElementById(id);if (!el) continue;
         if (el.type === "checkbox") el.checked = settings[key]; else el.value=String(settings[key]);
-        const output=document.getElementById(key+"Value");if (output) output.textContent = ["speechThreshold","wakeThreshold","voicuteThreshold","goThreshold","stopThreshold","yesThreshold","noThreshold"].includes(key) ? Number(settings[key]).toFixed(2) : String(settings[key]);
+        const output=document.getElementById(key+"Value");if (output) output.textContent = ["speechThreshold","wakeThreshold","voicuteThreshold","goThreshold","stopThreshold","yesThreshold","noThreshold"].includes(key) ? Number(settings[key]).toFixed(2) : key === "audioPromptVolume" ? `${settings[key]}%` : String(settings[key]);
     }
     document.getElementById("heedThresholdRow").hidden = settings.wakeEngine !== "heed";
     document.getElementById("voicuteThresholdRow").hidden = settings.wakeEngine !== "voicute";
@@ -108,7 +109,8 @@ for (const [key,id] of Object.entries(controls)) {
         settings[key] = el.type === "checkbox" ? el.checked : el.type === "range" ? Number(el.value) : el.value;
         try {localStorage.setItem(KEY,JSON.stringify(settings));} catch (error) {console.warn("iMuse settings could not be saved",error);}
         render();
-        window.dispatchEvent(new CustomEvent("imuse-settings-changed",{detail:getSettings()}));
+        // Prompt volume is read at playback; dragging it must not reset recognition.
+        if (key !== "audioPromptVolume") window.dispatchEvent(new CustomEvent("imuse-settings-changed",{detail:getSettings()}));
     });
 }
 
