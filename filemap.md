@@ -2,7 +2,7 @@
 
 Updated 12 November 2026. Paths are relative to the repository root. Click a filename to open it, or search this page for its exact name. Every tracked repository file is listed individually, including models, vendor runtimes and archived tools; this map also lists itself. Git internals, local OS files and generated Python caches are excluded.
 
-Current iPhone stop-message observation status and recurrence handoff: [recording investigation](docs/recording-investigation.md#iphone-stop-announcement-output-regression). The temporary isolated output check and audio substitution were reverted and are not part of this file inventory.
+Current iPhone prompt behavior and recurrence guidance: [recording investigation](docs/recording-investigation.md#iphone-stop-announcement-output-regression). The temporary isolated output check and audio substitution were reverted and are not part of this file inventory.
 
 ## Find the right file quickly
 
@@ -241,6 +241,8 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [docs/Archive/wake word implementation.md](docs/Archive/wake%20word%20implementation.md) | Early wake-model/phrase/threshold experiments and superseded implementation ideas. |
 | [docs/Archive/wake-word-comparison-lab-2026-11-04.html](docs/Archive/wake-word-comparison-lab-2026-11-04.html) | Earlier standalone wake review/comparison tool with its own saved-review database. |
 | [docs/Archive/wake-word-review-notes-2026-11-04.md](docs/Archive/wake-word-review-notes-2026-11-04.md) | Instructions/evidence for the archived comparison tool. |
+
+| [docs/Archive/wake-evaluation-evidence-2026-11-12.md](docs/Archive/wake-evaluation-evidence-2026-11-12.md) | Historical wake/Silero replay measurements, labels and threshold comparisons for the earlier model. |
 
 ## Maintenance scripts
 

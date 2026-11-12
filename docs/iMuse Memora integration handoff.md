@@ -1,6 +1,6 @@
 # iMuse → Memora integration handoff
 
-Updated 4 November 2026. This document owns the integration contract, not the recording investigation or immediate development queue. See the [index](README.md), [current priorities](iMuse%20next%20steps.md), and [platform evidence](recording-investigation.md).
+Reviewed 12 November 2026. This document owns the integration contract, not the recording investigation or immediate development queue. See the [index](README.md), [current priorities](iMuse%20next%20steps.md), and [platform evidence](recording-investigation.md).
 
 ## Objective and scope
 
@@ -44,4 +44,4 @@ Integration is not evidence that background capture or every recovered container
 
 ## Deferred work
 
-Idle voice-start before first Record, custom wake training, command-audio removal, OPFS/storage redesign, native recording, and headset media-button research are independent workstreams. A future native iMuse may transcribe locally and still export audio/metadata to Memora. Model-management and recording behavior can share contracts without sharing runtime files or databases; full native Search/editor parity is not agreed. Nothing in this contract schedules those features automatically.
+Idle voice-start before first Record, command-audio removal, OPFS/storage redesign, native recording, and headset media-button research are independent workstreams. A future native iMuse may transcribe locally and still export audio/metadata to Memora. Model-management and recording behavior can share contracts without sharing runtime files or databases; full native Search/editor parity is not agreed. Nothing in this contract schedules those features automatically.

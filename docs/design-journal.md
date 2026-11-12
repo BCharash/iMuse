@@ -1,6 +1,6 @@
 # iMuse Design Journal
 
-Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated snapshots. DJ012 records the installed failure; DJ013 records preservation; DJ014–DJ016 record library/store/recovery extractions. DJ025 records the earlier roadmap/transcription priority; DJ026 records the accepted wake refactor, build identity and latest documentation cleanup. Older proposals, test counts and labels are historical, not current instructions.
+Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated snapshots. DJ012 records the installed failure; DJ013 records preservation; DJ014–DJ016 record library/store/recovery extractions. DJ025 records the earlier roadmap/transcription priority; DJ026 records the accepted wake refactor and build identity. DJ038 records the startup policy corrected in build 2026-11-12.11. Older proposals, test counts and labels are historical, not current instructions.
 
 ---
 
@@ -1758,3 +1758,8 @@ Validation: 114 regression methods pass across sixteen suites. Chrome confirmed 
 **DJ038 follow-up — user preference, build 2026-11-12.11:**
 
 **Startup policy correction — 2026-11-12.11:** prepare all six spoken prompts at startup regardless of Audio commands. Spoken feedback and volume preview are used by manual recording too, and measured prompt preparation is small compared with model startup. Restore the unconditional prompt preparation call; its existing cache prevents repeated fetching/decoding. Keep wake-model startup gated by Audio commands, duplicate-load protection and warmed-model reuse. All other prompt, microphone and recording behavior remains unchanged. The earlier .10 audio-file deferral is superseded; enabled-model UI blocking remains an open, separate issue.
+
+
+# DJ039 — Consolidate current documentation
+
+12 November 2026. Replaced stacked, conflicting current-build notes in the index, voice guide, recording guide and roadmap with the final .11 behavior. Removed obsolete diagnostics labels/instructions, old test-count appendices and completed training work from deferred lists. Retained historical investigations and journal entries as dated evidence. Documentation only; runtime behavior/build unchanged.

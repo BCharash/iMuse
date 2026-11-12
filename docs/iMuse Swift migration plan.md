@@ -1,6 +1,6 @@
 # Native iMuse: feasibility and proposed scope
 
-Updated 4 November 2026. Conditional direction, not authorization to build or migrate. No Swift implementation exists here. Xcode/device testing is deferred until the user has a suitable cable. The [earlier detailed proposal](Archive/native-proposal-2026-11-04.md) is historical; its exclusion of native transcription is superseded.
+Reviewed 12 November 2026. Conditional direction, not authorization to build or migrate. No Swift implementation exists here. Xcode/device testing is deferred until the user has a suitable cable. The [earlier detailed proposal](Archive/native-proposal-2026-11-04.md) is historical; its exclusion of native transcription is superseded.
 
 ## Product direction under consideration
 

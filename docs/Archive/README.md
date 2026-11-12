@@ -1,9 +1,10 @@
 # Documentation archive
 
-Reviewed 5 November 2026. These are retained investigations, design decisions and implementation snapshots. Their imperative wording, “current” labels and test counts describe their original dates. Use the [active index](../README.md) for present work; archived checklists do not authorize restoring retired features or repeating completed stages.
+Reviewed 12 November 2026. These are retained investigations, design decisions and implementation snapshots. Their imperative wording, “current” labels and test counts describe their original dates. Use the [active index](../README.md) for present work; archived checklists do not authorize restoring retired features or repeating completed stages.
 
 | Snapshot | Why retained / what supersedes it |
 | --- | --- |
+| [Wake evaluation evidence, 12 November](wake-evaluation-evidence-2026-11-12.md) | Historical Hey Doc replay/label/threshold measurements; current lab use remains in the active evaluation guide. |
 | [Voice-control extraction history, 5 November](voice-control-history-2026-11-05.md) | Detailed pre-acceptance characterization, staged extraction, original race observations and prior UI/diagnostic validation. Current accepted architecture is in the voice-control guide. |
 | [Native proposal snapshot, 4 November](native-proposal-2026-11-04.md) | Earlier recorder-only scope and system-integration detail; current native guide includes possible transcription/model management and recording priority. |
 | [Recorder lab guide snapshot, 4 November](recorder-lab-guide-2026-11-04.md) | Detailed startup/build history and earlier live Whisper procedures; current evaluation guide records rejected latency and detector-aligned Silero work. |
