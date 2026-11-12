@@ -62,7 +62,11 @@ window.addEventListener("imuse-settings-changed", event => {
         wakeWord?.engine?.setThreshold?.(threshold);
     }
     syncAudioCommandsSuspension();
-    if (event.detail.audioCommands) preloadCommandModel();
+    if (event.detail.audioCommands) {
+        if (!wakeWord && !wakeModelLoading) void initializeWakeWord();
+        prepareSpokenResponses();
+        preloadCommandModel();
+    }
     if (event.detail.audioCommands && activeSession && !voiceController.active && wakeWord) {
         scheduleWakeDetectorArm(activeSession, 0);
     }
@@ -74,6 +78,7 @@ let WAKE_THRESHOLD = getSettings().voicuteThreshold;
 let selectedWakeEngine = getSettings().wakeEngine;
 const WAKE_DETECT_COOLDOWN_MS = 1500;
 let wakeModelLoadGeneration = 0;
+let wakeModelLoading = false;
 let wakeWord = null;
 let wakeWordPhrase = "Hey Friday";
 let wakeWordLoadError = null;
@@ -550,8 +555,10 @@ function setLifecycleStatus(message) {
 }
 
 async function initializeWakeWord() {
+ if (!getSettings().audioCommands) { refreshIdleWakeStatus(); return; }
  const engineName=selectedWakeEngine;
  const generation=++wakeModelLoadGeneration;
+ wakeModelLoading=true;
  const isLatestLoad=()=>generation===wakeModelLoadGeneration&&selectedWakeEngine===engineName;
  WAKE_THRESHOLD=engineName==="heed"?getSettings().wakeThreshold:getSettings().voicuteThreshold;
  wakeWordLoadError=null;
@@ -570,6 +577,8 @@ async function initializeWakeWord() {
   if(!isLatestLoad())return;
   wakeWordLoadError=error;
   if(activeSession)setWakeStatus(`Voice commands unavailable. You can still use the recording buttons.`);else refreshIdleWakeStatus();
+ }finally{
+  if(isLatestLoad())wakeModelLoading=false;
  }
 }
 
@@ -1685,5 +1694,5 @@ window.setTimeout(preloadCommandModel, 1000);
 // Microphone opens only for explicit recording or a short level check; no startup capture.
 setLifecycleStatus("Screen lock prevention activates during recording when available.");
 
-// Cache short response files without opening the microphone.
-void prepareSpokenResponses();
+// Spoken feedback is used by manual recording as well as voice commands.
+prepareSpokenResponses();

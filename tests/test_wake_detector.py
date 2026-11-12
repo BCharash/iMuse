@@ -57,6 +57,7 @@ function handleWakeDetected(current){triggers.push(current);}
 function closeCommandWindow(){closeCalls++;}
 function syncAudioCommandsSuspension(){}function preloadCommandModel(){}
 function prepareSpeechDetection(){}
+let promptPrepares=0;function prepareSpokenResponses(){promptPrepares++;}
 const speechDetector={reset(){},feed(){return null;},decide:async()=>({valid:true,pass:true})};
 const speechEvents=[];const voiceDiagnostics={record(type,details){speechEvents.push({type,...details});}};
 function loadHeedWakeWord(options){const gate=deferred();loads.push({name:'heed',options,...gate});return gate.promise;}
@@ -314,8 +315,23 @@ class WakeRoutingTests(unittest.TestCase):
  loads[2].reject(Error('obsolete failure'));await obsolete;assert(wakeWordLoadError===null,'obsolete failure ignored');
  const failed=initializeWakeWord(),error=Error('offline');loads[3].reject(error);await failed;
  assert(wakeWordLoadError===error&&timers.size===0&&statuses.at(-1).includes('recording buttons'),'current failure reported without arm');
- settings.audioCommands=false;const disabled=initializeWakeWord();loads[4].resolve(loaded);await disabled;
- assert(wakeWord===loaded&&timers.size===0,'disabled preference permits load but no arm');
+ settings.audioCommands=false;await initializeWakeWord();
+ assert(loads.length===4&&wakeWord===null&&timers.size===0,'disabled preference skips new model loading and arming');
+""")
+
+    def test_disabled_startup_enable_deduplication_and_warm_reuse(self):
+        check(r"""
+ settings.audioCommands=false;await initializeWakeWord();changed({detail:settings});
+ assert(loads.length===0&&promptPrepares===0,'disabled startup does not prepare models or prompts');
+ settings.audioCommands=true;changed({detail:settings});
+ assert(loads.length===1&&wakeModelLoading&&promptPrepares===1,'enabling starts selected model and prompt preparation');
+ settings.wakeThreshold=.84;changed({detail:settings});
+ assert(loads.length===1,'settings changes during preparation do not duplicate model loading');
+ const model={phrase:'Hey iMuse',engine:{setThreshold(value){this.threshold=value;}}};
+ loads[0].resolve(model);await flush();
+ assert(!wakeModelLoading&&wakeWord===model&&model.engine.threshold===.84,'ready model uses latest tuning');
+ settings.audioCommands=false;changed({detail:settings});settings.audioCommands=true;changed({detail:settings});
+ assert(loads.length===1&&wakeWord===model,'re-enabling reuses the already warmed model');
 """)
 
     def test_settings_threshold_engine_and_disable_integration(self):

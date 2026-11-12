@@ -2,7 +2,7 @@
 
 Updated 12 November 2026. Start here; current findings take precedence over older plans and journal entries.
 
-Current candidate: **2026-11-12.9** extends the iPhone-accepted buffered “Yes?” playback to all spoken prompts to address clipped beginnings. Earlier stop/microphone changes and Audio Prompt Volume remain; iPhone acceptance for the other prompts is pending. See [voice control](voice-control-refactor.md) and [recording reliability](recording-investigation.md).
+Current candidate: **2026-11-12.11** prepares spoken prompts at startup for manual and voice controls, while skipping wake-model loading when Audio commands is off. Warm model reuse remains; enabled-model UI blocking is still open. See [voice control](voice-control-refactor.md) and [recording reliability](recording-investigation.md).
 
 | Document | Purpose |
 | --- | --- |

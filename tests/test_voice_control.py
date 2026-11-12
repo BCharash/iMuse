@@ -27,6 +27,7 @@ const assert=(value,message)=>{if(!value)throw Error(message);};
 const console={warn(){},error(){}};
 const speechDetector={reset(){}};
 function prepareSpeechDetection(){}
+function prepareSpokenResponses(){}
 const order=[],listeners=[],prompts=[],arms=[],metadata=[];
 let clock=0,activeSession=null,loadGate=null,startGate=null,stopGate=null,loadError=null,stopError=null;
 let loads=0,shutdowns=0,promptGate=null,promptOK=true,beeps=0;
@@ -81,8 +82,9 @@ class VoiceControlTests(unittest.TestCase):
         evaluate(r"""
 globalThis.testResult='pending';const assert=(v,m)=>{if(!v)throw Error(m);};
 const speechDetector={reset(){}};function prepareSpeechDetection(){}
+function prepareSpokenResponses(){}
 let activeSession=null,wakeWord=null,wakeWordLoadError=null,selectedWakeEngine='heed',WAKE_THRESHOLD=.8,wakeWordPhrase='Hey Doc',text='';
-let wakeModelLoadGeneration=0;
+let wakeModelLoadGeneration=0,wakeModelLoading=false;
 const settings={audioCommands:true,wakeEngine:'heed',wakeThreshold:.8,voicuteThreshold:.9},getSettings=()=>settings;
 const voiceController={suspended:false,active:false,setSuspended(value){this.suspended=value;}};
 const setWakeStatus=value=>text=value,closeCommandWindow=()=>{},clearWakeDetectorTimers=()=>{},syncAudioCommandsSuspension=()=>{},preloadCommandModel=()=>{},scheduleWakeDetectorArm=()=>{};
