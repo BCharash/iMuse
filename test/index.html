@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="css/style.css">
+
+    <title>iMuse — older audio test</title>
+
+    <!-- Browser tab -->
+    <link rel="icon" href="./favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32"
+          href="./icons/favicon-32-v2.png">
+    <link rel="icon" type="image/png" sizes="16x16"
+          href="./icons/favicon-16.png">
+
+    <!-- iPhone Home Screen -->
+    <link rel="apple-touch-icon" sizes="180x180"
+          href="./icons/apple-touch-icon.png">
+
+    <!-- Progressive Web App -->
+
+
+    <meta name="apple-mobile-web-app-title" content="iMuse">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#07145C">
+</head>
+
+<body>
+<aside style="margin:12px;padding:14px;border:2px solid #666;background:#fff;color:#111" role="note">
+<strong>Older iMuse audio test — b9f3a87 (3 November)</strong>
+<p>This is the pre-command-refactor version, not current iMuse. Its recordings and settings use separate names. Audio commands starts off; the older Heed phrase is Hey Doc.</p>
+<p>Close other recording tabs. Without Bluetooth, make one short recording, then Stop. Report whether “Recording stopped” is audible. Do not install this test as an app. <a href="../">Return to current iMuse</a>.</p>
+</aside>
+
+<main>
+
+    <h1>iMuse</h1>
+
+    <p class="tagline">Turn your thoughts into text</p>
+    <p class="subtitle">Speak freely. iMuse is ready</p>
+
+    <section class="recording-primary-controls" aria-label="Recording controls">
+        <h2 id="recordingHeading" aria-live="polite">New Recording</h2>
+        <button id="recordButton" class="record-icon-button" type="button" aria-label="Start recording" title="Start recording"><span class="record-symbol" aria-hidden="true"></span></button>
+        <button id="pauseButton" class="stop-icon-button" type="button" disabled aria-label="Stop recording" title="Stop recording"><span class="stop-symbol" aria-hidden="true"></span><span class="stop-caption">Stop</span></button>
+    </section>
+
+    <p id="microphoneStatus" class="microphone-status" role="status">Microphone: inactive (not listening)</p>
+
+    <div id="recordingStatusGroup">
+    <div id="commandListening" class="command-listening" hidden role="status" aria-live="polite">Listening for voice command <svg id="commandCountdown" class="command-timer" viewBox="0 0 40 40" aria-hidden="true"><circle class="command-timer-track" cx="20" cy="20" r="17"></circle><path id="commandTimerProgress" class="command-timer-progress"></path><line id="commandTimerHand" class="command-timer-hand" x1="20" y1="20" x2="20" y2="3" visibility="hidden"></line></svg></div>
+    <div id="status" role="status" aria-live="polite">Ready to record.</div>
+    <p id="wakeStatus" aria-live="polite">Preparing voice commands…</p>
+    <p id="lifecycleStatus" aria-live="polite">Screen lock prevention activates during recording when available.</p>
+    </div>
+
+    <audio
+        id="audioPlayer"
+        controls
+        hidden>
+    </audio>
+
+    <div id="recordingControls" hidden>
+        <button id="deleteButton">
+            Delete
+        </button>
+    </div>
+
+
+
+    <button id="settingsButton" type="button" aria-expanded="false" aria-controls="settingsPanel">Settings</button>
+    <section id="settingsPanel" class="settings-panel" hidden aria-label="Voice control settings">
+        <h2>Settings</h2>
+        <div class="imuse-microphone-group">
+        <h3>Recording microphone</h3>
+        <label class="microphone-choice-label" for="microphoneChoice">Recording microphone</label>
+        <div class="microphone-choice-controls">
+            <select id="microphoneChoice"><option value="">System default</option></select>
+            <button id="refreshMicrophones" type="button">Refresh</button>
+        </div>
+        <p class="settings-note">Selection applies to the next recording. Device names may require microphone permission.</p>
+        <div class="imuse-mic-processing-controls" role="group" aria-label="Microphone processing requests">
+            <label><input type="checkbox" id="autoGainControl"> Automatic gain control</label>
+            <label><input type="checkbox" id="noiseSuppression"> Noise suppression</label>
+            <label><input type="checkbox" id="echoCancellation"> Echo cancellation</label>
+        </div>
+        <p class="settings-note">Processing changes apply to the next recording. The diagnostics below show whether the browser honored each request.</p>
+        <div class="imuse-disclosure"><strong>Microphone levels</strong><button type="button" id="microphoneLevelsToggle" aria-expanded="false" aria-controls="microphoneLevelsDetail">View</button></div>
+        <div id="microphoneLevelsDetail" class="imuse-disclosure-detail" hidden>
+            <div class="microphone-meter">
+                <svg id="microphoneLevelDial" class="microphone-level-dial" viewBox="0 0 320 174" role="meter" aria-label="Live microphone RMS level in dBFS" aria-valuemin="-70" aria-valuemax="0" aria-valuetext="Microphone inactive">
+                    <path class="microphone-meter-arc" d="M 30 145 A 130 130 0 0 1 290 145" />
+                    <line x1="34.0" y1="145.0" x2="43.0" y2="145.0" />
+                    <text x="58.0" y="149.0">-70</text>
+                    <line x1="46.5" y1="90.3" x2="54.6" y2="94.2" />
+                    <text x="68.1" y="104.7">-60</text>
+                    <line x1="81.4" y1="46.5" x2="87.1" y2="53.5" />
+                    <text x="96.4" y="69.3">-50</text>
+                    <line x1="132.0" y1="22.2" x2="134.0" y2="30.9" />
+                    <text x="137.3" y="49.6">-40</text>
+                    <line x1="188.0" y1="22.2" x2="186.0" y2="30.9" />
+                    <text x="182.7" y="49.6">-30</text>
+                    <line x1="238.6" y1="46.5" x2="232.9" y2="53.5" />
+                    <text x="223.6" y="69.3">-20</text>
+                    <line x1="273.5" y1="90.3" x2="265.4" y2="94.2" />
+                    <text x="251.9" y="104.7">-10</text>
+                    <line x1="286.0" y1="145.0" x2="277.0" y2="145.0" />
+                    <text x="262.0" y="149.0">0</text>
+                    <text class="microphone-meter-unit" x="160" y="112">Smoothed RMS · dBFS</text>
+                    <g id="quietRoomMarker" class="microphone-room-marker" hidden><text x="160" y="11">Q</text><line x1="160" y1="15" x2="160" y2="26" /></g>
+                    <g id="noisyRoomMarker" class="microphone-room-marker" hidden><text x="160" y="11">N</text><line x1="160" y1="15" x2="160" y2="26" /></g>
+                    <g id="microphoneLevelNeedle" class="microphone-meter-needle" transform="rotate(-90 160 145)"><line x1="160" y1="145" x2="160" y2="35" /><circle cx="160" cy="145" r="5" /></g>
+                </svg>
+                <output id="microphoneLevelLive" class="microphone-meter-reading">—</output>
+                <div class="microphone-room-actions"><button id="markQuietRoom" type="button" disabled>Mark quiet room</button><button id="markNoisyRoom" type="button" disabled>Mark noisy room</button></div>
+                <p class="settings-note microphone-room-reference"><span id="quietRoomValue">Q Quiet room: not marked</span><span id="noisyRoomValue">N Noisy room: not marked</span></p>
+                <p class="settings-note">Let the needle settle, then mark your room levels. References last until reload; microphone or gain changes require new measurements. The dial spans −70 to 0 dBFS; the number shows levels below the dial too.</p>
+            </div>
+            <label class="settings-slider" for="silenceThresholdDb">Silence threshold (dBFS) <output id="silenceThresholdDbValue"></output><input type="range" id="silenceThresholdDb" min="-65" max="-20" step="0.5"></label>
+            <label class="settings-slider" for="wakeMinimumDb">Wake-word minimum level (dBFS) <output id="wakeMinimumDbValue"></output><input type="range" id="wakeMinimumDb" min="-65" max="-20" step="1"></label>
+            <p class="settings-note">The needle shows input loudness, not recognition confidence. Start recording to measure; readings continue while paused. Wake-word minimum level is for evaluation only; it does not yet filter activations.</p>
+            <h3>Microphone processing</h3>
+            <div id="microphoneProcessingDetails" class="imuse-mic-report" aria-live="polite">No recording microphone has been acquired yet.</div>
+            <p class="settings-note">Active values are browser-reported and may not describe additional operating-system processing. Not reported does not mean disabled.</p>
+        </div>
+        </div>
+        <label class="settings-slider">Pause after no speech (seconds) <output id="silencePauseSecondsValue"></output><input type="range" id="silencePauseSeconds" min="3" max="15" step="1"></label>
+        <label class="settings-check"><input type="checkbox" id="audioCommandsToggle"> Audio commands</label>
+        <div id="voiceSettings">
+            <fieldset class="settings-group">
+                <legend>Wake-word recognition</legend>
+                <label>Wake-word engine <select id="wakeEngine"><option value="voicute">Voicute — Hey Friday</option><option value="heed">Heed — Hey Doc</option></select></label>
+                <label id="voicuteThresholdRow">Voicute threshold <output id="voicuteThresholdValue"></output><input type="range" id="voicuteThreshold" min="0.3" max="0.95" step="0.01"></label>
+                <label id="heedThresholdRow">Heed threshold <output id="wakeThresholdValue"></output><input type="range" id="wakeThreshold" min="0.3" max="0.99" step="0.01"></label>
+            </fieldset>
+            <fieldset class="settings-group">
+                <legend>Voice command recognition</legend>
+                <label>Command listening window (seconds) <output id="commandWindowValue"></output><input type="range" id="commandWindow" min="2" max="15" step="1"></label>
+                <label>Go threshold <output id="goThresholdValue"></output><input type="range" id="goThreshold" min="0.3" max="0.99" step="0.01"></label>
+                <label>Stop threshold <output id="stopThresholdValue"></output><input type="range" id="stopThreshold" min="0.3" max="0.99" step="0.01"></label>
+                <label>Yes confirmation threshold <output id="yesThresholdValue"></output><input type="range" id="yesThreshold" min="0.3" max="0.99" step="0.01"></label>
+                <label>No confirmation threshold <output id="noThresholdValue"></output><input type="range" id="noThreshold" min="0.3" max="0.99" step="0.01"></label>
+                <label>TensorFlow overlap <select id="overlapFactor"><option value="auto">Automatic (desktop 0.75 / mobile 0.90)</option><option value="0.5">0.50</option><option value="0.75">0.75</option><option value="0.9">0.90</option></select></label>
+            </fieldset>
+        </div>
+        <p class="settings-note">Settings are saved on this device. Wake phrases enter the Go/Stop command window during recording or pause.</p>
+    </section>
+    <section id="savedRecordingsLocation" aria-label="Saved recordings"></section>
+
+</main>
+
+<script type="module" src="js/settings.js"></script>
+<script
+    type="module"
+    src="js/recorder.js">
+</script>
+
+</body>
+</html>
+

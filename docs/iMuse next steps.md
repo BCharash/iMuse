@@ -8,6 +8,8 @@ Updated 12 November 2026. This is the active work queue. **Build 2026-11-05.3 is
 
 ### Stability investigation: exact resume order
 
+**Next comparison prepared:** the scoped .4 request did not restore iPhone built-in output. The earlier baseline (`b9f3a87`) is prepared in `test/` on branch `audio-baseline-test`, with separate database/preferences and unchanged historical capture/playback. After publishing to `/iMuse/test/`, compare manual Record/Stop with Audio commands off on the same iPhone. See [baseline instructions](../test/README.md). Branch creation alone does not publish the URL; production code remains unchanged.
+
 **Current .4 experiment:** temporary .3 instrumentation is reverted. Perform the built-in/Bluetooth iPhone stop-message comparison for 2026-11-12.4 using the [active investigation](recording-investigation.md#iphone-stop-announcement-output-regression). Only the idle stopped prompt requests playback intent; revert this separate experiment if it fails. Older .3 instrumentation instructions below are historical and no longer describe the current checkout.
 
 1. **Observe the current production checkpoint.** Checkout `95291db`, build 2026-11-11.5, uses the original stop prompt. The user reports normal iPhone speaker output again; cause remains unresolved. The standalone output check and .6 substitution were reverted. Do not repeat those experiments or change routing unless the symptom recurs. The [recording investigation](recording-investigation.md#iphone-stop-announcement-output-regression) owns the evidence and recurrence checklist.

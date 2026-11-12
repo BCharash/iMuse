@@ -1,0 +1,234 @@
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500&display=swap');
+
+/* iMuse — visual foundation */
+
+:root {
+    --background: #f4f1eb;
+    --surface: #fffdf9;
+    --text: #30343b;
+    --muted: #777b82;
+    --accent: #6d7f73;
+    --accent-dark: #53665b;
+    --border: #ddd8cf;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at 50% 0%, #ffffff 0%, var(--background) 55%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.6;
+}
+
+h1,
+h2,
+button,
+label,
+select,
+p,
+div {
+    font-family: inherit;
+}
+
+main {
+    width: min(720px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 56px 0 48px;
+}
+
+h1 {
+    margin: 0;
+    text-align: center;
+    font-size: 42px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+}
+
+.tagline {
+    margin: 8px 0 2px;
+    text-align: center;
+    color: var(--accent-dark);
+    font-family: "Dancing Script", cursive;
+    font-size: 33px;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+}
+
+.subtitle {
+    margin: 0 0 42px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 16px;
+}
+
+button {
+    border: none;
+    border-radius: 999px;
+    padding: 13px 24px;
+    background: var(--accent);
+    color: white;
+    font-family: inherit;
+    font-size: 16px;
+    cursor: pointer;
+    transition:
+        background 0.2s ease,
+        transform 0.1s ease;
+}
+
+button:hover {
+    background: var(--accent-dark);
+}
+
+button:disabled {
+    background: #d6d3cd;
+    color: #99958e;
+    cursor: not-allowed;
+    transform: none;
+}
+
+button:active {
+    transform: scale(0.97);
+}
+
+#audioPlayer {
+    display: block;
+    width: min(500px, 100%);
+    margin: 0 auto 14px;
+    accent-color: var(--accent);
+}
+
+#audioPlayer[hidden] {
+    display: none;
+}
+
+/* The recorder state is the sole source of truth for these controls. */
+.recording-primary-controls {display:flex;flex-direction:column;align-items:center;gap:12px;margin:0 auto 20px}
+#recordingHeading {margin:0 0 5px;text-align:center;font-size:23px;font-weight:500}
+#recordButton {width:116px;height:116px;padding:0;display:grid;place-items:center;background:#fbe8e6;border:2px solid #dfc4c1;border-radius:50%}
+#recordButton:hover:not(:disabled) {background:#f6d9d5}
+#recordButton:disabled {opacity:.55}
+.record-symbol {width:65px;height:65px;border-radius:50%;background:#c63e37;display:block}
+#recordButton.is-recording .record-symbol {width:22px;height:58px;border-radius:4px;box-shadow:32px 0 0 #c63e37;transform:translateX(-16px)}
+#pauseButton {min-width:76px;padding:8px 14px;background:transparent;color:var(--text);display:flex;align-items:center;flex-direction:column;gap:5px;border-radius:12px}
+#pauseButton:hover:not(:disabled) {background:#eee8e2}
+.stop-symbol {width:32px;height:32px;border-radius:5px;background:#c63e37;display:block}
+#pauseButton:disabled .stop-symbol {background:#bcb8b3}
+#pauseButton:disabled {color:#99958e;background:transparent}
+.stop-caption {font-size:13px}
+
+#recordingControls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 0 auto 20px;
+}
+
+#recordingControls[hidden] {
+    display: none;
+}
+
+#status {
+    min-height: 28px;
+    margin: 22px 0 42px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 15px;
+}
+
+/* Stage 1: settings and microphone status. Existing recording controls unchanged. */
+#settingsButton {display:block;margin:0 auto 14px;background:transparent;color:var(--accent-dark);border:1px solid var(--border);padding:9px 22px}
+.settings-panel {max-width:520px;margin:12px auto 22px;padding:18px;background:var(--surface);border:1px solid var(--border);border-radius:16px}
+.settings-panel[hidden],.command-listening[hidden] {display:none}
+.settings-panel h2 {margin:0 0 12px;font-size:20px}
+.settings-check {display:block;margin:8px 0}
+#voiceSettings {display:grid;gap:14px;margin-top:14px}
+#voiceSettings label {display:grid;gap:3px;font-size:14px}
+#voiceSettings output {color:var(--accent-dark);font-weight:600}
+#voiceSettings input[type=range] {width:100%;accent-color:var(--accent)}
+#voiceSettings select {width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;background:white}
+.settings-note {font-size:12px;color:var(--muted)}
+.microphone-status {text-align:center;font-size:13px;color:var(--accent-dark);overflow-wrap:anywhere}
+.command-listening {margin:12px auto;padding:12px;border:1px solid var(--accent);border-radius:12px;text-align:center;font-weight:600}
+
+/* Wake engine selection; microphone remains outside the collapsible Settings panel. */
+#heedThresholdRow[hidden],#voicuteThresholdRow[hidden]{display:none}
+.microphone-status{margin:4px auto 16px;padding:8px 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface);font-weight:600}
+
+#recordingStatusGroup { margin: 12px auto 20px; text-align: center; }
+#recordingStatusGroup #status { margin: 12px 0; }
+#recordingStatusGroup #wakeStatus, #recordingStatusGroup #lifecycleStatus { margin: 8px auto; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+#savedRecordingsLocation { margin-top: 26px; }
+#savedRecordingsLocation:empty { display: none; }
+.saved-audio-open { padding:6px 10px; min-width:36px; min-height:36px; }
+.recording-diagnostic-action { display:inline-flex; align-items:center; gap:5px; font-size:12px; }
+.recording-diagnostic-download { padding:4px 8px; min-width:32px; min-height:32px; font-size:12px; }
+.saved-audio-dialog { width:min(360px, calc(100% - 48px)); border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--text); padding:18px; }
+.saved-audio-dialog::backdrop { background:rgb(0 0 0 / 35%); }
+.saved-audio-dialog h3 { margin:0 0 12px; }
+.saved-audio-dialog audio { display:block; width:100%; margin-bottom:14px; }
+
+/* Microphone selection is independent of voice-command settings. */
+.microphone-choice-label { display:block; font-size:14px; font-weight:600; margin-top:8px; }
+.microphone-choice-controls { display:flex; gap:8px; align-items:center; margin-top:6px; }
+.microphone-choice-controls select { flex:1; min-width:0; padding:9px; border:1px solid var(--border); border-radius:8px; }
+.microphone-choice-controls button { padding:9px 12px; }
+
+/* Compact solid pie countdown; blue area shrinks counterclockwise. */
+.command-listening { display: flex; align-items: center; justify-content: center; gap: 9px; }
+.command-timer { width: 28px; height: 28px; flex: 0 0 28px; }
+.command-timer-track { fill: var(--surface); stroke: var(--border); stroke-width: 1; }
+.command-timer-progress { fill: #9bdcf5; stroke: none; }
+.command-timer-hand { stroke: #35424b; stroke-width: 0.85; }
+
+/* Settings groups use the existing neutral palette and rounded corners. */
+.settings-slider { display:grid; gap:4px; margin:16px 0 18px; font-size:14px; }
+.settings-slider output { color:var(--accent-dark); font-weight:600; }
+.settings-slider input[type=range] { width:100%; accent-color:var(--accent); }
+.settings-group { min-width:0; margin:0; padding:14px; border:1px solid var(--border); border-radius:12px; display:grid; gap:14px; background:var(--surface); }
+.settings-group legend { padding:0 7px; color:var(--accent-dark); font-size:15px; font-weight:600; }
+.settings-group:has(input:disabled) { /* Retain readable headings even when commands are disabled. */ }
+.settings-slider input:disabled { opacity:.5; }
+.microphone-meter { max-width:360px; margin:8px auto 16px; text-align:center; }
+.microphone-level-dial { display:block; width:100%; overflow:visible; }
+.microphone-level-dial line { stroke:var(--text); stroke-width:1.5; }
+.microphone-level-dial text { fill:var(--text); font-size:12px; text-anchor:middle; }
+.microphone-meter-arc { fill:none; stroke:var(--border); stroke-width:8; }
+.microphone-level-dial .microphone-meter-unit { font-size:11px; fill:var(--muted); }
+.microphone-meter-needle { transition:transform 240ms ease-out; }
+.microphone-meter-needle line { stroke:var(--accent-dark); stroke-width:2.5; }
+.microphone-meter-needle circle { fill:var(--accent-dark); }
+.microphone-room-marker[hidden] { display:none; }
+.microphone-room-marker text { font-weight:700; }
+.microphone-meter-reading { display:block; min-height:1.5em; font-variant-numeric:tabular-nums; font-weight:600; }
+.microphone-room-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.microphone-room-actions button { padding:6px 9px; font-size:12px; }
+.microphone-room-reference { display:flex; justify-content:center; flex-wrap:wrap; gap:4px 12px; }
+@media (prefers-reduced-motion:reduce) { .microphone-meter-needle { transition:none; } }
+
+/* Compact Memora-style settings disclosures, retaining the iMuse palette. */
+.imuse-disclosure { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:15px; padding:9px 0; border-top:1px solid var(--border); }
+.imuse-disclosure button { flex:0 0 auto; padding:5px 12px; font-size:12px; background:transparent; color:var(--accent-dark); border:1px solid var(--border); border-radius:8px; }
+.imuse-disclosure-detail { padding:8px 0 12px; }
+.imuse-disclosure-detail[hidden] { display:none !important; }
+.imuse-disclosure-detail h3 { font-size:15px; margin:16px 0 8px; }
+.imuse-mic-report { overflow-wrap:anywhere; font-size:12px; }
+.imuse-mic-table { display:grid; gap:0; overflow-x:auto; }
+.imuse-mic-table-row { display:grid; grid-template-columns:minmax(100px,1.4fr) repeat(3,minmax(75px,1fr)); gap:6px; border-bottom:1px solid var(--border); padding:7px 0; }
+.imuse-mic-table-row > * { min-width:0; overflow-wrap:anywhere; }
+#recordingDiagnostics { padding:10px 14px !important; }
+
+/* Microphone controls grouped without changing iMuse's visual language. */
+.imuse-microphone-group { border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0 18px;background:var(--surface);min-width:0; }
+.imuse-microphone-group > h3 { margin:0 0 8px;color:var(--accent-dark);font-size:15px;font-weight:600; }
+.imuse-microphone-group .imuse-disclosure { margin-top:12px; }
+.imuse-mic-processing-controls { display:grid;gap:8px;margin:12px 0 8px; }
+.imuse-mic-processing-controls label { display:flex;align-items:center;gap:9px;font-size:14px; }
+.imuse-mic-processing-controls input[type=checkbox] { accent-color:var(--accent);width:17px;height:17px; }
+.imuse-mic-processing-controls input:disabled { opacity:.45;cursor:not-allowed; }
+.imuse-mic-processing-controls label:has(input:disabled) { opacity:.55; }

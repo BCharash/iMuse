@@ -1,0 +1,222 @@
+{
+  "revision": "b9f3a878907236c9a5136b2a1468962957a56640",
+  "description": "Complete production runtime from b9f3a87, except labelled HTML and isolated storage keys. No lab/test tooling copied.",
+  "files": [
+    {
+      "path": "audio/confirm-stop-recording.wav",
+      "originalSha256": "f7ccc62c5be6fee729cf474008a75b152f286487b7e826ae1d3602713664da25",
+      "testSha256": "f7ccc62c5be6fee729cf474008a75b152f286487b7e826ae1d3602713664da25",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "audio/new-recording.wav",
+      "originalSha256": "d856eef8f5ed53f74c281f1e3565846a03472364ec083e6813c78073d8498bd1",
+      "testSha256": "d856eef8f5ed53f74c281f1e3565846a03472364ec083e6813c78073d8498bd1",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "audio/pause.wav",
+      "originalSha256": "b063c2fcebe4a15377d94a0f698f43ed5d606fc3d8bb4d809c1d821a7dc62fc8",
+      "testSha256": "b063c2fcebe4a15377d94a0f698f43ed5d606fc3d8bb4d809c1d821a7dc62fc8",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "audio/recording-stopped.wav",
+      "originalSha256": "0bab23285c9f01240b73ea9e8423f17092edfd250c4df7afd9fff5c3fda252f4",
+      "testSha256": "0bab23285c9f01240b73ea9e8423f17092edfd250c4df7afd9fff5c3fda252f4",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "audio/recording.wav",
+      "originalSha256": "ae13247f3dd36e827aad569abce3508e9a8fbb92c862c74ea5a9c414904e45ce",
+      "testSha256": "ae13247f3dd36e827aad569abce3508e9a8fbb92c862c74ea5a9c414904e45ce",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "audio/yes.wav",
+      "originalSha256": "fa49ec15e88f232f4ebd13b432f0d238784ea4e1aaf159e11da50a1845d33496",
+      "testSha256": "fa49ec15e88f232f4ebd13b432f0d238784ea4e1aaf159e11da50a1845d33496",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "css/style.css",
+      "originalSha256": "66249a1f5ffc118fa5d0c864e09570936ee46712585056ed34a5531e1b1b1fbc",
+      "testSha256": "66249a1f5ffc118fa5d0c864e09570936ee46712585056ed34a5531e1b1b1fbc",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "favicon.ico",
+      "originalSha256": "cefe3067fa6e81301496343adc5f4084af0b744a4b59d7c0eab3f6be097679c3",
+      "testSha256": "cefe3067fa6e81301496343adc5f4084af0b744a4b59d7c0eab3f6be097679c3",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "icons/apple-touch-icon.png",
+      "originalSha256": "e84e8f693dd89388f91a66c58b7250334ebfec1547a132302af32d07599beeef",
+      "testSha256": "e84e8f693dd89388f91a66c58b7250334ebfec1547a132302af32d07599beeef",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "icons/favicon-16.png",
+      "originalSha256": "0ed6b7f5f675579d7bec3508cb55a2a0b8583ecfd2bceaa1080b0d967608bdd1",
+      "testSha256": "0ed6b7f5f675579d7bec3508cb55a2a0b8583ecfd2bceaa1080b0d967608bdd1",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "icons/favicon-32-v2.png",
+      "originalSha256": "8c94862bf20b2ffb103059610601afe6b275e2130ed87157fed567c75830f508",
+      "testSha256": "8c94862bf20b2ffb103059610601afe6b275e2130ed87157fed567c75830f508",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "icons/iMuse2.png",
+      "originalSha256": "8e7ef9b5c3ac3d452a64ccf600a3557988c318c8d908a206e94d278c72a78150",
+      "testSha256": "8e7ef9b5c3ac3d452a64ccf600a3557988c318c8d908a206e94d278c72a78150",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "icons/icon-192.png",
+      "originalSha256": "4eea9e76ce54266f5a48142a360ac252108090972374e03d6d2b18678179865e",
+      "testSha256": "4eea9e76ce54266f5a48142a360ac252108090972374e03d6d2b18678179865e",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "icons/icon-512.png",
+      "originalSha256": "9539216493a8f07ff1e60e099de6483d0c60947b054c65f3d8fdc6c71cfef7c4",
+      "testSha256": "9539216493a8f07ff1e60e099de6483d0c60947b054c65f3d8fdc6c71cfef7c4",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "index.html",
+      "originalSha256": "6b0d1a0decbd89132bdcc2730cb5d9e7f822a59e4b16ca78db3d782cfafde3e2",
+      "testSha256": "e5ff425f0438feefd7c8b90c32352a3cc20482a5d863c62f136744dbdd185cdb",
+      "modifiedForIsolation": true
+    },
+    {
+      "path": "js/app.js",
+      "originalSha256": "b8fba563b3779bdc825713fad5592fdd0d21068b753f5a904d2ccee6dfacdf1d",
+      "testSha256": "b8fba563b3779bdc825713fad5592fdd0d21068b753f5a904d2ccee6dfacdf1d",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/audio-response-manager.js",
+      "originalSha256": "e2cac6274f12b163dcb4907e8906ae499c9173ff55ec08a969ec1ea6d15fe9ef",
+      "testSha256": "e2cac6274f12b163dcb4907e8906ae499c9173ff55ec08a969ec1ea6d15fe9ef",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/audio.js",
+      "originalSha256": "1b56d3f585e87b19150d18368263949df667f7f3c72d5cb924ad50a2ded2a565",
+      "testSha256": "1b56d3f585e87b19150d18368263949df667f7f3c72d5cb924ad50a2ded2a565",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/heed/filter-coeffs.js",
+      "originalSha256": "f1123468e92b4941b421f5c52352da5b8c4cbc5368aca603163b8695c3558f0f",
+      "testSha256": "f1123468e92b4941b421f5c52352da5b8c4cbc5368aca603163b8695c3558f0f",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/heed/heed-adapter.js",
+      "originalSha256": "599db4edacb12011fc9b61b3e2e6b46e0a0c5cc90828cca863fe65945f89dd52",
+      "testSha256": "599db4edacb12011fc9b61b3e2e6b46e0a0c5cc90828cca863fe65945f89dd52",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/heed/preprocessing.js",
+      "originalSha256": "011168251b72201b3346f9c08502363885cb0635742a2e6244faf69c14478d42",
+      "testSha256": "011168251b72201b3346f9c08502363885cb0635742a2e6244faf69c14478d42",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/heed/wake.json",
+      "originalSha256": "eb5e5e06a315f625f8c6cbe7cc61d0f3d33242d814eb9ce1397790bb14ac2b6d",
+      "testSha256": "eb5e5e06a315f625f8c6cbe7cc61d0f3d33242d814eb9ce1397790bb14ac2b6d",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/heed/wake.onnx",
+      "originalSha256": "2635f8c007651c39a8f63d9f6834c65f85359b7361d99e2e5d0770fa9513aa01",
+      "testSha256": "2635f8c007651c39a8f63d9f6834c65f85359b7361d99e2e5d0770fa9513aa01",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/heed/wakeword.js",
+      "originalSha256": "da12924ea9da141fd229d98c72470f53f422ee7add398f6f48fd2d2457c9375b",
+      "testSha256": "da12924ea9da141fd229d98c72470f53f422ee7add398f6f48fd2d2457c9375b",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/microphone-manager.js",
+      "originalSha256": "6fa1878e3e64933212fdb0b42b4ef09d283e245b3019050b13af4d9a991b9c6f",
+      "testSha256": "0f7a2c729fceeed6db5a722f313513c9613087d4503bf6b4ebc268c7eee9af60",
+      "modifiedForIsolation": true
+    },
+    {
+      "path": "js/recorder.js",
+      "originalSha256": "ec442a565b9b60d591b9123bb51e47506580ad9159e7a61807b8c034cfe38c95",
+      "testSha256": "ec442a565b9b60d591b9123bb51e47506580ad9159e7a61807b8c034cfe38c95",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/recording-integrity.js",
+      "originalSha256": "93399cbd8b39e13efde31262e66dbb00ab12c492cf0f29aca9c51029f5da7ac4",
+      "testSha256": "93399cbd8b39e13efde31262e66dbb00ab12c492cf0f29aca9c51029f5da7ac4",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/recording-library.js",
+      "originalSha256": "b67fc4ae0de151cfbf14c08ee8be5368fa8211f20f0b3b92c44ae247b5d95812",
+      "testSha256": "b67fc4ae0de151cfbf14c08ee8be5368fa8211f20f0b3b92c44ae247b5d95812",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/recording-recovery.js",
+      "originalSha256": "f1e010c25b0f77051747fea183071a7aec018f5761d25d54bfdd046520cfe919",
+      "testSha256": "f1e010c25b0f77051747fea183071a7aec018f5761d25d54bfdd046520cfe919",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/recording-storage-coordinator.js",
+      "originalSha256": "59b522b58dc3ac932875bbd9e3ad0bf8ac11b3f4eed3edafd5fcc04f2113dad5",
+      "testSha256": "59b522b58dc3ac932875bbd9e3ad0bf8ac11b3f4eed3edafd5fcc04f2113dad5",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/recording-store.js",
+      "originalSha256": "3c8cdf114179fd32d85ba661fb152e074dc4909a80cb606769597e609651d6cd",
+      "testSha256": "4a376e3ee9dbd0cb7a603d6b67fedfb40fee191a17c61d73e5560276ff2aeaab",
+      "modifiedForIsolation": true
+    },
+    {
+      "path": "js/settings.js",
+      "originalSha256": "06f01cb81f639bfa2cee6e24e1fcc31db530a66bf812bad3df660141e485d0bd",
+      "testSha256": "f97602f333260a1d1683150e8e4b87e0af225dc92860d047fac24410cca639c9",
+      "modifiedForIsolation": true
+    },
+    {
+      "path": "js/storage-persistence.js",
+      "originalSha256": "adfe63218505413feea311b2a488f5ce202cc9288de98ce243e5aa95805ebeeb",
+      "testSha256": "adfe63218505413feea311b2a488f5ce202cc9288de98ce243e5aa95805ebeeb",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/tensorflow/commands-adapter.js",
+      "originalSha256": "736d8cd2b4a7f49fcaadf9c753fddd27bf7e45f5ec6f9ea96b3d24a96b45a3cd",
+      "testSha256": "736d8cd2b4a7f49fcaadf9c753fddd27bf7e45f5ec6f9ea96b3d24a96b45a3cd",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/voicute/voicute-adapter.js",
+      "originalSha256": "e6ac88f93faeabefac2aadf692762ef6ac14ed0c60714033228d0ce69feb3376",
+      "testSha256": "e6ac88f93faeabefac2aadf692762ef6ac14ed0c60714033228d0ce69feb3376",
+      "modifiedForIsolation": false
+    },
+    {
+      "path": "js/voicute/wakeword.js",
+      "originalSha256": "6fb1fbd3ac661a6e26b38e12d6413857386a994a70d68865a1743e40ee4adab3",
+      "testSha256": "6fb1fbd3ac661a6e26b38e12d6413857386a994a70d68865a1743e40ee4adab3",
+      "modifiedForIsolation": false
+    }
+  ]
+}
