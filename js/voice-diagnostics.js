@@ -1,6 +1,6 @@
 // Bounded, page-memory-only observation. No model, microphone, recording or storage ownership.
 import { APP_BUILD } from './build-info.js';
-export const VOICE_DIAGNOSTICS_VERSION = '2026-11-04.4';
+export const VOICE_DIAGNOSTICS_VERSION = '2026-11-12.1';
 export function createVoiceDiagnostics({limit=500, enabledByDefault=true, now=()=>performance.now(), timestamp=()=>new Date().toISOString()}={}) {
     const capacity=Math.max(1,Math.min(500,Math.floor(limit)||500));
     let enabled=Boolean(enabledByDefault),buffer=new Array(capacity),start=0,size=0,dropped=0,sequence=0,onChange=()=>{};
@@ -100,6 +100,8 @@ function activityRows(snapshot) {
             const words=event.phase==='yes-no'?['yes','no']:['go','stop'];
             detail=`Top match: ${event.scores?.top||'—'} (${scoreText(event.scores?.topScore)}) · `+words.map(word=>`${word} ${scoreText(event.scores?.[word])} / threshold ${scoreText(event.thresholds?.[word])}`).join(' · ');
         } else if(event.type==='command-accepted') detail=`${event.command} · score ${scoreText(event.score)} / threshold ${scoreText(event.threshold)}`;
+        else if(event.type==='prompt-playback') detail=`${event.prompt}: ${event.event} · time ${scoreText(event.currentTime)} / ${scoreText(event.duration)} s · volume ${scoreText(event.volume)} · muted ${event.muted} · session ${event.sessionType}/${event.sessionState}${event.reason?' · '+event.reason:''}${event.error?' · '+event.error:''}`;
+        else if(event.type==='prompt-end') detail=`${event.prompt}: ${event.ok?'playback completed':'playback failed'}${event.error?' · '+event.error:''}`;
         else if(event.prompt) detail=({confirmStop:'Confirm stop recording',pause:'Pause',yes:'Acknowledgement',newRecording:'New recording',recording:'Recording',stopped:'Stopped'})[event.prompt]||event.prompt;
         else if(event.windowSeconds) detail=event.windowSeconds+' s listening window';
         else if(event.cancelled) detail='Cancelled before startup completed';
@@ -127,6 +129,10 @@ export function initializeVoiceDiagnostics() {
     if(!toggle||!download||!clear||!status||!view||!summary||!windows||!events||!refresh)return;
     // Keep voice diagnostics at the bottom of the Voice commands category.
     if(audioSection&&advanced)audioSection.appendChild(advanced);
+    const outputLabel = document.getElementById('voiceOutputTestLabel');
+    outputLabel?.addEventListener('change', () => voiceDiagnostics.record('output-test-label', {
+        label: outputLabel.value, message: 'User-labelled output test: '+outputLabel.value
+    }));
     function renderView(){
         const snapshot=voiceDiagnostics.snapshot(),report=summarizeVoiceDiagnostics(snapshot);
         summary.textContent=report.windows.length?`${report.goStopWindows} listening periods · ${report.gos} Go and ${report.stops} Stop recognitions. These are model decisions, not verified speech.${snapshot.droppedEvents?' Older data was dropped; some attempts may be incomplete.':''}`:voiceDiagnostics.enabled?'No voice recognition results yet. Say the wake phrase to open a Go/Stop listening period.':'Diagnostics are off. Enable collection to log new voice recognition results.';
@@ -166,7 +172,7 @@ export function initializeVoiceDiagnostics() {
     document.getElementById('downloadRecognitionResults')?.addEventListener('click',()=>saveReport(
         voiceRecognitionReport(voiceDiagnostics.snapshot()),`iMuse-voice-recognition-results-${Date.now()}.txt`));
     document.getElementById('downloadVoiceDiagnosticsJSON')?.addEventListener('click',()=>saveReport(
-        JSON.stringify(voiceDiagnostics.snapshot({userAgent:navigator.userAgent,platform:navigator.platform,hardwareConcurrency:navigator.hardwareConcurrency,visibility:document.visibilityState}),null,2),
+        JSON.stringify(voiceDiagnostics.snapshot({userAgent:navigator.userAgent,platform:navigator.platform,hardwareConcurrency:navigator.hardwareConcurrency,visibility:document.visibilityState,outputTestLabel:outputLabel?.value||'unspecified'}),null,2),
         `iMuse-voice-diagnostics-${Date.now()}.json`,'application/json'));
     voiceDiagnostics.onChange(render);
     toggle.addEventListener('change',()=>voiceDiagnostics.setEnabled(toggle.checked));

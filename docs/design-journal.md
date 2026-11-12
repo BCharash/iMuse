@@ -1712,3 +1712,12 @@ Validation for DJ032: exact supplied file copies verified; all 106 regression me
 
 
 **Follow-up, candidate 2026-11-12.2:** user requested Heed first in the dropdown and as the initial-load default. Preserve explicit saved engine choices; Audio commands remains off by default. No inference, capture or threshold changes.
+
+
+# DJ033 — Temporary prompt-state instrumentation after iPhone recurrence
+
+**Date:** 12 November 2026. **Status:** Candidate 2026-11-12.3; paired iPhone reports pending.
+
+The user confirmed inaudible stopped prompts on built-in iPhone output but normal Bluetooth playback. Other prompts, direct WAVs and Mac output are normal. The supplied .2 JSON shows eight completed stopped prompts (`ok: true`) and cleanup in 11–24 ms, without playback errors. That proves media `ended`, not the audible output route. The user authorized bounded temporary instrumentation in the real prompt path, not another lab or a routing fix.
+
+Capture actual player/session snapshots, playback lifecycle/finish reason and owned capture-state at Stop. Preserve the original WAV and all route/volume behavior. Add a page-only, user-selected built-in/Bluetooth label to the diagnostic JSON and readable label-change event. Coalesce repeated media events, remove handlers on finish and contain observer failures. The existing 500-event memory-only log remains the bound. The exact next action/removal boundary is in the recording investigation. 108 automated tests across sixteen suites pass; Chrome ran the actual stopped WAV with telemetry, without a microphone. iPhone output behavior remains unverified.

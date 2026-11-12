@@ -617,9 +617,9 @@ async function sayResponse(name) {
     const context={prompt:name,sessionId:activeSession?.id};
     voiceDiagnostics.record('prompt-start',context);
     let result;
-    try { result = await playSpokenResponse(name); }
+    try { result = await playSpokenResponse(name, detail => voiceDiagnostics.record("prompt-playback", { ...context, ...detail })); }
     catch (error) { voiceDiagnostics.record('prompt-error',{...context,message:String(error)}); throw error; }
-    voiceDiagnostics.record('prompt-end',{...context,ok:result.ok});
+    voiceDiagnostics.record('prompt-end',{...context,ok:result.ok,error:result.error});
     if (!result.ok) {
         console.warn(`Voice response ${name} could not be heard:`, result.error);
         setWakeStatus(`Voice prompt unavailable. Voice commands may still work.`);
@@ -1501,6 +1501,17 @@ async function startRecording() {
                 lastRecordingPeakBytes = current.peakPendingBytes;
                 current.resolvePauseAnnouncement?.();
                 current.resolvePauseAnnouncement = null;
+                const stoppedContext = current.audioContext;
+                const captureState = () => {
+                    try {
+                        const tracks = stream?.getAudioTracks?.() || [];
+                        return { contextState: stoppedContext?.state ?? 'none', trackCount: tracks.length,
+                            liveTracks: tracks.filter(track => track.readyState === 'live').length,
+                            mutedTracks: tracks.filter(track => track.muted).length,
+                            recorderState: current.recorder?.state ?? 'unknown' };
+                    } catch (_) { return { observationUnavailable: true }; }
+                };
+                voiceDiagnostics.record('stop-audio-capture', { sessionId: id, ...captureState() });
                 const audioCleanupAt = Date.now();
                 const commandShutdown = closeCommandWindow({ restorePauseReminder: false });
                 const audioShutdown = cleanupAudioMonitor(current);
@@ -1540,7 +1551,7 @@ async function startRecording() {
                 const outputReady = await stoppedAudioReady;
                 const newerCapture = Boolean(activeSession) || Boolean(microphoneLevelCheck.state && microphoneLevelCheck.state.phase !== "idle");
                 voiceDiagnostics.record('stopped-audio-ready', {
-                    sessionId: id, outputReady, newerCapture, elapsedMs: Date.now() - audioCleanupAt,
+                    sessionId: id, outputReady, newerCapture, elapsedMs: Date.now() - audioCleanupAt, ...captureState(),
                     message: outputReady ? 'Capture audio cleanup completed before stop announcement.' : 'Stop announcement skipped: capture audio cleanup failed or timed out.'
                 });
                 if (outputReady && !newerCapture) void sayResponse("stopped");
