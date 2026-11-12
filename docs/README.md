@@ -2,7 +2,7 @@
 
 Updated 12 November 2026. Start here; current findings take precedence over older plans and journal entries.
 
-Current candidate: **2026-11-12.7** changes stop-announcement timing and microphone release, and adds Audio Prompt Volume with a wider slider and delayed “Yes?” preview. Saving remains independent; iPhone acceptance is pending. See [recording reliability](recording-investigation.md).
+Current candidate: **2026-11-12.8** predecodes “Yes?” and removes the pointer-release preview delay to address iPhone acknowledgement latency/clipping. Earlier stop/microphone changes and Audio Prompt Volume remain; iPhone acceptance is pending. See [voice control](voice-control-refactor.md) and [recording reliability](recording-investigation.md).
 
 | Document | Purpose |
 | --- | --- |

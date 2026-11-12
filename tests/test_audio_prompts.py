@@ -5,7 +5,9 @@ from recording_test_support import MOCKS, evaluate
 
 SOURCE = (Path(__file__).resolve().parents[1] / 'js/audio-response-manager.js').read_text().replace('export ', '')
 HARNESS = r"""
-const players=[], gains=[];
+const players=[], gains=[], bufferSources=[];
+let decodeCount=0;
+Blob.prototype.arrayBuffer=async()=>new ArrayBuffer(8);
 class Audio {
  constructor(){this.events=new Map();this.volume=1;players.push(this);}
  setAttribute(){} pause(){}
@@ -16,7 +18,9 @@ class Audio {
 class AudioContext {
  constructor(){this.state='suspended';}
  createMediaElementSource(){return {connect(){}};}
- createGain(){const gain={gain:{value:1},connect(){}};gains.push(gain);return gain;}
+ createGain(){const gain={gain:{value:1},connect(){},disconnect(){}};gains.push(gain);return gain;}
+ async decodeAudioData(){decodeCount++;return {duration:.456,fullOriginal:true};}
+ createBufferSource(){const source={connect(){},disconnect(){this.disconnected=true;},start(...args){this.startArgs=args;},stop(){this.stopped=true;}};bufferSources.push(source);return source;}
  async resume(){this.state='running';}
 }
 globalThis.AudioContext=AudioContext;
@@ -36,7 +40,7 @@ globalThis.testResult='pending';
  players[0].events.get('ended')();await first;await settle();
  assert(gains[0].gain.value===0&&players[0].playCount===2,'zero volume preserved for next prompt');
  players[0].events.get('ended')();await second;
- const third=playSpokenResponse('yes',{volume:1});await settle();
+ const third=playSpokenResponse('pause',{volume:1});await settle();
  assert(gains[0].gain.value===1&&gains.length===1,'full volume restored on shared graph');
  players[0].events.get('ended')();await third;globalThis.testResult='PASS';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack));
@@ -51,6 +55,41 @@ globalThis.testResult='pending';
  controller.abort();assert(!(await first).ok,'active prompt resolves when cancelled');
  const second=playSpokenResponse('stopped',{signal:controller.signal});
  assert(!(await second).ok&&players[0].playCount===1,'cancelled queued prompt never plays later');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack));
+""")
+
+    def test_yes_predecoded_once_and_plays_full_buffer_at_selected_volume(self):
+        evaluate(MOCKS + SOURCE + HARNESS + r"""
+globalThis.testResult='pending';
+(async()=>{
+ prepareSpokenResponses();await settle();
+ assert(decodeCount===1&&bufferSources.length===0,'Yes is decoded before playback without starting audio');
+ const first=playSpokenResponse('yes',{volume:.42});await settle();
+ const source=bufferSources[0];
+ assert(source.buffer.fullOriginal&&source.startArgs.join(',')==='0,0','entire original acknowledgement starts at sample zero');
+ assert(gains.at(-1).gain.value===.42&&!players.some(player=>player.playCount),'buffer supplies selected volume without a media-element start');
+ let completed=false;first.then(()=>completed=true);await settle();
+ assert(!completed,'command acknowledgement remains pending until audio ends');
+ source.onended();assert((await first).ok&&source.disconnected,'completion releases buffer source');
+ const second=playSpokenResponse('yes',{volume:1});await settle();
+ assert(decodeCount===1&&bufferSources.length===2&&gains.at(-1).gain.value===1,'repeated Yes reuses decoded audio at full volume');
+ bufferSources[1].onended();await second;
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack));
+""")
+
+    def test_buffered_yes_cancellation_releases_serial_queue(self):
+        evaluate(MOCKS + SOURCE + HARNESS + r"""
+globalThis.testResult='pending';
+(async()=>{
+ const controller=new AbortController();
+ const first=playSpokenResponse('yes',{signal:controller.signal});await settle();
+ const next=playSpokenResponse('recording');await settle();
+ assert(!players.some(player=>player.playCount),'next prompt waits for buffered acknowledgement');
+ controller.abort();assert(!(await first).ok&&bufferSources[0].stopped&&bufferSources[0].disconnected,'cancellation stops and disconnects buffer');
+ await settle();const player=players.find(player=>player.playCount);
+ assert(player,'next prompt starts after cancellation');player.events.get('ended')();await next;
  globalThis.testResult='PASS';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack));
 """)

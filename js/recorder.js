@@ -1,4 +1,4 @@
-import { playSpokenResponse, prepareSpokenResponses } from "./audio-response-manager.js";
+import { playSpokenResponse, prepareSpokenResponses, primeSpokenResponses } from "./audio-response-manager.js";
 import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSelectionLocked, getRequestedMicrophoneConstraints } from "./microphone-manager.js";
 import { loadWakeDetector, evaluateWakeDetector } from "./wake-detector.js";
 import { localRecordingStamp, requestDownloadFilename } from "./recording-download.js";
@@ -1589,6 +1589,7 @@ async function startRecording() {
 }
 
 recordButton.addEventListener("click", () => {
+    primeSpokenResponses();
     const current = activeSession;
     if (!current) {
         startRecording();

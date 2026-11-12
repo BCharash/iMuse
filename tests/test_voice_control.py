@@ -56,6 +56,7 @@ function scheduleWakeDetectorArm(current){arms.push(current.id);current.wakeDete
 function logRecordingEvent(){}function setRecordingControlState(){}function armFinalizationWatchdog(){}
 async function putSession(value){metadata.push({...value});}
 function savedChunkProgress(){return 'saved audio';}
+function primeSpokenResponses(){}
 function startRecording(){throw Error('unexpected new capture');}
 function seed(id,state='paused'){
  const current={id,stream:{id},metadata:{id,state},wakeDetectorEnabled:true,activeSinceMs:null,recordedMs:0};

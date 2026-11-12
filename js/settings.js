@@ -1,4 +1,4 @@
-import { playSpokenResponse } from "./audio-response-manager.js";
+import { playSpokenResponse, primeSpokenResponses } from "./audio-response-manager.js";
 import { createStoragePersistence, storagePersistenceLabel } from "./storage-persistence.js";
 
 // Persisted recognition preferences; recording/microphone ownership stays in recorder.js.
@@ -123,7 +123,7 @@ function cancelPromptPreview() {
     clearTimeout(promptPreviewTimer);
     promptPreviewController?.abort();
 }
-function schedulePromptPreview() {
+function schedulePromptPreview(delayMs = 150) {
     clearTimeout(promptPreviewTimer);
     if (promptVolumeDragging || !promptVolumeChanged) return;
     promptPreviewTimer = setTimeout(() => {
@@ -133,21 +133,24 @@ function schedulePromptPreview() {
         void playSpokenResponse("yes", {
             volume:settings.audioPromptVolume / 100, signal:promptPreviewController.signal
         }).catch(error => console.warn("Volume preview unavailable:", error));
-    }, 500);
+    }, delayMs);
 }
 promptVolumeSlider.addEventListener("input", () => {
     cancelPromptPreview();
     promptVolumeChanged = true;
+    primeSpokenResponses();
     schedulePromptPreview();
 });
 promptVolumeSlider.addEventListener("pointerdown", () => {
     promptVolumeDragging = true;
     cancelPromptPreview();
+    primeSpokenResponses();
 });
 window.addEventListener("pointerup", () => {
     if (!promptVolumeDragging) return;
     promptVolumeDragging = false;
-    schedulePromptPreview();
+    // Pointer release is already a completed adjustment; no extra debounce.
+    schedulePromptPreview(0);
 });
 window.addEventListener("pointercancel", () => {
     promptVolumeDragging = false;
