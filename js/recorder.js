@@ -1,4 +1,4 @@
-import { playSpokenResponse, prepareSpokenResponses } from "./audio-response-manager.js";
+import { playSpokenResponse, prepareSpokenResponses, releaseStoppedPlaybackSession } from "./audio-response-manager.js";
 import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSelectionLocked, getRequestedMicrophoneConstraints } from "./microphone-manager.js";
 import { loadWakeDetector, evaluateWakeDetector } from "./wake-detector.js";
 import { localRecordingStamp, requestDownloadFilename } from "./recording-download.js";
@@ -280,7 +280,7 @@ function publishMicrophoneCheckState() {
     publishLiveMicrophoneLevel();
 }
 const microphoneLevelCheck=createMicrophoneLevelCheck({
-    acquire: isCurrent=>acquireRecordingMicrophone({purpose:'level-check',isCurrent}),
+    acquire: isCurrent=>{ releaseStoppedPlaybackSession(); return acquireRecordingMicrophone({purpose:'level-check',isCurrent}); },
     release: releaseRecordingMicrophone,
     createContext:()=>{const AudioContextClass=window.AudioContext||window.webkitAudioContext;return new AudioContextClass();},
     isRecordingBusy:microphoneCheckBusy,
@@ -617,7 +617,9 @@ async function sayResponse(name) {
     const context={prompt:name,sessionId:activeSession?.id};
     voiceDiagnostics.record('prompt-start',context);
     let result;
-    try { result = await playSpokenResponse(name); }
+    try { result = await playSpokenResponse(name, {
+        canUsePlaybackSession: () => !activeSession && microphoneLevelCheck.state?.phase === 'idle'
+    }); }
     catch (error) { voiceDiagnostics.record('prompt-error',{...context,message:String(error)}); throw error; }
     voiceDiagnostics.record('prompt-end',{...context,ok:result.ok});
     if (!result.ok) {
@@ -1251,6 +1253,7 @@ async function startRecording() {
     try {
         await microphoneCheckShutdown;
         recordingLease = await recordingStorage.hold();
+        releaseStoppedPlaybackSession();
         stream = await acquireRecordingMicrophone();
         publishMicrophoneProcessing(stream);
         if (requestId !== startRequest) {

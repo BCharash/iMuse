@@ -18,6 +18,8 @@ Updated 12 November 2026. Start here; current findings take precedence over olde
 
 ## Current checkpoint
 
+**Reversible iPhone experiment 2026-11-12.4:** after the user reverted the temporary logging commit, request media-playback intent only for the idle iPhone stop announcement, restoring the prior type afterward and before another microphone acquisition. The original WAV, volume, Mac path and other prompts are unchanged. All 109 automated methods pass across sixteen suites; actual built-in/Bluetooth output requires the [two short device checks](recording-investigation.md#iphone-stop-announcement-output-regression). This is not an established fix.
+
 **Candidate 2026-11-12.2:** Heed — Hey iMuse appears first in the wake-engine dropdown and is selected for initial load when no valid preference exists. Existing saved Heed/Voicute choices remain unchanged; Audio commands remains opt-in.
 
 **Candidate 2026-11-12.1:** user-approved replacement of Heed Hey Doc weights/metadata with the user-trained medium Hey iMuse export. Production and current lab display Hey iMuse and default Heed to 0.75; existing saved settings remain unchanged. Every audio-control range slider shows its recommended starting value in parentheses. Voicute, capture, voice-command sequencing, Silero decisions, storage and queues are unchanged. Current lab cache advances to v2; historical Hey Doc evidence remains historical. All 106 regression methods pass. Isolated Chrome loaded/warmed the real ONNX model and exercised streaming inference, verified the 0.75 default/saved-value preservation, and checked all 13 slider annotations and lab defaults. Acoustic/device acceptance remains pending. See [model notes](../js/heed/README.md#hey-imuse-model-12-november-2026).

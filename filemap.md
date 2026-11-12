@@ -100,7 +100,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | File | Function |
 | --- | --- |
 | [js/app.js](js/app.js) | Legacy transcription-button hookup to window.transcribeRecording; not loaded by current index.html. |
-| [js/audio-response-manager.js](js/audio-response-manager.js) | Loads/caches prerecorded spoken prompts and serializes their playback. |
+| [js/audio-response-manager.js](js/audio-response-manager.js) | Loads/caches prerecorded prompts and serializes playback; candidate .4 temporarily requests playback intent for an idle iPhone stopped prompt and restores the previous mode. |
 | [js/audio.js](js/audio.js) | Audio decoding and mono 16 kHz resampling helper intended for Whisper; not wired into current production recording. |
 | [js/build-info.js](js/build-info.js) | Single production build identifier and Settings build-label helper. |
 | [js/microphone-level-check.js](js/microphone-level-check.js) | Temporary microphone-level check: deadline, cancellation, cleanup and handoff to Record. |
@@ -264,6 +264,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [tests/test_recording_finalization.py](tests/test_recording_finalization.py) | Complete recovery module and recorder wiring: integrity/error/delay handling, fullest-copy retention, truthful status, confirmed discard with failure retention and current-player isolation. |
 | [tests/test_recording_storage.py](tests/test_recording_storage.py) | Complete store module plus recorder wiring: ordering, counters, ownership, competing startup/deletion, abort/restore, diagnostic cleanup, schema and blocked/failed opens. |
 | [tests/test_speech_detection.py](tests/test_speech_detection.py) | Production speech policy, settings, worker warm-up/lifecycle, bounded queue/timeout cancellation and streaming context/resampling regression checks. |
+| [tests/test_stopped_playback_session.py](tests/test_stopped_playback_session.py) | Reversible iPhone stopped-message playback-intent gating, restoration, capture handoff and fallback regression checks. |
 | [tests/test_storage_persistence.py](tests/test_storage_persistence.py) | Grants/refusals/unsupported APIs, errors/timeouts and automatic Settings refresh. |
 | [tests/test_voice_control.py](tests/test_voice_control.py) | Complete voice controller, recorder session bridge, real pause/manual handlers and finalization entry: prompt/listener ordering, Go shutdown, Stop confirmation, timeout/thresholds, failures, stale sessions, narrow session capabilities, preserved deadline semantics, and TensorFlow clone/override/startup teardown. |
 | [tests/test_voice_diagnostics.py](tests/test_voice_diagnostics.py) | Default-on 500-event bounded memory, safe copies/no raw audio, overflow, human-readable window summaries/partial data, automatic display/Settings refresh/clear/disable controls, observer failures, runtime build label and build metadata in voice/recording diagnostic exports. |

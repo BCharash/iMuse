@@ -1712,3 +1712,10 @@ Validation for DJ032: exact supplied file copies verified; all 106 regression me
 
 
 **Follow-up, candidate 2026-11-12.2:** user requested Heed first in the dropdown and as the initial-load default. Preserve explicit saved engine choices; Audio commands remains off by default. No inference, capture or threshold changes.
+
+
+# DJ034 — Scoped stopped-message playback-intent experiment
+
+**Date:** 12 November 2026. **Status:** Candidate 2026-11-12.4; iPhone acceptance pending.
+
+The user reverted temporary playback instrumentation and authorized the next experiment. Reports showed full original-WAV playback at unmuted volume 1 with ended/success and closed capture state, yet Bluetooth was audible and built-in output was not. No root cause is established. Request playback audio-session intent only for the stopped prompt on an idle iPhone, at actual playback time. Restore the prior type on completion/failure/timeout and before another microphone acquisition; unsupported environments retain ordinary playback. Do not select a physical output, change gain/WAVs or alter other prompts/Mac behavior. Keep the change separately reversible. The earlier standalone playback-mode experiment's negative result remains evidence; the candidate requires its own device check. 109 tests across sixteen suites pass for the software boundaries, not physical output routing.
