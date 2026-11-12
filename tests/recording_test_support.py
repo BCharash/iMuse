@@ -152,7 +152,6 @@ function downloadAudioBlob(blob, name) {
 }
 function logRecordingEvent() {} function closeCommandWindow() {}
 function cleanupAudioMonitor() {} function stopStream() {}
-function releaseStoppedPlaybackSession() {}
 function microphoneCheckBusy(){return false;}
 const voiceDiagnostics={record(){}};
 function publishRecordingDiagnostics() {} function publishMicrophoneCheckState() {} function setAudioCommandsToggleLocked() {}

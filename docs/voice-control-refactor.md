@@ -4,6 +4,8 @@ Updated 12 November 2026. This is the current production reference. **Build 2026
 
 ## Current checkpoint
 
+Build 2026-11-12.5 removes the unsuccessful iPhone playback-intent experiment after the pre-refactor baseline also reproduced the symptom. Ordinary spoken-response playback is restored. Heed, settings, diagnostics layout and bounded shutdown handling remain. Temporary output instrumentation and historical preview are absent; the user requested no further backward-version experiments.
+
 Build 2026-11-12.2 puts Heed first in the dropdown and uses it when no valid saved engine choice exists. Explicit saved Voicute and Heed choices are preserved; the Audio commands default remains off.
 
 Build 2026-11-12.1 changes only the Heed model/phrase integration and recommended slider labels: Hey iMuse replaces Hey Doc, default Heed threshold is 0.75, saved user thresholds are preserved. Export metadata is retained exactly (Hey Eyemews / 0.738), with the selected application threshold overriding that export recommendation. Current lab and TensorFlow diagnostic labels/defaults follow the new model. Voicute selection/defaults and recognition scheduling/DSP/trigger behavior remain unchanged. See [model provenance](../js/heed/README.md#hey-imuse-model-12-november-2026).

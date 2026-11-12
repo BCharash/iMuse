@@ -100,7 +100,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | File | Function |
 | --- | --- |
 | [js/app.js](js/app.js) | Legacy transcription-button hookup to window.transcribeRecording; not loaded by current index.html. |
-| [js/audio-response-manager.js](js/audio-response-manager.js) | Loads/caches prerecorded prompts and serializes playback; candidate .4 temporarily requests playback intent for an idle iPhone stopped prompt and restores the previous mode. |
+| [js/audio-response-manager.js](js/audio-response-manager.js) | Loads/caches prerecorded spoken prompts and serializes their playback. |
 | [js/audio.js](js/audio.js) | Audio decoding and mono 16 kHz resampling helper intended for Whisper; not wired into current production recording. |
 | [js/build-info.js](js/build-info.js) | Single production build identifier and Settings build-label helper. |
 | [js/microphone-level-check.js](js/microphone-level-check.js) | Temporary microphone-level check: deadline, cancellation, cleanup and handoff to Record. |
@@ -264,7 +264,6 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [tests/test_recording_finalization.py](tests/test_recording_finalization.py) | Complete recovery module and recorder wiring: integrity/error/delay handling, fullest-copy retention, truthful status, confirmed discard with failure retention and current-player isolation. |
 | [tests/test_recording_storage.py](tests/test_recording_storage.py) | Complete store module plus recorder wiring: ordering, counters, ownership, competing startup/deletion, abort/restore, diagnostic cleanup, schema and blocked/failed opens. |
 | [tests/test_speech_detection.py](tests/test_speech_detection.py) | Production speech policy, settings, worker warm-up/lifecycle, bounded queue/timeout cancellation and streaming context/resampling regression checks. |
-| [tests/test_stopped_playback_session.py](tests/test_stopped_playback_session.py) | Reversible iPhone stopped-message playback-intent gating, restoration, capture handoff and fallback regression checks. |
 | [tests/test_storage_persistence.py](tests/test_storage_persistence.py) | Grants/refusals/unsupported APIs, errors/timeouts and automatic Settings refresh. |
 | [tests/test_voice_control.py](tests/test_voice_control.py) | Complete voice controller, recorder session bridge, real pause/manual handlers and finalization entry: prompt/listener ordering, Go shutdown, Stop confirmation, timeout/thresholds, failures, stale sessions, narrow session capabilities, preserved deadline semantics, and TensorFlow clone/override/startup teardown. |
 | [tests/test_voice_diagnostics.py](tests/test_voice_diagnostics.py) | Default-on 500-event bounded memory, safe copies/no raw audio, overflow, human-readable window summaries/partial data, automatic display/Settings refresh/clear/disable controls, observer failures, runtime build label and build metadata in voice/recording diagnostic exports. |
@@ -274,48 +273,3 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 ## Keeping this map current
 
 When adding, moving or removing repository files, update the matching folder table and check its links. Describe generated and third-party assets here, but use [lab dependency notes](js/lab/SOURCES.md) for pinned versions/licenses and [the documentation index](docs/README.md) for current behavior and acceptance evidence. Earlier plans in the archive remain historical.
-
-## Isolated older audio baseline — test/
-
-These files belong only to the separately named b9f3a87 preview at `/iMuse/test/`. Production app files remain unchanged. See [baseline instructions](test/README.md).
-
-| File | Function |
-| --- | --- |
-| [test/README.md](test/README.md) | Baseline provenance, storage isolation, iPhone test and removal instructions. |
-| [test/audio/confirm-stop-recording.wav](test/audio/confirm-stop-recording.wav) | Exact historical spoken-response WAV, unchanged from b9f3a87. |
-| [test/audio/new-recording.wav](test/audio/new-recording.wav) | Exact historical spoken-response WAV, unchanged from b9f3a87. |
-| [test/audio/pause.wav](test/audio/pause.wav) | Exact historical spoken-response WAV, unchanged from b9f3a87. |
-| [test/audio/recording-stopped.wav](test/audio/recording-stopped.wav) | Exact historical spoken-response WAV, unchanged from b9f3a87. |
-| [test/audio/recording.wav](test/audio/recording.wav) | Exact historical spoken-response WAV, unchanged from b9f3a87. |
-| [test/audio/yes.wav](test/audio/yes.wav) | Exact historical spoken-response WAV, unchanged from b9f3a87. |
-| [test/css/style.css](test/css/style.css) | Exact historical page styling. |
-| [test/favicon.ico](test/favicon.ico) | Historical browser/application artwork used by the preview. |
-| [test/icons/apple-touch-icon.png](test/icons/apple-touch-icon.png) | Historical browser/application artwork used by the preview. |
-| [test/icons/favicon-16.png](test/icons/favicon-16.png) | Historical browser/application artwork used by the preview. |
-| [test/icons/favicon-32-v2.png](test/icons/favicon-32-v2.png) | Historical browser/application artwork used by the preview. |
-| [test/icons/iMuse2.png](test/icons/iMuse2.png) | Historical browser/application artwork used by the preview. |
-| [test/icons/icon-192.png](test/icons/icon-192.png) | Historical browser/application artwork used by the preview. |
-| [test/icons/icon-512.png](test/icons/icon-512.png) | Historical browser/application artwork used by the preview. |
-| [test/index.html](test/index.html) | Archived page with visible test label; install-manifest link removed. |
-| [test/js/app.js](test/js/app.js) | Exact archived app runtime module. |
-| [test/js/audio-response-manager.js](test/js/audio-response-manager.js) | Unmodified historical spoken-prompt cache/player and serialization. |
-| [test/js/audio.js](test/js/audio.js) | Exact archived audio runtime module. |
-| [test/js/heed/filter-coeffs.js](test/js/heed/filter-coeffs.js) | Historical Hey Doc Heed asset/module; no production Hey iMuse substitution. |
-| [test/js/heed/heed-adapter.js](test/js/heed/heed-adapter.js) | Historical Hey Doc Heed asset/module; no production Hey iMuse substitution. |
-| [test/js/heed/preprocessing.js](test/js/heed/preprocessing.js) | Historical Hey Doc Heed asset/module; no production Hey iMuse substitution. |
-| [test/js/heed/wake.json](test/js/heed/wake.json) | Historical Hey Doc Heed asset/module; no production Hey iMuse substitution. |
-| [test/js/heed/wake.onnx](test/js/heed/wake.onnx) | Historical Hey Doc Heed asset/module; no production Hey iMuse substitution. |
-| [test/js/heed/wakeword.js](test/js/heed/wakeword.js) | Historical Hey Doc Heed asset/module; no production Hey iMuse substitution. |
-| [test/js/microphone-manager.js](test/js/microphone-manager.js) | Old microphone manager with a separate device-preference key. |
-| [test/js/recorder.js](test/js/recorder.js) | Unmodified old recorder with integrated voice-command handling and original Stop playback sequence. |
-| [test/js/recording-integrity.js](test/js/recording-integrity.js) | Exact archived recording integrity runtime module. |
-| [test/js/recording-library.js](test/js/recording-library.js) | Exact archived recording library runtime module. |
-| [test/js/recording-recovery.js](test/js/recording-recovery.js) | Exact archived recording recovery runtime module. |
-| [test/js/recording-storage-coordinator.js](test/js/recording-storage-coordinator.js) | Old writer coordination; lock identity derives from the isolated database name. |
-| [test/js/recording-store.js](test/js/recording-store.js) | Old IndexedDB store with a separate recording database name. |
-| [test/js/settings.js](test/js/settings.js) | Old Settings with separate preference key and separate Storage Settings database opener. |
-| [test/js/storage-persistence.js](test/js/storage-persistence.js) | Exact archived storage persistence runtime module. |
-| [test/js/tensorflow/commands-adapter.js](test/js/tensorflow/commands-adapter.js) | Historical TensorFlow command-listener adapter. |
-| [test/js/voicute/voicute-adapter.js](test/js/voicute/voicute-adapter.js) | Historical Voicute integration used only by the preview. |
-| [test/js/voicute/wakeword.js](test/js/voicute/wakeword.js) | Historical Voicute integration used only by the preview. |
-| [test/snapshot.json](test/snapshot.json) | Original and test SHA-256 hashes and the exact baseline revision. |

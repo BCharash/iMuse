@@ -1714,8 +1714,8 @@ Validation for DJ032: exact supplied file copies verified; all 106 regression me
 **Follow-up, candidate 2026-11-12.2:** user requested Heed first in the dropdown and as the initial-load default. Preserve explicit saved engine choices; Audio commands remains off by default. No inference, capture or threshold changes.
 
 
-# DJ034 — Scoped stopped-message playback-intent experiment
+# DJ034 — End unsuccessful audio-output experiments
 
-**Date:** 12 November 2026. **Status:** Candidate 2026-11-12.4; iPhone acceptance pending.
+**Date:** 12 November 2026. **Status:** Cleanup build 2026-11-12.5; root cause unresolved.
 
-The user reverted temporary playback instrumentation and authorized the next experiment. Reports showed full original-WAV playback at unmuted volume 1 with ended/success and closed capture state, yet Bluetooth was audible and built-in output was not. No root cause is established. Request playback audio-session intent only for the stopped prompt on an idle iPhone, at actual playback time. Restore the prior type on completion/failure/timeout and before another microphone acquisition; unsupported environments retain ordinary playback. Do not select a physical output, change gain/WAVs or alter other prompts/Mac behavior. Keep the change separately reversible. The earlier standalone playback-mode experiment's negative result remains evidence; the candidate requires its own device check. 109 tests across sixteen suites pass for the software boundaries, not physical output routing.
+The temporary playback-mode request did not improve built-in iPhone output. The subsequently deployed complete b9f3a87 pre-command-refactor baseline also reproduced silent built-in output and normal Bluetooth. The user concluded backward investigation had little remaining value and explicitly requested removal. Remove the /test/ snapshot, failed playback-intent request and its dedicated tests, and the temporary audio-baseline-test branch. Retain historical commits and this evidence, current Heed integration, diagnostics usability and bounded capture-side shutdown handling. Restore the original stopped WAV and ordinary player without output overrides. Do not clear browser/site data or restart removed experiments without a new hypothesis and explicit request.

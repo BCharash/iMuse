@@ -11,30 +11,6 @@ const cache = new Map();
 let output = null;
 let queue = Promise.resolve();
 
-// Temporary iPhone stopped-prompt experiment; never selects a physical output.
-let stoppedPlaybackRelease = null;
-export function releaseStoppedPlaybackSession() {
-    stoppedPlaybackRelease?.();
-}
-function requestStoppedPlaybackSession(name, canUsePlaybackSession) {
-    if (name !== 'stopped') return () => {};
-    try {
-        if (!/iPhone/.test(navigator.userAgent || '') || !canUsePlaybackSession()) return () => {};
-        const session = navigator.audioSession;
-        if (!session || session.type === 'playback') return () => {};
-        const previous = session.type;
-        const release = () => {
-            if (stoppedPlaybackRelease !== release) return;
-            stoppedPlaybackRelease = null;
-            try { if (session.type === 'playback') session.type = previous; } catch (_) {}
-        };
-        stoppedPlaybackRelease = release;
-        try { session.type = 'playback'; }
-        catch (_) { release(); }
-        return release;
-    } catch (_) { return () => {}; }
-}
-
 function getOutput() {
     if (!output) {
         output = new Audio();
@@ -59,21 +35,19 @@ export function prepareSpokenResponses() {
     }
 }
 
-async function playOne(name, canUsePlaybackSession) {
+async function playOne(name) {
     if (!FILES[name]) return {ok:false,error:`Unknown spoken response: ${name}`};
     prepareSpokenResponses();
     const player = getOutput();
     const source = await cache.get(name);
     return new Promise(resolve => {
         let done = false;
-        let releasePlayback = () => {};
         const finish = (ok, error) => {
             if (done) return;
             done = true;
             clearTimeout(watchdog);
             player.removeEventListener("ended", onEnded);
             player.removeEventListener("error", onError);
-            releasePlayback();
             resolve({ok,error});
         };
         const onEnded = () => finish(true, null);
@@ -86,7 +60,6 @@ async function playOne(name, canUsePlaybackSession) {
         // Prevent an unresolvable playback promise from blocking command entry.
         const watchdog = setTimeout(() => finish(false, `Playback timed out: ${name}`), 6000);
         try {
-            releasePlayback = requestStoppedPlaybackSession(name, canUsePlaybackSession);
             Promise.resolve(player.play()).catch(error => finish(false, error?.message || String(error)));
         } catch (error) {
             finish(false, error?.message || String(error));
@@ -94,8 +67,8 @@ async function playOne(name, canUsePlaybackSession) {
     });
 }
 
-export function playSpokenResponse(name, { canUsePlaybackSession = () => false } = {}) {
-    const next = queue.catch(() => {}).then(() => playOne(name, canUsePlaybackSession));
+export function playSpokenResponse(name) {
+    const next = queue.catch(() => {}).then(() => playOne(name));
     queue = next;
     return next;
 }

@@ -18,9 +18,7 @@ Updated 12 November 2026. Start here; current findings take precedence over olde
 
 ## Current checkpoint
 
-**Older-version comparison prepared:** branch `audio-baseline-test` adds [test/](../test/README.md), a production-runtime snapshot of `b9f3a87` (3 November), for the intended `https://bcharash.github.io/iMuse/test/` address. The old recorder/player/WAVs are unchanged; storage names are isolated and the page is visibly labelled. Current production code is untouched. The URL is not published merely by creating the branch; the test folder must be included in the existing Pages publication.
-
-**Reversible iPhone experiment 2026-11-12.4:** after the user reverted the temporary logging commit, request media-playback intent only for the idle iPhone stop announcement, restoring the prior type afterward and before another microphone acquisition. The original WAV, volume, Mac path and other prompts are unchanged. All 109 automated methods pass across sixteen suites; actual built-in/Bluetooth output requires the [two short device checks](recording-investigation.md#iphone-stop-announcement-output-regression). This is not an established fix.
+**Current build 2026-11-12.5 — investigation cleanup.** The pre-refactor version reproduced the iPhone built-in-output failure. At the user’s request, remove the older preview/branch and unsuccessful playback-mode experiment; stop backward-version testing. Restore ordinary stop-prompt playback while retaining Heed, diagnostics and shutdown handling. The root cause remains unresolved. See the [negative result and retained behavior](recording-investigation.md#iphone-stop-announcement-output-regression).
 
 **Candidate 2026-11-12.2:** Heed — Hey iMuse appears first in the wake-engine dropdown and is selected for initial load when no valid preference exists. Existing saved Heed/Voicute choices remain unchanged; Audio commands remains opt-in.
 
