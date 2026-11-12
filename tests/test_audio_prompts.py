@@ -29,10 +29,11 @@ async function settle(){for(let i=0;i<60;i++)await Promise.resolve();}
 """
 
 class AudioPromptTests(unittest.TestCase):
-    def test_gain_and_serialized_prompt_volume(self):
+    def test_fallback_gain_and_serialized_prompt_volume(self):
         evaluate(MOCKS + SOURCE + HARNESS + r"""
 globalThis.testResult='pending';
 (async()=>{
+ AudioContext.prototype.decodeAudioData=undefined;
  const first=playSpokenResponse('recording',{volume:.37});await settle();
  assert(gains.length===1&&gains[0].gain.value===.37&&players[0].volume===1,'gain supplies volume independently of media element support');
  const second=playSpokenResponse('stopped',{volume:0});await settle();
@@ -46,10 +47,11 @@ globalThis.testResult='pending';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack));
 """)
 
-    def test_active_and_queued_cancellation(self):
+    def test_fallback_active_and_queued_cancellation(self):
         evaluate(MOCKS + SOURCE + HARNESS + r"""
 globalThis.testResult='pending';
 (async()=>{
+ AudioContext.prototype.decodeAudioData=undefined;
  const controller=new AbortController();
  const first=playSpokenResponse('stopped',{signal:controller.signal});await settle();
  controller.abort();assert(!(await first).ok,'active prompt resolves when cancelled');
@@ -64,7 +66,7 @@ globalThis.testResult='pending';
 globalThis.testResult='pending';
 (async()=>{
  prepareSpokenResponses();await settle();
- assert(decodeCount===1&&bufferSources.length===0,'Yes is decoded before playback without starting audio');
+ assert(decodeCount===6&&bufferSources.length===0,'Prompts are decoded before playback without starting audio');
  const first=playSpokenResponse('yes',{volume:.42});await settle();
  const source=bufferSources[0];
  assert(source.buffer.fullOriginal&&source.startArgs.join(',')==='0,0','entire original acknowledgement starts at sample zero');
@@ -73,7 +75,7 @@ globalThis.testResult='pending';
  assert(!completed,'command acknowledgement remains pending until audio ends');
  source.onended();assert((await first).ok&&source.disconnected,'completion releases buffer source');
  const second=playSpokenResponse('yes',{volume:1});await settle();
- assert(decodeCount===1&&bufferSources.length===2&&gains.at(-1).gain.value===1,'repeated Yes reuses decoded audio at full volume');
+ assert(decodeCount===6&&bufferSources.length===2&&gains.at(-1).gain.value===1,'repeated Yes reuses decoded audio at full volume');
  bufferSources[1].onended();await second;
  globalThis.testResult='PASS';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack));
@@ -86,10 +88,31 @@ globalThis.testResult='pending';
  const controller=new AbortController();
  const first=playSpokenResponse('yes',{signal:controller.signal});await settle();
  const next=playSpokenResponse('recording');await settle();
- assert(!players.some(player=>player.playCount),'next prompt waits for buffered acknowledgement');
+ assert(bufferSources.length===1,'next prompt waits for buffered acknowledgement');
  controller.abort();assert(!(await first).ok&&bufferSources[0].stopped&&bufferSources[0].disconnected,'cancellation stops and disconnects buffer');
- await settle();const player=players.find(player=>player.playCount);
- assert(player,'next prompt starts after cancellation');player.events.get('ended')();await next;
+ await settle();assert(bufferSources.length===2,'next buffered prompt starts after cancellation');
+ bufferSources[1].onended();await next;
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack));
+""")
+
+    def test_all_spoken_prompts_use_complete_cached_buffers(self):
+        evaluate(MOCKS + SOURCE + HARNESS + r"""
+globalThis.testResult='pending';
+(async()=>{
+ prepareSpokenResponses();await settle();
+ const names=['pause','yes','recording','newRecording','stopped','confirmStop'];
+ assert(decodeCount===names.length&&bufferSources.length===0,'all prompts decode without starting playback');
+ for(const name of names){
+  const playing=playSpokenResponse(name,{volume:.7});await settle();
+  const source=bufferSources.at(-1);
+  assert(source.buffer.fullOriginal&&source.startArgs.join(',')==='0,0','full original buffer starts at beginning: '+name);
+  assert(gains.at(-1).gain.value===.7,'volume applies to '+name);
+  let finished=false;playing.then(()=>finished=true);await settle();
+  assert(!finished,'completion waits for actual playback end: '+name);
+  source.onended();assert((await playing).ok&&source.disconnected,'source released after '+name);
+ }
+ assert(decodeCount===names.length&&players.length===0,'cache reused without media-element creation or reload');
  globalThis.testResult='PASS';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack));
 """)

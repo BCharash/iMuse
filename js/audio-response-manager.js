@@ -10,7 +10,7 @@ const FILES = Object.freeze({
 const cache = new Map();
 let output = null;
 let volumeContext = null, volumeGain = null;
-let yesBuffer = null;
+const decodedBuffers = new Map();
 let queue = Promise.resolve();
 
 function getOutput() {
@@ -42,7 +42,7 @@ export function primeSpokenResponses() {
     }
 }
 
-async function playBufferedYes(buffer, {volume = 1, signal} = {}) {
+async function playBufferedPrompt(name, buffer, {volume = 1, signal} = {}) {
     const context = getVolumeContext();
     let resumeTimer;
     try {
@@ -72,10 +72,10 @@ async function playBufferedYes(buffer, {volume = 1, signal} = {}) {
         };
         const onAbort = () => finish(false, "Prompt cancelled");
         source.onended = () => finish(true, null);
-        const watchdog = setTimeout(() => finish(false, "Playback timed out: yes"), 6000);
+        const watchdog = setTimeout(() => finish(false, `Playback timed out: ${name}`), 6000);
         signal?.addEventListener("abort", onAbort, {once:true});
         // Always start at the beginning; no media-element seek/reload or live
-        // resampling startup is needed for this very short acknowledgement.
+        // resampling startup is needed for the spoken prompt.
         try { source.start(0, 0); }
         catch (error) { finish(false, error?.message || String(error)); }
     });
@@ -108,12 +108,10 @@ export function prepareSpokenResponses() {
                 if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
                 return response.blob();
             }).then(blob => {
-                if (name === "yes") {
-                    const context = getVolumeContext();
-                    if (context?.decodeAudioData && blob.arrayBuffer) {
-                        yesBuffer = blob.arrayBuffer().then(bytes => context.decodeAudioData(bytes))
-                            .catch(error => { console.warn("Could not decode Yes prompt:", error); return null; });
-                    }
+                const context = getVolumeContext();
+                if (context?.decodeAudioData && blob.arrayBuffer) {
+                    decodedBuffers.set(name, blob.arrayBuffer().then(bytes => context.decodeAudioData(bytes))
+                        .catch(error => { console.warn(`Could not decode ${name} prompt:`, error); return null; }));
                 }
                 return URL.createObjectURL(blob);
             }).catch(error => {
@@ -128,7 +126,6 @@ async function playOne(name, {volume = 1, signal} = {}) {
     if (signal?.aborted) return {ok:false,error:"Prompt cancelled"};
     if (!FILES[name]) return {ok:false,error:`Unknown spoken response: ${name}`};
     prepareSpokenResponses();
-    const player = getOutput();
     const source = await Promise.race([
         cache.get(name),
         new Promise(resolve => {
@@ -137,18 +134,19 @@ async function playOne(name, {volume = 1, signal} = {}) {
         })
     ]);
     if (!source || signal?.aborted) return {ok:false,error:"Prompt unavailable or cancelled"};
-    if (name === "yes" && yesBuffer) {
+    if (decodedBuffers.has(name)) {
         let decodeTimer;
         let buffer;
         try {
             buffer = await Promise.race([
-                yesBuffer,
+                decodedBuffers.get(name),
                 new Promise(resolve => { decodeTimer = setTimeout(() => resolve(null), 2000); })
             ]);
         } finally { clearTimeout(decodeTimer); }
         if (signal?.aborted) return {ok:false,error:"Prompt cancelled"};
-        if (buffer) return playBufferedYes(buffer, {volume, signal});
+        if (buffer) return playBufferedPrompt(name, buffer, {volume, signal});
     }
+    const player = getOutput();
     let volumeTimer;
     try {
         await Promise.race([

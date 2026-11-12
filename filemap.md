@@ -100,7 +100,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | File | Function |
 | --- | --- |
 | [js/app.js](js/app.js) | Legacy transcription-button hookup to window.transcribeRecording; not loaded by current index.html. |
-| [js/audio-response-manager.js](js/audio-response-manager.js) | Loads/caches and serializes spoken prompts; predecodes Yes for immediate full-buffer playback, primes output on interaction and applies volume/cancellation. |
+| [js/audio-response-manager.js](js/audio-response-manager.js) | Loads/caches and serializes spoken prompts; predecodes all spoken prompts for immediate full-buffer playback, primes output on interaction and applies volume/cancellation. |
 | [js/audio.js](js/audio.js) | Audio decoding and mono 16 kHz resampling helper intended for Whisper; not wired into current production recording. |
 | [js/build-info.js](js/build-info.js) | Single production build identifier and Settings build-label helper. |
 | [js/microphone-level-check.js](js/microphone-level-check.js) | Temporary microphone-level check: deadline, cancellation, cleanup and handoff to Record. |
@@ -262,7 +262,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [tests/test_recorder_lab.py](tests/test_recorder_lab.py) | New recorder lab: warmed Whisper worker limits, bounded shadow verification/strict phrase matching/latency/deadlines, immediate pre-roll dispatch, opening-sentence phrase filenames, review clip bounds/WAV and gap/Stop handling, TP/FP/TN/FN comparisons, review playback guards and saved labels, continuous anti-alias resampling, speech/level gates, failed writes/late tails, actual encoder-start fallback, model-before-microphone ordering/cancellation, idempotent cleanup, final data after microphone loss, silent AudioWorklet packets, scripts and offline asset integrity. |
 | [tests/test_recording_download.py](tests/test_recording_download.py) | Local timestamps, portable names, dialog preview/confirmation/cancellation, single-dialog ownership, actual download format and URL behavior, current-playback button creation/start-time naming and retained downloads without database metadata, and saved/emergency cancellation outside the writer lock. |
 | [tests/test_recording_finalization.py](tests/test_recording_finalization.py) | Complete recovery module and recorder wiring: integrity/error/delay handling, fullest-copy retention, truthful status, confirmed discard with failure retention and current-player isolation. |
-| [tests/test_audio_prompts.py](tests/test_audio_prompts.py) | Spoken prompt gain, mute/full-volume restoration, serialization, active/queued cancellation and full-buffer Yes acknowledgement checks. |
+| [tests/test_audio_prompts.py](tests/test_audio_prompts.py) | Spoken prompt gain, mute/full-volume restoration, serialization, active/queued cancellation and full-buffer playback checks for all spoken prompts. |
 | [tests/test_recording_storage.py](tests/test_recording_storage.py) | Complete store module plus recorder wiring: ordering, counters, ownership, competing startup/deletion, abort/restore, diagnostic cleanup, schema and blocked/failed opens. |
 | [tests/test_speech_detection.py](tests/test_speech_detection.py) | Production speech policy, settings, worker warm-up/lifecycle, bounded queue/timeout cancellation and streaming context/resampling regression checks. |
 | [tests/test_storage_persistence.py](tests/test_storage_persistence.py) | Grants/refusals/unsupported APIs, errors/timeouts and automatic Settings refresh. |

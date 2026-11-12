@@ -1,5 +1,5 @@
 // Production build: UTC release date + daily sequence. See docs/build-versioning.md.
-export const APP_BUILD = '2026-11-12.8';
+export const APP_BUILD = '2026-11-12.9';
 
 export function displayBuildInfo(element) {
     if (element) element.textContent = `iMuse build ${APP_BUILD}`;
