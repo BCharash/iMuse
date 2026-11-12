@@ -1698,3 +1698,17 @@ The user reported that the original stopped prompt now plays normally through th
 A temporary .6 substitution mapped stopped to recording.wav, but the user distinctly heard the original stopped message/intonation while speaker output was normal. Thus the substitution did not produce a verified A/B test. The .6 label does not establish every module or audio asset refreshed, and a cache/session explanation remains a hypothesis.
 
 The user reverted the isolated output test (`0639a27` → `eebb6f4`) and the temporary audio swap (`6569436` → `95291db`). Live checkout verification shows build 2026-11-11.5 and the original recording-stopped.wav mapping. Retain scoped diagnostics, Silero settings and the earlier shutdown-ordering correction; no further audio change is authorized by this documentation checkpoint. The active investigation owns recurrence instructions. No site data was cleared. Last retained implementation validation is 106 tests across fifteen suites; documentation validation checks file coverage and links, without rerunning microphone/model tests.
+
+
+# DJ032 — User-trained Hey iMuse model and visible recommendations
+
+**Date:** 12 November 2026. **Status:** Candidate 2026-11-12.1; full acoustic/device acceptance pending.
+
+After explicit scope confirmation, the user approved installing the medium wake.json and wake.onnx from Desktop/Hey_iMuse_Ready_To_Run/medium, updating current production/lab Hey Doc prompts to Hey iMuse and setting the new Heed default to 0.75. Existing saved thresholds must remain. All production audio-control sliders show recommended starting values in parentheses, using existing defaults for other controls. The supplied files remain exact, including metadata phrase Hey Eyemews and exported threshold 0.738; application/lab settings supply the approved 0.75 default. Model format, preprocessing and trigger metadata match the former export. Heed model SHA-256: 3c28466070aefb4b29421ea16921121c293beb2dbaf0e549bf771ca9bf61e157.
+
+Current lab cache v2 prevents reuse of the former immutable weights; saved reviews remain historical. Optional strict Whisper verification expects the new phrase without adding fuzzy matching. The existing TensorFlow diagnostic page also labels the shared model Hey iMuse. Production capture, command sequencing, Silero policy, storage and queue behavior remain unchanged. Historical documents/results retain their original Hey Doc evidence. No automatic settings reset, commit or deployment is part of the implementation.
+
+Validation for DJ032: exact supplied file copies verified; all 106 regression methods passed. An isolated Chrome profile loaded/warmed the real model through the production adapter and exercised streaming inference, confirmed the displayed Hey iMuse phrase, default 0.75, preservation of a saved 0.88 threshold, all 13 slider annotations, and lab engine-switch defaults (Heed 0.75 / Voicute 0.90). This is model/wiring evidence, not an acoustic accuracy or iPhone acceptance claim. The training handoff’s earlier 0.80 proposal is explicitly superseded by the user’s current 0.75 instruction.
+
+
+**Follow-up, candidate 2026-11-12.2:** user requested Heed first in the dropdown and as the initial-load default. Preserve explicit saved engine choices; Audio commands remains off by default. No inference, capture or threshold changes.

@@ -1,6 +1,6 @@
 # iMuse file map
 
-Updated 11 November 2026. Paths are relative to the repository root. Click a filename to open it, or search this page for its exact name. Every tracked repository file is listed individually, including models, vendor runtimes and archived tools; this map also lists itself. Git internals, local OS files and generated Python caches are excluded.
+Updated 12 November 2026. Paths are relative to the repository root. Click a filename to open it, or search this page for its exact name. Every tracked repository file is listed individually, including models, vendor runtimes and archived tools; this map also lists itself. Git internals, local OS files and generated Python caches are excluded.
 
 Current iPhone stop-message observation status and recurrence handoff: [recording investigation](docs/recording-investigation.md#iphone-stop-announcement-output-regression). The temporary isolated output check and audio substitution were reverted and are not part of this file inventory.
 
@@ -130,8 +130,8 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [js/heed/filter-coeffs.js](js/heed/filter-coeffs.js) | Generated Heed filter/window/mel constants; source comments reference an upstream generator absent from this checkout. |
 | [js/heed/heed-adapter.js](js/heed/heed-adapter.js) | Loads Heed runtime/model and adapts audio to the detector interface. |
 | [js/heed/preprocessing.js](js/heed/preprocessing.js) | Heed signal processing: filtering, framing, FFT and mel feature preparation. |
-| [js/heed/wake.json](js/heed/wake.json) | Heed model metadata, phrase and detector/preprocessing/trigger parameters. |
-| [js/heed/wake.onnx](js/heed/wake.onnx) | Bundled Hey Doc wake-classifier model weights. |
+| [js/heed/wake.json](js/heed/wake.json) | Exact user-supplied Hey iMuse export metadata (phonetic phrase Hey Eyemews); application threshold defaults to 0.75. |
+| [js/heed/wake.onnx](js/heed/wake.onnx) | User-supplied medium Hey iMuse wake-classifier weights installed 12 November 2026. |
 | [js/heed/wakeword.js](js/heed/wakeword.js) | Heed streaming detector, model execution and trigger/cooldown logic. |
 
 ## Voicute wake engine
@@ -213,6 +213,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 
 | File | Function |
 | --- | --- |
+| [docs/Hey iMuse Heed Training Handoff.md](docs/Hey%20iMuse%20Heed%20Training%20Handoff.md) | Training/export provenance and integration decision: current default 0.75 supersedes the earlier 0.80 proposal. |
 | [docs/README.md](docs/README.md) | Start here for current implementation status, acceptance evidence and links to authoritative subject guides. |
 | [docs/build-versioning.md](docs/build-versioning.md) | Production build numbering/display, diagnostic identity and deferred asset-fingerprinting direction. |
 | [docs/design-journal.md](docs/design-journal.md) | Dated design/implementation decisions and historical evidence; later entries supersede earlier plans. |

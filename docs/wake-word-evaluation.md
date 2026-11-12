@@ -1,6 +1,10 @@
 # Wake-word evaluation and offline recorder lab
 
-Updated 11 November 2026. This guide owns wake-model evidence and lab use. Production ownership/refactoring lives in the [voice-control plan](voice-control-refactor.md); future transcription lives in the [native proposal](iMuse%20Swift%20migration%20plan.md). The [detailed lab snapshot](Archive/recorder-lab-guide-2026-11-04.md) retains implementation history and experimental procedures.
+Updated 12 November 2026. This guide owns wake-model evidence and lab use. Production ownership/refactoring lives in the [voice-control plan](voice-control-refactor.md); future transcription lives in the [native proposal](iMuse%20Swift%20migration%20plan.md). The [detailed lab snapshot](Archive/recorder-lab-guide-2026-11-04.md) retains implementation history and experimental procedures.
+
+## Hey iMuse model transition, 12 November
+
+Current lab build 2026-11-12.1 uses the supplied medium Hey iMuse model, labels and default Heed threshold 0.75. The wake-mode and engine selectors use 0.75 for Heed and retain 0.90 for Voicute. Optional strict Whisper comparison now expects Hey iMuse. The lab cache advances to imuse-simple-lab-v2 to load the new weights. Saved recordings/reviews remain; all older Hey Doc measurements below describe the prior model and are not evidence of new-model accuracy. No queue, Silero gate, review decision or capture behavior was tuned.
 
 ## Current conclusions
 

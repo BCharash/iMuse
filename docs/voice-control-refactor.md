@@ -1,8 +1,12 @@
 # Voice control: current architecture and validation
 
-Updated 11 November 2026. This is the current production reference. **Build 2026-11-05.3 is the accepted wake-word refactor and race-fix checkpoint:** the user tested it, reported it worked as expected and called it a success. Device/browser and individual acceptance scenarios were not specified; this does not certify every platform, environment or acoustic false-trigger rate. Detailed intermediate plans and test counts are [archived](Archive/voice-control-history-2026-11-05.md).
+Updated 12 November 2026. This is the current production reference. **Build 2026-11-05.3 is the accepted wake-word refactor and race-fix checkpoint:** the user tested it, reported it worked as expected and called it a success. Device/browser and individual acceptance scenarios were not specified; this does not certify every platform, environment or acoustic false-trigger rate. Detailed intermediate plans and test counts are [archived](Archive/voice-control-history-2026-11-05.md).
 
 ## Current checkpoint
+
+Build 2026-11-12.2 puts Heed first in the dropdown and uses it when no valid saved engine choice exists. Explicit saved Voicute and Heed choices are preserved; the Audio commands default remains off.
+
+Build 2026-11-12.1 changes only the Heed model/phrase integration and recommended slider labels: Hey iMuse replaces Hey Doc, default Heed threshold is 0.75, saved user thresholds are preserved. Export metadata is retained exactly (Hey Eyemews / 0.738), with the selected application threshold overriding that export recommendation. Current lab and TensorFlow diagnostic labels/defaults follow the new model. Voicute selection/defaults and recognition scheduling/DSP/trigger behavior remain unchanged. See [model provenance](../js/heed/README.md#hey-imuse-model-12-november-2026).
 
 Command coordination, wake-model loading and inference routing are extracted. The latest implementation check passed **106 methods across fifteen suites**, including production speech-gate coverage; see the [tests guide](../tests/README.md). The user accepted stage one, stage two and the subsequent race fixes. Do not restart these completed extractions. Build 2026-11-11.1 adds state-specific Silero checking described below. AudioWorklet migration, wake-model tuning and asset fingerprinting remain separate work.
 

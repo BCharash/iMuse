@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "cache": "imuse-simple-lab-v1",
-  "bytes": 82578450,
+  "cache": "imuse-simple-lab-v2",
+  "bytes": 82579159,
   "assets": [
     {
       "path": "js/heed/filter-coeffs.js",
@@ -15,13 +15,13 @@
     },
     {
       "path": "js/heed/wake.json",
-      "bytes": 1781,
-      "sha256": "eb5e5e06a315f625f8c6cbe7cc61d0f3d33242d814eb9ce1397790bb14ac2b6d"
+      "bytes": 1785,
+      "sha256": "19e260dcbefd9d3ef5e8093bf72a4f5a5490e52486df0ad15f177c0529bc7cc5"
     },
     {
       "path": "js/heed/wake.onnx",
-      "bytes": 110936,
-      "sha256": "2635f8c007651c39a8f63d9f6834c65f85359b7361d99e2e5d0770fa9513aa01"
+      "bytes": 110958,
+      "sha256": "3c28466070aefb4b29421ea16921121c293beb2dbaf0e549bf771ca9bf61e157"
     },
     {
       "path": "js/heed/wakeword.js",
@@ -30,13 +30,13 @@
     },
     {
       "path": "js/lab/SOURCES.md",
-      "bytes": 3265,
-      "sha256": "4f05bf6a6b7d0dc872eb5fcc4e194f47a01fbeee57ebc9aaf4bbcdca0f298349"
+      "bytes": 3923,
+      "sha256": "752dfdc83b0811bcdd3fcbc10e2670e4d07ec0d4ef48533668b0112fdf44ef56"
     },
     {
       "path": "js/lab/app.js",
-      "bytes": 47611,
-      "sha256": "989a6cc4e60eaa006bbe8b5b06981eecbc6e4868e40f96bce5d42c2d5241ca53"
+      "bytes": 47615,
+      "sha256": "1fe7f59f80868bfff6803c7662e23c6512922f105c42b7d4ac5481008b1634e1"
     },
     {
       "path": "js/lab/capture.js",
@@ -45,8 +45,8 @@
     },
     {
       "path": "js/lab/core.js",
-      "bytes": 5759,
-      "sha256": "2d7e517970348550abf442c77cb44152090442c4fa2471641fff6ee3985ebc3c"
+      "bytes": 5771,
+      "sha256": "6e3a0ab9acc99d23044d43f90e191eafc7b208759c39d4ad0198b435fa609e8d"
     },
     {
       "path": "js/lab/detection-worker.js",
@@ -235,8 +235,8 @@
     },
     {
       "path": "js/lab/verification.js",
-      "bytes": 1748,
-      "sha256": "d0fec887a7580d844bf666ccb2a7776d825bbedcb56391386c3e5f6959cd6e3c"
+      "bytes": 1752,
+      "sha256": "8d14ad9f2a5aad4c1d332441b62ae06e0c1db31e543386cc21615f40ce60ef6c"
     },
     {
       "path": "js/lab/whisper-worker.js",
@@ -246,12 +246,12 @@
     {
       "path": "lab-sw.js",
       "bytes": 1652,
-      "sha256": "2894cbd8c5dce7b1e0db413853d595a8bf2f60463a9af051a3c35d3e3033a800"
+      "sha256": "de742f9f45717e552555cba352891f0d2616e4355c760cd39e5ddc6f470040d2"
     },
     {
       "path": "lab.html",
-      "bytes": 10528,
-      "sha256": "5fc32dfc17b3d94194b4543c76bcb20a4982e13066be2f4568db13f24c28bf95"
+      "bytes": 10533,
+      "sha256": "0aa6c3f2f2b018d4514f4a6b127b12acb6eaa0dd7a14098793922f8f102a5b73"
     }
   ]
 }

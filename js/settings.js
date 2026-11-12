@@ -2,7 +2,7 @@ import { createStoragePersistence, storagePersistenceLabel } from "./storage-per
 
 // Persisted recognition preferences; recording/microphone ownership stays in recorder.js.
 const KEY = "imuse.voice-settings.v1";
-const defaults = Object.freeze({audioCommands:false, wakeEngine:"voicute", wakeThreshold:0.67, voicuteThreshold:0.90, commandWindow:5, silencePauseSeconds:5, silenceThresholdDb:-36.5, wakeMinimumDb:-40, autoGainControl:false, noiseSuppression:true, echoCancellation:true,
+const defaults = Object.freeze({audioCommands:false, wakeEngine:"heed", wakeThreshold:0.75, voicuteThreshold:0.90, commandWindow:5, silencePauseSeconds:5, silenceThresholdDb:-36.5, wakeMinimumDb:-40, autoGainControl:false, noiseSuppression:true, echoCancellation:true,
     speechDuringRecord:false, speechDuringPause:true, speechThreshold:0.6, speechMinFrames:2, speechLookbackMs:1000,
     goThreshold:0.60, stopThreshold:0.85, yesThreshold:0.85, noThreshold:0.55, overlapFactor:"auto"});
 const allowedOverlap = new Set(["auto", "0.5", "0.75", "0.9"]);
@@ -16,7 +16,7 @@ export function loadSettings() {
         speechThreshold:clamp(stored.speechThreshold,.1,.95,defaults.speechThreshold),
         speechMinFrames:Math.round(clamp(stored.speechMinFrames,1,6,defaults.speechMinFrames)),
         speechLookbackMs:Math.round(clamp(stored.speechLookbackMs,250,2000,defaults.speechLookbackMs)),
-        wakeEngine:stored.wakeEngine === "heed" ? "heed" : "voicute",
+        wakeEngine:stored.wakeEngine === "voicute" ? "voicute" : "heed",
         voicuteThreshold:clamp(stored.voicuteThreshold,.3,.95,defaults.voicuteThreshold),
         wakeThreshold:clamp(stored.wakeThreshold,.3,.99,defaults.wakeThreshold),
         silencePauseSeconds:Math.round(clamp(stored.silencePauseSeconds,3,15,defaults.silencePauseSeconds)),

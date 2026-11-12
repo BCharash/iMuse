@@ -1,5 +1,7 @@
 # Hey iMuse — Heed wake-word training, safety, export, testing, and iMuse integration handoff
 
+**Integration update, 12 November 2026:** Candidate 2026-11-12.1 installs the supplied medium export into production and the current lab. The user explicitly selected **0.75** as the new default/recommendation and confirmed existing saved thresholds must remain unchanged. This supersedes the earlier 0.80 proposal recorded below. Files remain byte-for-byte exports; display spelling is Hey iMuse. The model loaded and ran through the production adapter in isolated Chrome, and all 106 regression methods passed. Live acoustic/device acceptance in production remains pending.
+
 **Session:** 12 November 2026  
 **Purpose:** Preserve the decisions, inputs, outputs, tested settings, security precautions, and repeatable process for building a new speaker-independent Heed wake-word model in Google Colab.  
 **Status:** Small and medium models trained and exported; browser tests promising; production iMuse replacement not yet verified.  

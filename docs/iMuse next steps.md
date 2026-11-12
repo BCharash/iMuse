@@ -1,8 +1,10 @@
 # iMuse next steps
 
-Updated 11 November 2026. This is the active work queue. **Build 2026-11-05.3 is the accepted wake-refactor/race-fix checkpoint:** the user tested it and reported success. The latest implementation suite passed 106 methods across fifteen suites; device/browser details of that user check were not specified. See the [documentation index](README.md) and [recording investigation](recording-investigation.md). The detailed 1 November roadmap is [archived](Archive/roadmap-2026-11-01.md); it retains later feature requirements but no longer sets today's priority.
+Updated 12 November 2026. This is the active work queue. **Build 2026-11-05.3 is the accepted wake-refactor/race-fix checkpoint:** the user tested it and reported success. The latest implementation suite passed 106 methods across fifteen suites; device/browser details of that user check were not specified. See the [documentation index](README.md) and [recording investigation](recording-investigation.md). The detailed 1 November roadmap is [archived](Archive/roadmap-2026-11-01.md); it retains later feature requirements but no longer sets today's priority.
 
 ## Current priorities
+
+**New model acceptance: candidate 2026-11-12.1.** Heed now uses the user-supplied medium Hey iMuse export in production and the current lab, default 0.75. Existing stored thresholds remain unchanged; users can manually select the displayed 0.75 recommendation. Verify the Hey iMuse phrase with Heed in recording/pause on desktop and iPhone, confirm command sequencing and saved playback/export, and verify the lab loads v2 model assets. Old Hey Doc lab accuracy findings do not transfer to this model. Preserve other settings/behavior and do not bundle queue or audio-routing changes.
 
 ### Stability investigation: exact resume order
 

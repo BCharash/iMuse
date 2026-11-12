@@ -15,11 +15,11 @@ export function filenameSuffix(text) {
 }
 // Opening-sentence keywords, in spoken order. Keep negations and topic words.
 export function filenameKeywords(text) {
- const common=new Set(('a an the and or but so as at by for from in into of on onto to with about after before between during over under is am are was were be been being have has had do does did i me my mine we us our ours you your yours he him his she her hers it its they them their theirs this that these those there here then than um uh erm hmm well okay ok hello hi hey doc docs friday please just really very also today now').split(' '));
+ const common=new Set(('a an the and or but so as at by for from in into of on onto to with about after before between during over under is am are was were be been being have has had do does did i me my mine we us our ours you your yours he him his she her hers it its they them their theirs this that these those there here then than um uh erm hmm well okay ok hello hi hey imuse doc docs friday please just really very also today now').split(' '));
  const sentences=(String(text||'').replace(/<\|[^>]+\|>/g,'').match(/[^.!?]+[.!?]*/g)||[]).slice(0,2);
  for(const sentence of sentences){
   const opening=sentence.trim()
-   .replace(/^(?:(?:hey\s+(?:doc|friday)|hello|hi|okay|ok)[,!.]?\s*)+/i,'')
+   .replace(/^(?:(?:hey\s+(?:imuse|doc|friday)|hello|hi|okay|ok)[,!.]?\s*)+/i,'')
    .replace(/^(?:(?:today\s+)?I\s+(?:want to|would like to|am going to)\s+(?:talk about|discuss)|(?:this is|lets|let’s|let us)\s+(?:a recording about|talk about|discuss)|(?:title|subject|file name)\s*:)\s*/i,'');
   const words=opening.match(/[\p{L}\p{N}]+(?:[’'-][\p{L}\p{N}]+)*/gu)||[];
   const selected=[],seen=new Set();

@@ -120,13 +120,13 @@
                 <p class="settings-note microphone-room-reference"><span id="quietRoomValue">Q Quiet room: not marked</span><span id="noisyRoomValue">N Noisy room: not marked</span></p>
                 <p class="settings-note">Let the needle settle, then mark your room levels. References last until reload; microphone or gain changes require new measurements. The dial spans −70 to 0 dBFS; the number shows levels below the dial too.</p>
             </div>
-            <label class="settings-slider" for="silenceThresholdDb">Silence threshold (dBFS) <output id="silenceThresholdDbValue"></output><input type="range" id="silenceThresholdDb" min="-65" max="-20" step="0.5"></label>
-            <label class="settings-slider" for="wakeMinimumDb">Wake-word minimum level (dBFS) <output id="wakeMinimumDbValue"></output><input type="range" id="wakeMinimumDb" min="-65" max="-20" step="1"></label>
+            <label class="settings-slider" for="silenceThresholdDb">Silence threshold (dBFS) (recommended: -36.5) <output id="silenceThresholdDbValue"></output><input type="range" id="silenceThresholdDb" min="-65" max="-20" step="0.5"></label>
+            <label class="settings-slider" for="wakeMinimumDb">Wake-word minimum level (dBFS) (recommended: -40) <output id="wakeMinimumDbValue"></output><input type="range" id="wakeMinimumDb" min="-65" max="-20" step="1"></label>
             <p class="settings-note">The needle shows input loudness, not recognition confidence. Use the short check before recording, or read levels while recording/paused. Wake-word minimum level is for evaluation only; it does not yet filter activations.</p>
 
         </div>
         </div>
-        <label class="settings-slider">Pause after no speech (seconds) <output id="silencePauseSecondsValue"></output><input type="range" id="silencePauseSeconds" min="3" max="15" step="1"></label>
+        <label class="settings-slider">Pause after no speech (seconds) (recommended: 5) <output id="silencePauseSecondsValue"></output><input type="range" id="silencePauseSeconds" min="3" max="15" step="1"></label>
         <details id="microphoneAdvancedSettings" class="advanced-settings"><summary>Advanced microphone settings</summary>
         <div class="imuse-mic-processing-controls" role="group" aria-label="Microphone processing requests">
             <label><input type="checkbox" id="autoGainControl"> Automatic gain control</label>
@@ -145,19 +145,19 @@
         <div id="voiceSettings">
             <fieldset class="settings-group">
                 <legend>Wake-word recognition</legend>
-                <label>Wake-word engine <select id="wakeEngine"><option value="voicute">Voicute — Hey Friday</option><option value="heed">Heed — Hey Doc</option></select></label>
-                <label id="voicuteThresholdRow">Voicute threshold <output id="voicuteThresholdValue"></output><input type="range" id="voicuteThreshold" min="0.3" max="0.95" step="0.01"></label>
-                <label id="heedThresholdRow">Heed threshold <output id="wakeThresholdValue"></output><input type="range" id="wakeThreshold" min="0.3" max="0.99" step="0.01"></label>
+                <label>Wake-word engine <select id="wakeEngine"><option value="heed">Heed — Hey iMuse</option><option value="voicute">Voicute — Hey Friday</option></select></label>
+                <label id="voicuteThresholdRow">Voicute threshold (recommended: 0.90) <output id="voicuteThresholdValue"></output><input type="range" id="voicuteThreshold" min="0.3" max="0.95" step="0.01"></label>
+                <label id="heedThresholdRow">Heed threshold (recommended: 0.75) <output id="wakeThresholdValue"></output><input type="range" id="wakeThreshold" min="0.3" max="0.99" step="0.01"></label>
             </fieldset>
 
 
             <fieldset class="settings-group">
                 <legend>Voice command recognition</legend>
-                <label>Command listening window (seconds) <output id="commandWindowValue"></output><input type="range" id="commandWindow" min="2" max="15" step="1"></label>
-                <label>Go threshold <output id="goThresholdValue"></output><input type="range" id="goThreshold" min="0.3" max="0.99" step="0.01"></label>
-                <label>Stop threshold <output id="stopThresholdValue"></output><input type="range" id="stopThreshold" min="0.3" max="0.99" step="0.01"></label>
-                <label>Yes confirmation threshold <output id="yesThresholdValue"></output><input type="range" id="yesThreshold" min="0.3" max="0.99" step="0.01"></label>
-                <label>No confirmation threshold <output id="noThresholdValue"></output><input type="range" id="noThreshold" min="0.3" max="0.99" step="0.01"></label>
+                <label>Command listening window (seconds) (recommended: 5) <output id="commandWindowValue"></output><input type="range" id="commandWindow" min="2" max="15" step="1"></label>
+                <label>Go threshold (recommended: 0.60) <output id="goThresholdValue"></output><input type="range" id="goThreshold" min="0.3" max="0.99" step="0.01"></label>
+                <label>Stop threshold (recommended: 0.85) <output id="stopThresholdValue"></output><input type="range" id="stopThreshold" min="0.3" max="0.99" step="0.01"></label>
+                <label>Yes confirmation threshold (recommended: 0.85) <output id="yesThresholdValue"></output><input type="range" id="yesThreshold" min="0.3" max="0.99" step="0.01"></label>
+                <label>No confirmation threshold (recommended: 0.55) <output id="noThresholdValue"></output><input type="range" id="noThreshold" min="0.3" max="0.99" step="0.01"></label>
                 <label>TensorFlow overlap <select id="overlapFactor"><option value="auto">Automatic (desktop 0.75 / mobile 0.90)</option><option value="0.5">0.50</option><option value="0.75">0.75</option><option value="0.9">0.90</option></select></label>
             </fieldset>
             <fieldset class="settings-group" id="speechSettings">

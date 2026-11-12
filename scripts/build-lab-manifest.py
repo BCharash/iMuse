@@ -11,6 +11,6 @@ assets=[]
 for path in sorted(paths):
     data=path.read_bytes()
     assets.append({'path':str(path.relative_to(ROOT)),'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()})
-manifest={'version':1,'cache':'imuse-simple-lab-v1','bytes':sum(asset['bytes'] for asset in assets),'assets':assets}
+manifest={'version':1,'cache':'imuse-simple-lab-v2','bytes':sum(asset['bytes'] for asset in assets),'assets':assets}
 (ROOT/'js/lab/manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print(f"{len(assets)} lab assets, {manifest['bytes']/1048576:.1f} MiB")

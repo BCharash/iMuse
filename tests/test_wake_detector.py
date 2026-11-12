@@ -465,7 +465,7 @@ class WakeAdapterTests(unittest.TestCase):
     def test_heed_model_loading_normalization_pending_frames_and_reset(self):
         check(r"""
  const loaded=await loadHeedWakeWord({threshold:.81,onStatus:v=>progress.push(v)}),detector=instances[0];
- assert(loaded.phrase==='Hey Doc'&&detector.threshold===.81,'phrase and requested threshold');
+ assert(loaded.phrase==='Hey iMuse'&&detector.threshold===.81,'phrase and requested threshold');
  assert(requests[0].endsWith('/wake.json')&&sessions[0].url.endsWith('/wake.onnx'),'local model and metadata');
  assert(sessions[0].options.executionProviders.join(',')==='wasm'&&progress.length===1,'existing runtime and progress');
  let result=await loaded.engine.consume(new Float32Array(2048).fill(32767*.25),16000);

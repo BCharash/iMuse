@@ -1,6 +1,6 @@
 # iMuse documentation
 
-Updated 11 November 2026. Start here; current findings take precedence over older plans and journal entries.
+Updated 12 November 2026. Start here; current findings take precedence over older plans and journal entries.
 
 | Document | Purpose |
 | --- | --- |
@@ -17,6 +17,10 @@ Updated 11 November 2026. Start here; current findings take precedence over olde
 | [Archive index](Archive/README.md) | Superseded reviews, detailed earlier roadmap, installation checklists, and voice/headset experiments |
 
 ## Current checkpoint
+
+**Candidate 2026-11-12.2:** Heed — Hey iMuse appears first in the wake-engine dropdown and is selected for initial load when no valid preference exists. Existing saved Heed/Voicute choices remain unchanged; Audio commands remains opt-in.
+
+**Candidate 2026-11-12.1:** user-approved replacement of Heed Hey Doc weights/metadata with the user-trained medium Hey iMuse export. Production and current lab display Hey iMuse and default Heed to 0.75; existing saved settings remain unchanged. Every audio-control range slider shows its recommended starting value in parentheses. Voicute, capture, voice-command sequencing, Silero decisions, storage and queues are unchanged. Current lab cache advances to v2; historical Hey Doc evidence remains historical. All 106 regression methods pass. Isolated Chrome loaded/warmed the real ONNX model and exercised streaming inference, verified the 0.75 default/saved-value preservation, and checked all 13 slider annotations and lab defaults. Acoustic/device acceptance remains pending. See [model notes](../js/heed/README.md#hey-imuse-model-12-november-2026).
 
 **Current checkpoint: production build 2026-11-11.5; observation period.** The user reports normal speaker playback has returned for the original iPhone stop message, without an established cause. The temporary .6 audio substitution and isolated output lab are reverted; current source uses the original stop WAV. Preserve the accepted diagnostics layout, Silero controls and shutdown-ordering correction. Do not treat spontaneous recovery as proof of a fix. See the [full evidence and exact resume instructions](recording-investigation.md#iphone-stop-announcement-output-regression). Last retained implementation validation: 106 methods across fifteen suites; this update changes documentation only.
 

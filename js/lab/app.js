@@ -8,7 +8,7 @@ const $=id=>document.getElementById(id),store=createLabStore(),records=new Map()
 let current=null,preparing=false,preparingCleanup=null,maintenance=false,generation=0,temporaryStream=null,playerUrl=null,whisper=null,whisperReady=false,whisperLoading=null,whisperSerial=0;
 let logEpoch=0;
 let events=[],displayStart=0,titleRequests=new Map(),offlinePreparing=false;
-const LAB_BUILD='2026-11-05.3';$('build').textContent='Lab build '+LAB_BUILD;
+const LAB_BUILD='2026-11-12.1';$('build').textContent='Lab build '+LAB_BUILD;
 const status=text=>$('status').textContent=text;
 const modelStatus=text=>$('modelStatus').textContent=text;
 const settings=()=>({freshSpeech:$('freshSpeech').checked&&$('liveAnalysis').checked&&$('labMode').value==='wake'&&$('engine').value!=='off',verifyWake:$('verifyWake').checked&&$('liveAnalysis').checked&&$('labMode').value==='wake'&&$('engine').value!=='off',autoName:$('autoName').checked,nearThreshold:Number($('nearThreshold').value),formatPreference:$('format').value,liveAnalysis:$('liveAnalysis').checked,engine:$('engine').value,threshold:Number($('wakeThreshold').value),requireSpeech:$('speechGate').checked,speechThreshold:Number($('speechThreshold').value),minimumDb:$('levelGate').checked?Number($('minimumDb').value):null});
@@ -191,7 +191,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:') {
 async function prepareOffline() {
  if(current||preparing||offlinePreparing||maintenance)return;offlinePreparing=true;controls();
  try {
-  await swReady;const manifest=await (await fetch('js/lab/manifest.json',{cache:'no-store'})).json();const cache=await caches.open('imuse-simple-lab-v1');let bytes=0;
+  await swReady;const manifest=await (await fetch('js/lab/manifest.json',{cache:'no-store'})).json();const cache=await caches.open('imuse-simple-lab-v2');let bytes=0;
   for(let i=0;i<manifest.assets.length;i++){const asset=manifest.assets[i],url=new URL(asset.path,location.href).href;
    modelStatus(`Preparing offline: ${i+1}/${manifest.assets.length} files · ${(bytes/1048576).toFixed(0)} MB`);
    if(!await cache.match(url)){const response=await fetch(url);if(!response.ok)throw Error(`${asset.path}: ${response.status}`);await cache.put(url,response);}bytes+=asset.bytes;
@@ -337,7 +337,7 @@ async function start() {
     const pcm=event.data,id=++packet;pending.add(id);
     worker.postMessage({type:'audio',pcm,id,generation:run,sentAt:Date.now(),sampleRate:context.sampleRate,recording:capture.recorder.state==='recording',reset:resetNext},[pcm.buffer]);resetNext=false;
    };
-   capture.source.connect(capture.processor);capture.processor.connect(capture.silent);capture.silent.connect(context.destination);capture.analysisStage='running';$('trackingMode').textContent=config.engine==='off'?'Wake tracking OFF — recording filename audio only.':`Wake tracking ACTIVE — ${config.engine==='heed'?'Hey Doc':'Hey Friday'} · ${config.requireSpeech?'speech gate on':'speech gate off'}. Scores update below; triggers appear in Review.`;log('analysis-stage',{id:record.id,stage:capture.analysisStage});
+   capture.source.connect(capture.processor);capture.processor.connect(capture.silent);capture.silent.connect(context.destination);capture.analysisStage='running';$('trackingMode').textContent=config.engine==='off'?'Wake tracking OFF — recording filename audio only.':`Wake tracking ACTIVE — ${config.engine==='heed'?'Hey iMuse':'Hey Friday'} · ${config.requireSpeech?'speech gate on':'speech gate off'}. Scores update below; triggers appear in Review.`;log('analysis-stage',{id:record.id,stage:capture.analysisStage});
   }catch(error){capture.detectorReady=false;worker.terminate();resolveTitle(null);await closeLabAudioContext(context,cleanup=>log('context-cleanup-error',{message:cleanup.message}));if(current===capture){$('detectionStatus').textContent='Audio recording continues without analysis: '+error.message;log('analysis-start-failed',{id:record.id,message:error.message});}}
  }catch(error){
   log('recording-start-failed',{name:error.name,message:error.message,streamActive:stream?.active,tracks:stream?.getAudioTracks().map(track=>({state:track.readyState,muted:track.muted,enabled:track.enabled,settings:track.getSettings()})),formatAttempts:capture?.record.formatAttempts});
@@ -349,7 +349,7 @@ async function start() {
 $('record').onclick=start;$('pause').onclick=togglePause;$('stop').onclick=()=>{if(preparing&&!current){generation++;preparingCleanup?.();preparingCleanup=null;preparing=false;temporaryStream?.getTracks().forEach(track=>track.stop());temporaryStream=null;controls();status('Preparation cancelled.');return;}if(current){current.stop();controls();status('Finishing recording…');}};
 function selectLabMode() {
  const naming=$('labMode').value==='filename';
- $('liveAnalysis').checked=true;$('autoName').checked=naming;$('engine').value=naming?'off':'heed';$('wakeThreshold').value=.7;
+ $('liveAnalysis').checked=true;$('autoName').checked=naming;$('engine').value=naming?'off':'heed';$('wakeThreshold').value=.75;
  $('wakePanel').hidden=naming;$('wakeEvents').hidden=false;$('filenameOptions').hidden=!naming;
  $('sessionTitle').textContent=naming?'Filename lab':'Speech-gate comparison lab';
  $('trackingMode').textContent=naming?'Wake tracking OFF — Filename mode does not run a wake detector. Choose Use wake detector lab to track triggers.':'Wake tracking selected — press Record to start listening. Live scores appear here; trigger clips appear under Review below.';
@@ -363,7 +363,7 @@ for(const [id,mode] of [['filenameMode','filename'],['wakeMode','wake']])$(id).o
 // Reconcile controls if the browser restores the select value after navigation.
 globalThis.addEventListener('pageshow',()=>{if(!current&&!preparing)selectLabMode();});
 selectLabMode();
-$('engine').onchange=()=>{$('wakeThreshold').value=$('engine').value==='voicute'?.9:.7;};
+$('engine').onchange=()=>{$('wakeThreshold').value=$('engine').value==='voicute'?.9:.75;};
 $('clearRecordings').onclick=async()=>{
  if(current||preparing||maintenance||pendingCaptures.size)return;
  if(!confirm('Permanently delete all recordings and their saved chunks from this lab? iMuse recordings and the old comparison lab are unaffected.'))return;

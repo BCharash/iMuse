@@ -10,8 +10,8 @@ async function ensureOrt(){
  await scriptPromise;
  if(!window.ort)throw new Error("ONNX Runtime did not initialize");
 }
-export async function loadHeedWakeWord({threshold=.667,onStatus=()=>{}}={}){
- onStatus("Loading Heed Hey Doc model…");await ensureOrt();
+export async function loadHeedWakeWord({threshold=.75,onStatus=()=>{}}={}){
+ onStatus("Loading Heed Hey iMuse model…");await ensureOrt();
  const base=new URL("./",import.meta.url);
  const response=await fetch(new URL("wake.json",base));if(!response.ok)throw new Error("Heed metadata HTTP "+response.status);
  const meta=await response.json();
@@ -19,7 +19,7 @@ export async function loadHeedWakeWord({threshold=.667,onStatus=()=>{}}={}){
  const detector=new WakeWordDetector(session,meta);detector.threshold=threshold;
  let pending=new Float32Array(0),busy=false;
  const frameSize=1600; // 100 ms at 16 kHz
- return {phrase:"Hey Doc",engine:{reset(){detector.reset();pending=new Float32Array(0)},setThreshold(v){detector.threshold=v},
+ return {phrase:"Hey iMuse",engine:{reset(){detector.reset();pending=new Float32Array(0)},setThreshold(v){detector.threshold=v},
   async consume(raw,sampleRate){
    if(busy)return null;
    // Recorder supplies PCM samples scaled to signed 16-bit; normalize first.

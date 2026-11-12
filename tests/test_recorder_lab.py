@@ -284,16 +284,16 @@ let loads=0;const pipeline=async()=>{loads++;return async(samples,options)=>{cal
         evaluate(source + r"""
 globalThis.testResult='pending';
 const assert=(value,message)=>{if(!value)throw Error(message);};
-assert(wakePhrasePresent('Hey, Doc! This is a note.','heed'),'phrase tolerates case and punctuation');
+assert(wakePhrasePresent('Hey, iMuse! This is a note.','heed'),'phrase tolerates case and punctuation');
 assert(wakePhrasePresent('hey-friday','voicute'),'Voicute expected phrase');
-assert(!wakePhrasePresent('hey dock','heed')&&!wakePhrasePresent('hey doctor','heed')&&!wakePhrasePresent('Hey Doc','off'),'strict matching avoids forced or fuzzy acceptance');
+assert(!wakePhrasePresent('Hey Doc','heed')&&!wakePhrasePresent('hey dock','heed')&&!wakePhrasePresent('hey doctor','heed')&&!wakePhrasePresent('Hey Doc','off'),'strict matching avoids forced or fuzzy acceptance');
 const updates=[];let clock=0,resolve,reject,deadline,calls=0;
 const verifier=createWakeVerifier({transcribe:samples=>{calls++;assert(samples.length===48000,'bounded input');return new Promise((yes,no)=>{resolve=yes;reject=no;});},onUpdate:(event,result)=>updates.push({event,...result}),now:()=>clock,setTimer:callback=>{deadline=callback;return 1;},clearTimer:()=>{}});
 (async()=>{
  const first=verifier.submit('first',new Float32Array(48000),{engine:'heed',transportMs:20});
  await verifier.submit('busy',new Float32Array(48000),{engine:'heed'});
  assert(calls===1&&updates.at(-1).status==='skipped-busy','live work never builds a queue');
- clock=300;resolve({text:'Hey Doc.',inferenceMs:280});await first;
+ clock=300;resolve({text:'Hey iMuse.',inferenceMs:280});await first;
  assert(updates.at(-1).phrasePresent&&updates.at(-1).totalMs===320&&updates.at(-1).withinBudget,'timing includes transport and complete inference response');
  const slow=verifier.submit('slow',new Float32Array(48000),{engine:'voicute',shortPreRoll:true});
  clock=16000;deadline();assert(verifier.busy&&updates.at(-1).status==='timed-out','deadline reports failure while retaining worker ownership');
