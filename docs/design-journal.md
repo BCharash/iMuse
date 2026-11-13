@@ -1822,3 +1822,17 @@ Corrected Safari WebCodecs audio version support and outdated Cache API quota as
 # DJ048 — Larger audio-command status
 
 13 November 2026, build 2026-11-13.9. Increased the main-page audio-command status from 12 px to 16 px for readability, including the enabled wake phrase and disabled state. Ready to record remains 18 px. CSS-only presentation change plus build identification; no recording/recognition behavior changed. Diff/whitespace checked; runtime tests were not repeated for this font-size adjustment.
+
+
+# DJ049 — Prepare and independently animate the command countdown
+
+13 November 2026, build 2026-11-13.10. User reports a first-wake full circle that jumps to 50% and requests preparation under spoken-prompt startup conditions. Found that Go/Stop's JavaScript animation interval was installed after awaited listener startup, while its deadline started before it. Prepare paused browser transform animations unconditionally alongside prompts, and start the Go/Stop visual before listener initialization. Allow a bounded first-frame presentation opportunity with stale-generation guards. Retain SVG fallback, original command deadlines, Yes/No readiness timing and all microphone/recording ownership. No model or microphone is started by visual preparation.
+
+127 regression methods pass, including four new countdown tests. Isolated Chrome verifies prepared/paused animations without TensorFlow requests when commands are off, visual progression across delayed listener preparation and close/reset; reviewed captures show the expected counterclockwise sector/hand. The first-use iPhone report still needs on-device acceptance; this change does not establish or remove the underlying TensorFlow initialization cost. Full details and limits are in the voice-control guide.
+
+
+# DJ050 — Align both command countdowns with listener readiness
+
+13 November 2026, build 2026-11-13.11. User clarifies that the circle should appear during both Go/Stop and Yes/No, accurately approximating the actual receptive interval, with no preparation message. Supersedes .10's animate-before-startup timing. Both phases now keep the circle hidden and reject predictions until listener startup resolves, then set a fresh full deadline and show/start the visual together. Startup time no longer consumes the Go/Stop interval. Removed the first-frame presentation wait; retained unconditional paused animation preparation and SVG fallback. Existing close/timeout/cancellation guards remain.
+
+127 regression methods pass with the intentionally changed Go/Stop timing covered. Browser checks delay startup longer than the configured window, verify a fresh full Go/Stop interval at readiness, then hidden delayed Yes/No preparation, display at readiness and timeout cleanup. The adapter's ready signal is the practical timing boundary; browser rendering and 100 ms timeout polling limit exact display/closure synchronization. Real iPhone first-use acceptance remains pending.

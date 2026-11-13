@@ -1,6 +1,6 @@
 # iMuse next steps
 
-Current source: **2026-11-13.7**, 13 November 2026. The user reports the updated interface and Combine work well. See the [session summary](2026-11-13-session-summary.md) for today's completed work and [Combine guide](combine-recordings.md) for the current implementation.
+Current source: **2026-11-13.11**, 13 November 2026. The user reports the updated interface and Combine work well. See the [session summary](2026-11-13-session-summary.md) for today's completed work and [Combine guide](combine-recordings.md) for the current implementation.
 
 ## Immediate follow-up
 
@@ -17,7 +17,7 @@ The [waveform/editing brief](waveform-editing-project.md) records the proposed s
 
 ## Next acceptance
 
-1. Check iPhone startup with Audio commands off: prompts prepare, voice models do not. Enable commands and check readiness, wake/commands and warm off/on reuse. Enabled-model UI stalls remain open; worker isolation requires separate design and validation.
+1. Check the prepared command countdown on the first iPhone wake after a fresh launch and on subsequent Go/Stop and Yes/No windows. Confirm the circle stays hidden until listening is ready, then counts smoothly counterclockwise for the full configured interval in both phases. No model or microphone should start solely to prepare the visual. Check iPhone startup with Audio commands off: prompts prepare, voice models do not. Enable commands and check readiness, wake/commands and warm off/on reuse. Enabled-model UI stalls remain open; worker isolation requires separate design and validation.
 2. Check all spoken prompts at full/reduced volume, speaker/Bluetooth, Safari/PWA. Yes/preview is user-accepted; the other messages still need acceptance. Confirm stop timing, disabled New Recording until cleanup, saved playback/download and another recording.
 3. Retain production Silero acceptance: pause on/recording off defaults, immediate post-pause wake, both engines and state switches, the unified on/off preference and manual controls. Preserve user tuning.
 4. Investigate reproducible failures with one hypothesis and detailed diagnostics. The intermittent menu issue was mainly reported after updates, is currently absent, and was not reproduced by single emulated touches. Do not add tap suppression speculatively.

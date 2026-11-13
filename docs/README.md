@@ -1,6 +1,6 @@
 # iMuse documentation
 
-Updated 13 November 2026. Current production source: **2026-11-13.9**. Current guides take precedence over historical journal entries and archived proposals.
+Updated 13 November 2026. Current production source: **2026-11-13.11**. Current guides take precedence over historical journal entries and archived proposals.
 
 | Document | Purpose |
 | --- | --- |
@@ -28,11 +28,12 @@ Updated 13 November 2026. Current production source: **2026-11-13.9**. Current g
 - Download pulses until initiation. Saved and archived rows report Download requested or Not yet downloaded; neither wording verifies successful external saving. Cancel retains the reminder; downloading again remains available.
 - Production Combine creates a new compatible M4A without re-encoding, preserves originals, and embeds original source history. Nested chronology and repeated occurrences are retained. Combined recording is bold, Sources expands its history, and dividers distinguish controls and recordings. The temporary Combine prototype is removed; the wake/Silero lab remains.
 - Filename input is 18 px; dialogs are viewport-bounded. Mutations preserve a surviving visible row where possible. Diagnostics opens View/Hide, Copy and Download of one snapshot. Deliberate pinch zoom remains available.
+- The command countdown prepares paused animations alongside all six prompts at startup. Both Go/Stop and Yes/No show their circle and begin their full response window only after listener readiness. The circle stays hidden during preparation; no preparation message is added. First-wake iPhone smoothness needs acceptance.
 - All six prompts prepare at startup. Recognition models wait until Audio commands is enabled and ready models are reused. Heed / Hey iMuse is first/default at 0.75, preserving saved tuning; Silero defaults to pause evaluation on and recording evaluation off.
 
 ## Acceptance and open work
 
-The user reports today's changes and Combine work well. The latest implementation validation is **123 methods across seventeen suites**, plus isolated Chrome checks of real AAC packet preservation, decoded order, nested/repeated history, real library/IndexedDB behavior, cancellation/errors, download markers, archive/unarchive and narrow layout.
+The user reports today's changes and Combine work well. The latest implementation validation is **127 methods across seventeen suites**, plus isolated Chrome checks of real AAC packet preservation, decoded order, nested/repeated history, real library/IndexedDB behavior, cancellation/errors, download markers, archive/unarchive and narrow layout.
 
 Targeted iPhone checks remain for combined playback/seek/Files exports, filename keyboard/zoom if it recurs, and large-combination resource use. The user has already recorded more than 90 minutes; that does not certify every background or export scenario, and does not require another duration run by default.
 

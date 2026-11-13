@@ -1774,3 +1774,4 @@ setLifecycleStatus("Screen lock prevention activates during recording when avail
 
 // Spoken feedback is used by manual recording as well as voice commands.
 prepareSpokenResponses();
+voiceController.prepareCountdown();

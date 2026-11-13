@@ -366,3 +366,32 @@ button:active {
 #suspendAudioCommands { display: block; margin: 0 auto 10px; }
 #suspendAudioCommands[hidden] { display: none; }
 #audioCommandsSuspensionStatus { margin: 0 auto; font-size: 16px; }
+
+/* Browser-driven countdown: two clipped covers reveal the surface CCW. */
+.command-timer { position: relative; display: inline-block; }
+.command-timer-fallback { display: block; width: 100%; height: 100%; }
+.command-timer-half, .command-timer-animated-hand { display: none; }
+.command-timer[data-animated="true"] {
+  overflow: hidden;
+  border-radius: 50%;
+  background: #9bdcf5;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.command-timer[data-animated="true"] .command-timer-fallback { display: none; }
+.command-timer[data-animated="true"] .command-timer-half { display: block; position: absolute; inset: 0; }
+.command-timer-left { clip-path: inset(0 50% 0 0); }
+.command-timer-right { clip-path: inset(0 0 0 50%); }
+.command-timer-cover { position: absolute; inset: 0; will-change: transform; }
+.command-timer-left .command-timer-cover { background: linear-gradient(to right, var(--surface) 50%, transparent 50%); }
+.command-timer-right .command-timer-cover { background: linear-gradient(to left, var(--surface) 50%, transparent 50%); }
+.command-timer[data-animated="true"] .command-timer-animated-hand {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: calc(50% - .5px);
+  width: 1px;
+  height: 50%;
+  background: #35424b;
+  transform-origin: center bottom;
+  will-change: transform;
+}

@@ -1,6 +1,6 @@
 # Voice control: current architecture and validation
 
-Updated 13 November 2026. Production source **2026-11-13.9**. Current validation and priorities are in the [index](README.md) and [next steps](iMuse%20next%20steps.md). Earlier build-by-build decisions remain in the [journal](design-journal.md).
+Updated 13 November 2026. Production source **2026-11-13.11**. Current validation and priorities are in the [index](README.md) and [next steps](iMuse%20next%20steps.md). Earlier build-by-build decisions remain in the [journal](design-journal.md).
 
 ## Startup and spoken prompts
 
@@ -24,7 +24,7 @@ The existing normalized microphone tap feeds the speech worker independently of 
 
 Advanced diagnostics records a `speech-gate` event for each completed current candidate decision: state, pass/reject, threshold, qualifying blocks/peak, lookback, and bypass reason when applicable. This adds no raw audio logging or persistent speech history.
 
-Current regression checkpoint: 123 methods across seventeen suites (see the [test guide](../tests/README.md)). Earlier model-specific verification: An isolated Chrome check used the real local ONNX/WASM model to reject digital silence and accept a bundled spoken prompt, confirmed zero microphone requests during preparation/UI changes, and checked the Settings layout at 390 and 880 pixels. This is wiring/model execution evidence, not false-positive/negative rates, iPhone performance, screen-lock capture or microphone/device acceptance.
+Current regression checkpoint: 127 methods across seventeen suites (see the [test guide](../tests/README.md)). Earlier model-specific verification: An isolated Chrome check used the real local ONNX/WASM model to reject digital silence and accept a bundled spoken prompt, confirmed zero microphone requests during preparation/UI changes, and checked the Settings layout at 390 and 880 pixels. This is wiring/model execution evidence, not false-positive/negative rates, iPhone performance, screen-lock capture or microphone/device acceptance.
 
 Focused device checks: enable Audio commands; verify paused defaults and ready status; record without speech gating, pause and deliberately say the wake phrase, then complete the usual command sequence. Test both engines, both state switches, both switches off, immediate post-pause phrases, suspension, repeated pause/resume and starting/stopping another recording. Confirm recorded audio/export remains intact. Observe threshold/decision diagnostics during quiet, noise, conversation and intended phrases before changing defaults. The separate lab remains available for detailed labeling/comparison.
 
@@ -93,7 +93,7 @@ Settings retains Microphone, Voice commands and Storage categories and their Adv
 | TensorFlow microphone adapter | Borrow a clone of the live recording track; do not acquire a new audio input; invalidate callbacks during pending startup; teardown releases the clone |
 | Adapter failure/repeated calls | Restore the temporary global media override after successful/failed startup; reject duplicate startup; reject a dead original track; repeated shutdown is harmless |
 
-Preserve these current timing semantics: Go/Stop computes its expiry before awaiting listener startup; Yes/No starts its countdown after listener startup completes. These are currently different. Normalizing them would be a separate behavior change, not part of extraction.
+Current timing (user-approved change in build 2026-11-13.11): both Go/Stop and Yes/No begin accepting commands, show the circle and start the full configured deadline after listener startup completes. The earlier Go/Stop deadline-before-startup policy was preserved during extraction but is now superseded.
 
 The adapter test also confirms that non-audio getUserMedia requests retain the original route. It does not establish safety for every concurrent microphone request or multiple recognizer instances. The temporary override remains a documented integration boundary, not a target for simultaneous redesign.
 
@@ -134,3 +134,15 @@ Record build, device/browser, microphone and failed scenario. Add a headset chec
 Asset fingerprinting remains deferred: conventional generated content-hashed assets and an automated deployment build, preserving readable source filenames. It has not been implemented or authorized by this documentation update. The [build guide](build-versioning.md) owns that scope.
 
 Silero now provides the state-specific production gate above; keep fresh-Silero replay and Whisper outside production wake verification. AudioWorklet migration changes audio delivery and needs independent validation. Naming/transcription/cleanup run only outside active recording sessions and yield to Record, including pause/startup/finalization; no production scheduler exists. Retain source audio and reversible derivatives. See [wake evaluation](wake-word-evaluation.md), [native/transcription requirements](iMuse%20Swift%20migration%20plan.md#recording-has-absolute-priority) and the [active queue](iMuse%20next%20steps.md).
+
+## Prepared countdown aligned with listening — 2026-11-13.11
+
+The user reported that the first Go/Stop circle stayed full and then jumped roughly halfway. Its old JavaScript interval was installed after awaited listener startup, while its deadline had already begun. Browser-driven transform animations were introduced in .10. The user then clarified that the displayed interval must approximate actual listening, and approved aligning readiness and deadlines in .11.
+
+Prepare three paused transform animations at startup alongside unconditional spoken-prompt preparation, even with Audio commands off. This loads no speech model and acquires no microphone. Two clipped covers and a counterclockwise hand let the browser drive the pie countdown without per-tick SVG geometry updates. No animation asset is fetched. Browsers without usable Web Animations keep the SVG fallback. [WebKit's animation overview](https://webkit.org/blog/8343/web-animations-in-webkit/) describes browser-managed execution; iPhone first-use smoothness still needs acceptance.
+
+Both Go/Stop and Yes/No keep the indicator hidden while models/listeners prepare. No preparation message is displayed. After startCommands resolves and current session/generation guards pass, the controller sets the full response deadline, shows Listening for Go or Stop / Listening for Yes or No, and starts the animation from full. Predictions arriving before readiness are ignored. Model/listener preparation does not consume response time. The two-frame/60 ms presentation wait from .10 is removed; there is no intentional paint delay before recognition. Both intervals use the same readiness policy.
+
+Animation and command acceptance share one deadline. Close, accepted action, cancellation, confirmation transition and timeout hide/reset the visual. Prediction callbacks reject expired commands immediately; the existing 100 ms timeout poll handles closure, so display/shutdown timing remains an approximation within normal browser rendering/scheduling limits. Listener readiness is the adapter's startup completion, not a guarantee of immediate acoustic recognition or a measured hardware timestamp. Audio prompts, thresholds, microphone ownership and capture/storage behavior remain unchanged.
+
+Validation: 127 methods across seventeen suites, including idempotent preparation without models, hidden/zero-progress delayed startup, full post-readiness Go/Stop interval, Yes/No readiness, ignored early/expired predictions and cancelled startup that cannot reopen the circle. Isolated Chrome tests deliberately delay the first listener 2.4 seconds with a two-second command window, verify a fresh full window at readiness, then test delayed Yes/No startup and timeout cleanup. This verifies controller/visual wiring, not real iPhone model latency. On iPhone, check first and subsequent wakes, Yes/No confirmation, premature disappearance, and the last part of the response interval without clearing site data.

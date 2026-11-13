@@ -1,6 +1,6 @@
 # 13 November 2026 — recording library and Combine
 
-End-of-day production checkpoint: **2026-11-13.8**. The user reports that the changes look good and that Combine works. Automated/browser evidence and remaining device checks are distinguished below. This summary records today's final outcome; earlier proposals are not implementation instructions.
+End-of-day production checkpoint: **2026-11-13.11**. The user reports that the changes look good and that Combine works. Automated/browser evidence and remaining device checks are distinguished below. This summary records today's final outcome; earlier proposals are not implementation instructions.
 
 ## Main screen and recording library
 
@@ -36,3 +36,11 @@ The documentation index, roadmap, recording/voice guides, Combine guide, test gu
 ## Readiness status follow-up — build 2026-11-13.8
 
 Placed an independent 18 px Ready to record status below Stop, followed by Microphone, Suspend/Resume audio commands and enabled/disabled command status with the active phrase. Removed (not listening) from inactive microphone wording. Readiness is visible whenever New Recording is available, including alongside Audio recording successful, and hidden during recording, pause, preparation, finalization and Combine. Recording/storage/voice behavior is unchanged. All 123 regression methods pass; isolated Chrome checks cover initial layout and the capture/finalization/success readiness transition.
+
+## Countdown follow-up — build 2026-11-13.10
+
+Prepared paused browser-driven countdown animations at the same unconditional startup point as spoken prompts. Go/Stop animation previously waited for listener startup before JavaScript updates began, explaining a full circle followed by a jump. Visual progress now starts before listener preparation, with a bounded first-frame presentation opportunity and cancellation guards; the original deadline and Yes/No readiness policy remain. SVG fallback and microphone/model ownership are preserved. Four added tests bring the current total to 127 methods; browser checks verify preparation, timeline progression and cleanup. First-wake iPhone smoothness remains a targeted user check. The earlier .9 update enlarged audio-command status to 16 px; Ready to record remains 18 px.
+
+## Listening-window alignment — build 2026-11-13.11
+
+User clarified that both command phases should display the countdown and that it must approximate actual receptivity. Supersedes the preceding .10 timing: Go/Stop and Yes/No now keep the circle hidden during preparation, then begin command acceptance, a fresh full configured deadline and the visible countdown together after listener startup completes. No preparation message or first-frame waiting delay is added. Paused animation preparation at startup remains. 127 regression tests and isolated delayed-listener browser checks pass; first-use iPhone timing still needs device acceptance.

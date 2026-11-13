@@ -74,7 +74,64 @@ def check(script):
         evaluate(HARNESS + DIAGNOSTICS + PRODUCTION + "\nglobalThis.testResult='pending';\n(async()=>{\n" + enable + script + "\nglobalThis.testResult='PASS';\n})().catch(error=>globalThis.testResult=String(error)+String(error.stack||''));")
 
 
+ANIMATION_MOCK = r"""
+const animated=[];
+for(const id of ['commandTimerLeft','commandTimerRight','commandAnimatedHand']) {
+ document.getElementById(id).animate=(frames,options)=>{
+  const animation={frames,options,currentTime:null,plays:0,pauses:0,cancelled:false,
+   effect:{updateTiming(value){animation.timing=value;}},
+   pause(){this.pauses++;},play(){this.plays++;},cancel(){this.cancelled=true;}};
+  animated.push(animation);return animation;
+ };
+}
+"""
+
 class VoiceControlTests(unittest.TestCase):
+    def test_countdown_preparation_is_idempotent_without_models_or_microphone(self):
+        check(ANIMATION_MOCK+r"""
+ settings.audioCommands=false;
+ voiceController.prepareCountdown();voiceController.prepareCountdown();
+ assert(animated.length===3&&animated.every(a=>a.plays===0&&a.pauses===1&&a.currentTime===0),'prepared once, paused at full circle');
+ assert(loads===0&&listeners.length===0&&prompts.length===0,'visual preparation has no model, listener or audio side effects');
+ voiceController.preload();await flush();assert(loads===0,'visual preparation does not change commands-disabled model policy');
+""")
+
+    def test_countdown_waits_for_slow_listener_and_gets_full_window(self):
+        check(ANIMATION_MOCK+r"""
+ const current=seed('slow-animated');voiceController.prepareCountdown();startGate=deferred();
+ const opening=handleWakeDetected(current);await flush();
+ assert(listeners.length===1&&animated.every(a=>a.plays===0)&&document.getElementById('commandListening').hidden,'circle stays hidden during preparation');
+ listeners[0]({top:'go',go:.99});await flush();assert(current.recorder.resumes===0,'not accepting commands before readiness');
+ clock=6000;startGate.resolve();await opening;
+ assert(animated.every(a=>a.plays===1&&a.currentTime===0)&&!document.getElementById('commandListening').hidden,'circle begins full at readiness');
+ assert(animated[0].timing.duration===2500&&animated[1].timing.delay===2500&&animated[2].timing.duration===5000,'full configured duration');
+ assert(animated[2].frames[1].transform==='rotate(-360deg)','counterclockwise hand');
+ clock=10999;for(const tick of [...intervals.values()])tick();assert(voiceController.active,'startup did not consume response time');
+ clock=11000;for(const tick of [...intervals.values()])tick();await flush();
+ assert(!voiceController.active&&document.getElementById('commandListening').hidden&&animated.every(a=>a.currentTime===0),'expiry hides and resets circle');
+""")
+
+    def test_cancel_during_listener_start_does_not_show_a_stale_window(self):
+        check(ANIMATION_MOCK+r"""
+ voiceController.prepareCountdown();startGate=deferred();
+ const current=seed('cancel-startup'),opening=handleWakeDetected(current);await flush();
+ voiceController.close();startGate.resolve();await opening;
+ assert(!voiceController.active&&document.getElementById('commandListening').hidden,'cancelled startup cannot show countdown');
+ assert(animated.every(a=>a.plays===0&&a.currentTime===0),'cancelled startup never starts animation');
+""")
+
+    def test_confirmation_animation_waits_for_listener_ready_and_cleans_up(self):
+        check(ANIMATION_MOCK+r"""
+ const current=seed('confirm-animated');await handleWakeDetected(current);
+ startGate=deferred();listeners[0]({top:'stop',stop:.99});await flush();
+ assert(listeners.length===2&&animated.every(a=>a.plays===1&&a.currentTime===0),'confirmation animation is reset during preparation');
+ assert(document.getElementById('commandListening').hidden,'confirmation circle hidden during preparation');
+ listeners[1]({top:'yes',yes:.99});await flush();assert(current.recorder.stops===0,'confirmation not accepted before readiness');
+ clock=2300;startGate.resolve();await flush();
+ assert(animated.every(a=>a.plays===2&&a.currentTime===0)&&!document.getElementById('commandListening').hidden,'confirmation circle starts from readiness');
+ voiceController.close();assert(animated.every(a=>a.currentTime===0),'close resets all animations');
+""")
+
     def test_idle_status_tracks_preference_and_async_readiness(self):
         handler=SOURCE[SOURCE.index('window.addEventListener("imuse-settings-changed"'):SOURCE.index('window.deviceClass = deviceClass;')]
         idle=between('function refreshIdleWakeStatus()', 'function setLifecycleStatus(')
@@ -257,17 +314,19 @@ const loadVoicuteWakeWord=loadHeedWakeWord;
  view.finalize('old-callback');assert(second.recorder.stops===0&&first.recorder.stops===0,'old finalization capability cannot stop replacement session');
 """)
 
-    def test_existing_listener_deadline_semantics_are_preserved(self):
+    def test_both_listener_windows_begin_after_startup_and_reject_expired_commands(self):
         check(r"""
  const current=seed('deadlines');startGate=deferred();
- const opening=handleWakeDetected(current);await flush();assert(listeners.length===1,'Go/Stop listener startup is pending');
- clock=6000;startGate.resolve();await opening;listeners[0]({top:'go',go:.99});await flush();
- assert(current.recorder.resumes===0,'Go/Stop expiry includes time awaiting listener startup');
+ const opening=handleWakeDetected(current);await flush();assert(listeners.length===1,'Go/Stop startup pending');
+ clock=6000;startGate.resolve();await opening;
+ clock=10999;listeners[0]({top:'stop',stop:.99});await flush();
+ assert(listeners.length===2&&current.recorder.stops===0,'Stop accepted near end of full post-startup window');
+ startGate=null;clock=12000;await flush();
+ // The confirmation is already ready, with its own deadline based on its startup.
+ clock=16000;listeners[1]({top:'yes',yes:.99});await flush();
+ assert(current.recorder.stops===0,'late Yes cannot finalize after confirmation deadline');
  for(const tick of [...intervals.values()])tick();await flush();
- startGate=null;await handleWakeDetected(current);startGate=deferred();listeners.at(-1)({top:'stop',stop:.99});await flush();
- const confirm=listeners.at(-1);clock=12000;startGate.resolve();await flush();
- confirm({top:'no',no:.99});await flush();
- assert(!voiceController.active&&status.wake==='Stop cancelled. Recording paused.','Yes/No expiry begins after listener startup');
+ assert(!voiceController.active&&current.recorder.state==='paused','expired confirmation closes and stays paused');
 """)
 
     def test_diagnostic_scores_window_linking_and_quiet_window(self):

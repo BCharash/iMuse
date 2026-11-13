@@ -1,6 +1,6 @@
 # Recording reliability and iPhone background capture
 
-Updated 13 November 2026. Current production source: **2026-11-13.9**. Preservation stages and component extractions are complete. Use the [active roadmap](iMuse%20next%20steps.md) for future work and the [journal](design-journal.md) for dated decisions.
+Updated 13 November 2026. Current production source: **2026-11-13.11**. Preservation stages and component extractions are complete. Use the [active roadmap](iMuse%20next%20steps.md) for future work and the [journal](design-journal.md) for dated decisions.
 
 ## Recording list and download reminders
 
@@ -133,7 +133,7 @@ From the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-The last verified implementation checkpoint has **seventeen suites and 123 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
+The last verified implementation checkpoint has **seventeen suites and 127 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
 
 The suites execute production functions with controlled DOM/storage/lock/timer mocks. They do not prove native player rendering, actual IndexedDB behavior, browser permission decisions, container decoding, background capture or multi-hour memory reliability.
 

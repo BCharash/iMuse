@@ -10,7 +10,47 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
     const commandCountdown = document.getElementById("commandCountdown");
     const commandTimerProgress = document.getElementById("commandTimerProgress");
     const commandTimerHand = document.getElementById("commandTimerHand");
+    let timerAnimations = null;
+    // Prepare paused transform animations without models, audio or a microphone.
+    // Their playback is browser-driven, rather than repainted by JS every tick.
+    function prepareCommandTimer() {
+        if (timerAnimations) return;
+        const parts = ['commandTimerLeft', 'commandTimerRight', 'commandAnimatedHand'].map(id => document.getElementById(id));
+        if (!commandCountdown || parts.some(part => !part?.animate)) return;
+        const prepared = [];
+        try {
+            for (const [index, part] of parts.entries()) {
+                const animation = part.animate(index === 2
+                    ? [{transform:'rotate(0deg)'}, {transform:'rotate(-360deg)'}]
+                    : [{transform:'rotate(180deg)'}, {transform:'rotate(0deg)'}],
+                {duration:1000, fill:'both', easing:'linear'});
+                prepared.push(animation);
+                animation.pause(); animation.currentTime = 0;
+            }
+            timerAnimations = prepared;
+            commandCountdown.setAttribute('data-animated', 'true');
+        } catch (error) {
+            for (const animation of prepared) animation.cancel();
+            // Keep the existing SVG timer on browsers without usable animations.
+            console.warn('Command countdown preparation unavailable:', error);
+        }
+    }
+    function resetCommandTimer() {
+        for (const animation of timerAnimations || []) { animation.pause(); animation.currentTime = 0; }
+    }
+    function startCommandTimer(seconds, expiresAt) {
+        prepareCommandTimer();
+        if (!timerAnimations) return;
+        const duration = seconds * 1000;
+        const elapsed = Math.max(0, Math.min(duration, duration - (expiresAt - performance.now())));
+        timerAnimations.forEach((animation, index) => {
+            animation.effect.updateTiming({duration:index === 2 ? duration : duration / 2,
+                delay:index === 1 ? duration / 2 : 0});
+            animation.currentTime = elapsed; animation.play();
+        });
+    }
     function updateCommandTimer(remainingFraction) {
+        if (timerAnimations) return;
         if (!commandTimerProgress) return;
         const fraction = Math.max(0, Math.min(1, remainingFraction));
         const cx = 20, cy = 20, radius = 17;
@@ -59,7 +99,7 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
         const at=performance.now();
         if (voiceDiagnostics.enabled) {
             const settings=getSettings();
-            trace('command-prediction',{scores,thresholds:{go:settings.goThreshold,stop:settings.stopThreshold,yes:settings.yesThreshold,no:settings.noThreshold},elapsedMs:at-context.listenRequestedAtMs,remainingMs:Number.isFinite(expiresAt)?expiresAt-at:null,active:commandActive,generationMatches:generation===commandGeneration,expired:at>=expiresAt},context);
+            trace('command-prediction',{scores,thresholds:{go:settings.goThreshold,stop:settings.stopThreshold,yes:settings.yesThreshold,no:settings.noThreshold},elapsedMs:at-context.listenRequestedAtMs,remainingMs:Number.isFinite(expiresAt)?expiresAt-at:null,active:commandActive,generationMatches:generation===commandGeneration,listenerReady:Number.isFinite(expiresAt),expired:Number.isFinite(expiresAt)&&at>=expiresAt},context);
         }
         return at;
     }
@@ -85,6 +125,7 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
         ++commandGeneration;
         if (commandInterval !== null) clearInterval(commandInterval);
         commandInterval = null;
+        resetCommandTimer();
         commandIndicator.hidden = true;
         const pausedSession = getCurrentSession();
         if (pausedSession) pausedSession.stopReminder();
@@ -132,6 +173,7 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
         trace('stop-confirmation-request');
         if (commandInterval !== null) clearInterval(commandInterval);
         commandInterval = null;
+        resetCommandTimer();
         current.stopReminder();
         current.clearWake();
         commandIndicator.hidden = true;
@@ -151,18 +193,14 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
             // Starting a fresh listener AFTER playback prevents its audio windows from
             // including the spoken Yes/No prompt. No artificial post-prompt delay.
             const seconds = getSettings().commandWindow;
-            let expiresAt = Infinity;
-            commandIndicator.firstChild.textContent = "Listening for Yes or No ";
-            commandIndicator.hidden = false;
-            updateCommandTimer(1);
-            setWakeStatus("Say “Yes” to stop or “No” to stay paused.");
+            let expiresAt = null;
             diagnosticListener=context;
             context.listenRequestedAtMs=performance.now();
             const overlap=getOverlap();
             trace('listener-start-request',{windowSeconds:seconds,overlap},context);
             await startCommands(commandModel, current.stream, overlap, scores => {
                 const decisionAt=observePrediction(scores,generation,expiresAt,context);
-                if (suspended || generation !== commandGeneration || !commandActive || decisionAt >= expiresAt) return;
+                if (suspended || generation !== commandGeneration || !commandActive || expiresAt === null || decisionAt >= expiresAt) return;
                 const settings = getSettings();
                 if (scores.top === "yes" && scores.yes >= settings.yesThreshold) {
                     trace('command-accepted',{command:"yes",score:scores.yes,threshold:settings.yesThreshold,elapsedMs:decisionAt-context.listenRequestedAtMs},context);
@@ -179,8 +217,13 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
                 }
             });
             trace('listener-ready',{cancelled:generation!==commandGeneration||!commandActive},context);
-            if (generation !== commandGeneration || !commandActive) return;
+            if (generation !== commandGeneration || !commandActive || !current.isCurrent) return;
             expiresAt = performance.now() + seconds * 1000;
+            commandIndicator.firstChild.textContent = "Listening for Yes or No ";
+            commandIndicator.hidden = false;
+            updateCommandTimer(1);
+            startCommandTimer(seconds, expiresAt);
+            setWakeStatus("Say “Yes” to stop or “No” to stay paused.");
             trace('listener-deadline',{expiresAtMs:expiresAt},context);
             commandInterval = window.setInterval(() => {
                 if (generation !== commandGeneration || !commandActive) return;
@@ -242,17 +285,17 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
             if (generation !== commandGeneration || !commandActive) return;
             commandStream = current.stream;
             const seconds = getSettings().commandWindow;
-            const expiresAt = performance.now() + seconds * 1000;
-            commandIndicator.firstChild.textContent = "Listening for Go or Stop ";
-            commandIndicator.hidden = false;
-            updateCommandTimer(1);
+            // Accept commands and show the window only after listener startup.
+            let expiresAt = null;
+            commandIndicator.hidden = true;
+            resetCommandTimer();
             diagnosticListener=context;
             context.listenRequestedAtMs=performance.now();
             const overlap=getOverlap();
-            trace('listener-start-request',{windowSeconds:seconds,overlap,expiresAtMs:expiresAt},context);
+            trace('listener-start-request',{windowSeconds:seconds,overlap},context);
             await startCommands(commandModel, commandStream, overlap, scores => {
                 const decisionAt=observePrediction(scores,generation,expiresAt,context);
-                if (suspended || generation !== commandGeneration || !commandActive || decisionAt >= expiresAt) return;
+                if (suspended || generation !== commandGeneration || !commandActive || expiresAt === null || decisionAt >= expiresAt) return;
                 const settings = getSettings();
                 const command = scores.top === "go" && scores.go >= settings.goThreshold ? "go"
                     : scores.top === "stop" && scores.stop >= settings.stopThreshold ? "stop" : null;
@@ -269,7 +312,13 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
                 }
             });
             trace('listener-ready',{cancelled:generation!==commandGeneration||!commandActive},context);
-            if (generation !== commandGeneration || !commandActive) return;
+            if (generation !== commandGeneration || !commandActive || !current.isCurrent) return;
+            expiresAt = performance.now() + seconds * 1000;
+            commandIndicator.firstChild.textContent = "Listening for Go or Stop ";
+            commandIndicator.hidden = false;
+            updateCommandTimer(1);
+            startCommandTimer(seconds, expiresAt);
+            trace('listener-deadline',{expiresAtMs:expiresAt},context);
             commandInterval = setInterval(() => {
                 if (generation !== commandGeneration || !commandActive) return;
                 const remaining = Math.max(0, (expiresAt - performance.now()) / 1000);
@@ -309,6 +358,7 @@ export function createVoiceController({getSettings, getCurrentSession, getWakePh
         get suspended() { return suspended; },
         setSuspended,
         preload: preloadCommandModel,
+        prepareCountdown: prepareCommandTimer,
         close: closeCommandWindow,
         resume: resumeAfterCommandShutdown,
         wake: handleWakeDetected

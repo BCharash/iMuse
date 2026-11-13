@@ -1,6 +1,6 @@
 # Combine saved recordings
 
-Implemented in production build **2026-11-13.6**; current UI checkpoint **2026-11-13.9**. The separate PCM-WAV Combine
+Implemented in production build **2026-11-13.6**; current UI checkpoint **2026-11-13.11**. The separate PCM-WAV Combine
 prototype has been removed. The wake-word/Silero lab is unchanged.
 
 ## Using Combine
