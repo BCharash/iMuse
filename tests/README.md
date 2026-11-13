@@ -42,7 +42,7 @@ The voice suite executes the extracted production controller and recorder integr
 
 The wake suite covers production speech-gate acceptance/stale-state guards as well as both extraction stages and the separately approved race fixes, including loader delegation/promise identity, live guards/threshold, trigger/error/busy-cleanup ordering, stale results/errors across replaced/discarded/inactive sessions and model/arm generations, cancelled rearm callbacks, cached detector reuse, rapid load success/error/progress ordering and threshold changes during loading. It executes the actual ScriptProcessor callback, recorder integration and extracted routing with a fake audio graph; adapter checks mock network/runtime/model dependencies. Heed trigger checks run the real filters and mel preprocessing with synthetic tones/silence and controlled logits. They do not execute the ONNX models or downloaded Voicute library, measure acoustic accuracy/latency, or certify native audio scheduling. Assertions documenting unwanted async behavior were deliberately replaced with regression checks for the approved fixes. Findings and history are maintained in the [wake checkpoint](../docs/voice-control-refactor.md#wake-race-corrections).
 
-## Current validation — 2026-11-13.11
+## Current validation — 2026-11-13.12
 
 127 methods across seventeen suites passed at the current implementation checkpoint. Coverage includes mirrored audio-command controls, download markers/cancellation, archive/unarchive chronology, no recreation of deleted sessions, silent View refresh, stop diagnostics, atomic Combine publication/abort, rejected inputs, competing writer locks, provenance and worker cancellation/failure cleanup.
 

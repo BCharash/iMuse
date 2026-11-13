@@ -1,6 +1,6 @@
 # iMuse documentation
 
-Updated 13 November 2026. Current production source: **2026-11-13.11**. Current guides take precedence over historical journal entries and archived proposals.
+Updated 13 November 2026. Current production source: **2026-11-13.12**. Current guides take precedence over historical journal entries and archived proposals.
 
 | Document | Purpose |
 | --- | --- |
@@ -20,6 +20,9 @@ Updated 13 November 2026. Current production source: **2026-11-13.11**. Current 
 | [Archive index](Archive/README.md) | Older reviews, roadmaps and experiments |
 
 ## Current checkpoint
+
+The main title displays the user-provided icons/iMuse.png beside iMuse. The production palette matches Memora’s current local stylesheet: light gray background, white surfaces, navy controls/text accents and lavender selected states. Recording symbols retain their distinct red shape cues; download reminders retain their blue pulse.
+
 
 - Audio-command button and Settings checkbox share one persisted preference. Status below Microphone reports enabled with the selected wake phrase, or disabled.
 - Below Stop: Ready to record (18 px, whenever New Recording is available), the Microphone banner, Suspend/Resume audio commands, then command status with the active wake phrase. Readiness hides during capture/preparation/finalization/Combine and returns independently of the successful-recording message. Inactive microphone wording is Microphone: inactive.

@@ -1,6 +1,6 @@
 # 13 November 2026 — recording library and Combine
 
-End-of-day production checkpoint: **2026-11-13.11**. The user reports that the changes look good and that Combine works. Automated/browser evidence and remaining device checks are distinguished below. This summary records today's final outcome; earlier proposals are not implementation instructions.
+End-of-day production checkpoint: **2026-11-13.12**. The user reports that the changes look good and that Combine works. Automated/browser evidence and remaining device checks are distinguished below. This summary records today's final outcome; earlier proposals are not implementation instructions.
 
 ## Main screen and recording library
 
@@ -44,3 +44,7 @@ Prepared paused browser-driven countdown animations at the same unconditional st
 ## Listening-window alignment — build 2026-11-13.11
 
 User clarified that both command phases should display the countdown and that it must approximate actual receptivity. Supersedes the preceding .10 timing: Go/Stop and Yes/No now keep the circle hidden during preparation, then begin command acceptance, a fresh full configured deadline and the visible countdown together after listener startup completes. No preparation message or first-frame waiting delay is added. Paused animation preparation at startup remains. 127 regression tests and isolated delayed-listener browser checks pass; first-use iPhone timing still needs device acceptance.
+
+## Title and palette — build 2026-11-13.12
+
+Displayed the new user-provided iMuse icon next to the main title and matched Memora’s current light gray/white/navy/lavender palette. Applied the colors to panels, text accents, buttons, selected states and dividers, with distinct recording symbols and download reminders retained. No recording, recognition or storage behavior changed. Existing user asset changes were preserved; the file map reflects the available icons. Memora was inspected read-only.

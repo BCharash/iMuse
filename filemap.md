@@ -93,10 +93,12 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [audio/recording.wav](audio/recording.wav) | Spoken recording acknowledgement. Played by the response manager. |
 | [audio/yes.wav](audio/yes.wav) | Spoken Yes acknowledgement. Played by the response manager. |
 | [css/style.css](css/style.css) | Production layout, controls, Settings, saved-player and download-dialog styling. |
+| [icons/apple-touch-icon2.png](icons/apple-touch-icon2.png) | Alternative Home Screen icon artwork; the current page references apple-touch-icon.png. |
 | [icons/apple-touch-icon.png](icons/apple-touch-icon.png) | iOS home-screen touch icon. |
 | [icons/favicon-16.png](icons/favicon-16.png) | 16-pixel browser favicon. |
 | [icons/favicon-32-v2.png](icons/favicon-32-v2.png) | 32-pixel browser favicon variant. |
-| [icons/iMuse2.png](icons/iMuse2.png) | Additional iMuse artwork/icon asset. |
+| [icons/iMuse.png](icons/iMuse.png) | User-provided 180 px artwork displayed at 56 px beside the production title. |
+| [icons/favicon2.png](icons/favicon2.png) | Additional user-provided favicon artwork; not selected by the current page links. |
 | [icons/icon-192.png](icons/icon-192.png) | 192-pixel install icon referenced by the root app manifest. |
 | [icons/icon-512.png](icons/icon-512.png) | 512-pixel install icon referenced by the root app manifest. |
 
