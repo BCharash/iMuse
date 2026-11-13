@@ -167,13 +167,11 @@ button:active {
 #savedRecordingsLocation { margin-top: 26px; }
 #savedRecordingsLocation:empty { display: none; }
 .saved-audio-open { padding:6px 10px; min-width:36px; min-height:36px; }
-.recording-diagnostic-action { display:inline-flex; align-items:center; gap:5px; font-size:12px; }
-.recording-diagnostic-download { padding:4px 8px; min-width:32px; min-height:32px; font-size:12px; }
 .saved-audio-dialog { width:min(360px, calc(100% - 48px)); border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--text); padding:18px; }
 .saved-audio-dialog::backdrop { background:rgb(0 0 0 / 35%); }
 .saved-audio-dialog h3 { margin:0 0 12px; }
 .saved-audio-dialog audio { display:block; width:100%; margin-bottom:14px; }
-.recording-download-dialog input { display:block; box-sizing:border-box; width:100%; margin-top:6px; }
+.recording-download-dialog input { display:block; box-sizing:border-box; width:100%; margin-top:6px; font-size:18px; }
 .recording-download-dialog .download-name-preview { overflow-wrap:anywhere; }
 .recording-download-dialog form > div { display:flex; justify-content:flex-end; gap:8px; }
 
@@ -333,3 +331,14 @@ button:active {
 .recording-category-body[hidden] {display:none}
 .recording-download-state {font-size:12px;color:var(--muted)}
 #recordingControls {flex-wrap:wrap}
+
+.recording-download-dialog {max-height:calc(100dvh - 32px);overflow:auto}
+.stop-diagnostics-dialog {width:min(640px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto}
+.stop-diagnostics-actions {display:flex;flex-wrap:wrap;gap:8px}
+.stop-diagnostics-dialog pre {white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+
+/* Separate neighboring recordings in both library categories. */
+.recording-category-body > [data-recording-id] + [data-recording-id] {
+    border-top:1px solid #c7c5bf;
+    padding-top:14px;
+}

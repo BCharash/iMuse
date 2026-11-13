@@ -106,7 +106,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [js/microphone-level-check.js](js/microphone-level-check.js) | Temporary microphone-level check: deadline, cancellation, cleanup and handoff to Record. |
 | [js/microphone-manager.js](js/microphone-manager.js) | Microphone enumeration/selection, acquisition/release and requested-versus-reported processing settings. |
 | [js/recorder.js](js/recorder.js) | Production coordinator: capture/start/pause/stop, pending audio writes, wake/silence graph, session guards, main player and current-download wiring. |
-| [js/recording-download.js](js/recording-download.js) | Download filename dialog, local date/time formatting, description sanitization and filename preview; changes no saved-list title. |
+| [js/recording-download.js](js/recording-download.js) | Download filename dialog with 18 px input/focus handling, local timestamps, sanitization and filename preview; changes no saved-list title. |
 | [js/recording-integrity.js](js/recording-integrity.js) | Checks chunk ordering/counts/byte totals and derives completion/interruption outcomes; does not prove audible continuity. |
 | [js/recording-library.js](js/recording-library.js) | Saved/Archived lists, saved-player dialog, download actions, restore and deletion selection/confirmation UI. |
 | [js/recording-recovery.js](js/recording-recovery.js) | Chunk-to-Blob assembly, saved playback/export, finalization/watchdog and retained emergency audio. |

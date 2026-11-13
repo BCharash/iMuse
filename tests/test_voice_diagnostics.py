@@ -19,15 +19,28 @@ globalThis.testResult='pending';
 const assert=(v,m)=>{if(!v)throw Error(m);};
 const label={};displayBuildInfo(label);displayBuildInfo(null);
 assert(/^\d{4}-\d{2}-\d{2}\.[1-9]\d*$/.test(APP_BUILD)&&label.textContent==='iMuse build '+APP_BUILD,'production format and runtime label');
-let report;const item={id:'old-session'},events=[{type:'stopped'}];
+let report,copied;const item={id:'old-session'},events=[{type:'stopped'}];
 const getRecordingEvents=async()=>events,getSession=async()=>item;
 class Blob{constructor(parts){report=JSON.parse(parts.join(''));}}
 const URL={createObjectURL:()=> 'blob:test',revokeObjectURL(){}};
-const document={body:{appendChild(){}},createElement:()=>({click(){},remove(){}})};
+class Element {
+ constructor(){this.children=[];this.events={};}
+ setAttribute(){} addEventListener(name,fn){this.events[name]=fn;}
+ append(...nodes){this.children.push(...nodes);} appendChild(node){this.children.push(node);}
+ click(){return this.events.click?.();} remove(){} showModal(){this.open=true;} close(){this.open=false;this.events.close?.();}
+}
+const document={body:new Element(),createElement:()=>new Element()};
+const navigator={clipboard:{writeText:async text=>copied=text}};
+let stopDiagnosticsDialog=null;
 const setTimeout=()=>{};
 """+between('async function downloadRecordingEvents(', 'function getAllSessions()')+r"""
 (async()=>{
  await downloadRecordingEvents('old-session');
+ assert(!report&&stopDiagnosticsDialog.open,'opening diagnostics does not initiate download');
+ const dialog=stopDiagnosticsDialog,actions=dialog.children[1].children,detail=dialog.children[3];
+ assert(detail.hidden,'detail initially hidden');actions[0].click();assert(!detail.hidden&&actions[0].textContent==='Hide','View reveals diagnostics');
+ await actions[1].click();assert(copied===detail.textContent,'Copy matches displayed report');
+ actions[2].click();
  assert(report.appBuild===APP_BUILD&&report.sessionId==='old-session'&&report.session.id===item.id&&report.events[0].type==='stopped','export adds current app build without changing saved session/events');
  globalThis.testResult='PASS';
 })().catch(e=>globalThis.testResult=String(e)+String(e.stack||''));

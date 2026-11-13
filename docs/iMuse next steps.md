@@ -1,6 +1,6 @@
 # iMuse next steps
 
-## Phase-one acceptance — 2026-11-13.1
+## Phase-one acceptance — 2026-11-13.4
 
 Check on iPhone and Mac: both audio-command controls mirror each other during capture/pause, main button text remains readable, command status is below Microphone, completion/player/download/delete order, pulse and cancelled/completed download requests, reload persistence, View/Hide, Archive/Unarchive chronology and confirmed permanent deletion. Use disposable recordings for deletion. Preserve the separate iOS 27 installed-PWA background and lightweight Swift feasibility plans. The user has already recorded more than 90 minutes; review existing playback/seek/export evidence instead of requiring another duration test merely to repeat it.
 
@@ -8,7 +8,7 @@ Check on iPhone and Mac: both audio-command controls mirror each other during ca
 
 After phase one succeeds, an append selector will target the first entry in Saved Recordings and label the Record control Appending Recording. A newly finished recording becomes the latest/top saved entry. To expose an older target, the user archives intervening newer entries. Show the target explicitly before starting. Create a new combined recording and preserve originals until the user chooses deletion; do not byte-concatenate independent media containers. Automatic cleanup of older download-requested recordings is also deferred pending a separate retention policy; a download request is not a verified external backup.
 
-Updated 12 November 2026. Production source **2026-11-13.1**; latest implementation checks: **116 methods across sixteen suites**. This is the active queue; older plans and journal entries do not authorize new implementation.
+Updated 12 November 2026. Production source **2026-11-13.4**; latest implementation checks: **116 methods across sixteen suites**. This is the active queue; older plans and journal entries do not authorize new implementation.
 
 ## Next acceptance
 

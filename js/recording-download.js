@@ -64,7 +64,7 @@ export function requestDownloadFilename(defaultName, extension) {
         document.body.appendChild(dialog);
         if (typeof dialog.showModal === "function") dialog.showModal();
         else dialog.setAttribute("open", "");
-        input.focus();
+        input.focus({preventScroll:true});
         input.select();
     });
 }

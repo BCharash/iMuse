@@ -374,19 +374,35 @@ function getRecordingEvents(sessionId) {
     return recordingStore.getRecordingEvents(sessionId);
 }
 
+let stopDiagnosticsDialog = null;
 async function downloadRecordingEvents(id) {
     const events = await getRecordingEvents(id);
     const item = await getSession(id);
-    const report = { appBuild: APP_BUILD, sessionId: id, session: item, events };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `iMuse-stop-diagnostics-${id}.json`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const text = JSON.stringify({appBuild:APP_BUILD,sessionId:id,session:item,events},null,2);
+    const previous=stopDiagnosticsDialog;
+    if(previous){previous.close();previous.remove();}
+    const dialog=document.createElement('dialog');
+    stopDiagnosticsDialog=dialog;
+    dialog.className='saved-audio-dialog stop-diagnostics-dialog';
+    dialog.setAttribute('aria-label','Stop diagnostics');
+    const heading=document.createElement('h3');heading.textContent='Stop diagnostics';
+    const actions=document.createElement('div');actions.className='stop-diagnostics-actions';
+    const detail=document.createElement('pre');detail.hidden=true;detail.textContent=text;
+    const note=document.createElement('p');note.setAttribute('role','status');
+    const view=document.createElement('button');view.type='button';view.textContent='View';view.setAttribute('aria-expanded','false');
+    view.addEventListener('click',()=>{detail.hidden=!detail.hidden;view.textContent=detail.hidden?'View':'Hide';view.setAttribute('aria-expanded',String(!detail.hidden));});
+    const copy=document.createElement('button');copy.type='button';copy.textContent='Copy';
+    copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(text);note.textContent='Diagnostics copied.';}catch(error){note.textContent='Copy unavailable. Use Download instead.';}});
+    const download=document.createElement('button');download.type='button';download.textContent='Download';
+    download.addEventListener('click',()=>{
+        const url=URL.createObjectURL(new Blob([text],{type:'application/json'}));
+        const link=document.createElement('a');link.href=url;link.download=`iMuse-stop-diagnostics-${id}.json`;
+        document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    });
+    const close=document.createElement('button');close.type='button';close.textContent='Close';
+    close.addEventListener('click',()=>dialog.close());
+    dialog.addEventListener('close',()=>{if(stopDiagnosticsDialog===dialog)stopDiagnosticsDialog=null;dialog.remove();});
+    actions.append(view,copy,download,close);dialog.append(heading,actions,note,detail);document.body.appendChild(dialog);dialog.showModal();
 }
 
 function getAllSessions() { return recordingStore.getAllSessions(); }
@@ -1204,7 +1220,7 @@ function ensureCurrentDownloadButton() {
     button = document.createElement("button");
     button.id = "downloadRecordingButton";
     button.type = "button";
-    button.textContent = "Download Recording";
+    button.textContent = "Download";
     button.addEventListener("click", async () => {
         button.disabled = true;
         try {

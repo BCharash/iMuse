@@ -1,18 +1,18 @@
 # Recording reliability and iPhone background capture
 
-Updated 12 November 2026. Current production source: **2026-11-13.1**. Preservation stages and component extractions are complete. Use the [active roadmap](iMuse%20next%20steps.md) for future work and the [journal](design-journal.md) for dated decisions.
+Updated 12 November 2026. Current production source: **2026-11-13.4**. Preservation stages and component extractions are complete. Use the [active roadmap](iMuse%20next%20steps.md) for future work and the [journal](design-journal.md) for dated decisions.
 
 Refresh recordings rereads the library without reloading the app. While running it shows Refreshing… and disables repeat activation. The adjacent status reports an updated list, no changes, or a read failure. An empty result stays visible after a manual refresh so its feedback is not lost. Capture and stored audio are unaffected.
 
 ## Recording list and download reminders
 
-Saved Recordings and Archived Recordings each have View/Hide controls. Saved rows provide playback, Download Recording, Archive recording and confirmed permanent Delete recording. Archived rows provide Unarchive recording and confirmed individual/bulk permanent deletion. Unarchiving preserves the recording start date and its chronological position. The newest saved recording remains first. Category visibility survives list refreshes within the page; recovery copies force Saved open so unsaved-data warnings remain visible.
+Saved Recordings and Archived Recordings each have View/Hide controls. Saved rows provide playback, Download, Archive and confirmed permanent Delete. Archived rows provide Unarchive and confirmed individual/bulk permanent deletion. Unarchiving preserves the recording start date and its chronological position. The newest saved recording remains first. Category visibility survives list refreshes within the page; recovery copies force Saved open so unsaved-data warnings remain visible.
 
 Archive uses the existing internal `deleted` state and restore path; it does not delete chunks. Legacy Archived Recordings entries therefore become Archived Recordings without a schema migration. Permanent deletion retains existing idle/writer guards. Recovery copies with unsaved memory retain their explicit warned Discard action rather than silently losing that tail through ordinary archive controls.
 
 The current player remains separate from library playback and retains its Blob after library deletion. Its own Delete button permanently deletes after confirmation and clears that player. Library actions leave a different current player intact.
 
-Download Recording uses Memora's blue halo/thin outline pulse, with reduced-motion support. It stops reminding after a download request is initiated, not after verified file saving. Cancelling the filename dialog does not mark a request. A serialized metadata update records `downloadRequestedAt` without changing audio counters/state or recreating a permanently deleted session. Saved rows show Not yet downloaded or Download requested. Downloading again remains available. No automatic cleanup is implemented.
+Download uses Memora's blue halo/thin outline pulse, with reduced-motion support. It stops reminding after a download request is initiated, not after verified file saving. Cancelling the filename dialog does not mark a request. A serialized metadata update records `downloadRequestedAt` without changing audio counters/state or recreating a permanently deleted session. Saved rows show Not yet downloaded or Download requested. Downloading again remains available. No automatic cleanup is implemented.
 
 Final recording outcome is Audio recording successful or Audio recording unsuccessful. Structural checks still run and retain diagnostic metadata; user-facing completion text no longer recites those checks. Recovery entries retain missing/unsaved-data warnings. Opening either category silently refreshes stored recordings; no Refresh button or routine refresh message is shown.
 
@@ -41,7 +41,7 @@ After discussing voice-extraction risks, the user approved a lower-risk unused-c
 | Completion checks | Sequences, chunk data, counts, byte totals and known received counts are checked. Unexpected stops, encoder errors, failed checks and delayed finalization retain interrupted/error outcomes. |
 | Delayed finalization | A 10-second watchdog offers available audio; relevant reads have a 2-second fallback. Timers need JavaScript execution. Pending writes retain ownership until they settle; a new recording waits rather than competing with them. |
 | Browser protection | One nonblocking persistence request at initialization. Opening Settings checks the current grant and displays status; there are no manual protection buttons. |
-| Saved recordings | **▶** opens a separate player dialog. The top player retains the current in-memory recording. Rows show KB, Download audio, Delete and a small download button beside Stop diagnostics. Archived Recordings also shows KB. |
+| Saved recordings | **▶** opens a separate player dialog. The top player retains the current in-memory recording. Rows show KB and Download, Archive, Delete and Diagnostics actions. Diagnostics opens a dialog with View/Hide, Copy and Download for the same stop-diagnostics snapshot. Archived Recordings also shows KB. |
 | Deletion | Archive moves saved recordings to Archived Recordings; Delete permanently removes after confirmation. Interrupted recovery copies offer **Discard…**, with confirmation that unsaved audio will be lost; the committed prefix moves to Archived Recordings before memory is released. Pending writers remain protected. Permanent deletion is explicit. |
 
 The IndexedDB schema remains version 2. These changes do not migrate/clear recordings or add a file picker to capture. Normal audio cues remain; interruption-warning code, setting and WAV have been removed completely.
@@ -135,7 +135,7 @@ From the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-The last verified implementation checkpoint has **sixteen suites and 116 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
+The last verified implementation checkpoint has **sixteen suites and 117 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
 
 The suites execute production functions with controlled DOM/storage/lock/timer mocks. They do not prove native player rendering, actual IndexedDB behavior, browser permission decisions, container decoding, background capture or multi-hour memory reliability.
 
@@ -159,3 +159,7 @@ Stuck writes, missing stop events, encoder errors and malformed structures are s
 4. Where permission has not been granted, cancel a pending check by closing Settings or pressing Record. A late response must not resurrect the check or end a newer recording.
 
 The user reported the microphone check and countdown worked. Automated coverage and isolated Chrome checks are reported in the journal; this report does not establish every Safari/iPhone permission race or indicator scenario.
+
+## Filename dialog and list position
+
+Build 2026-11-13.4 uses 18 px filename input, focus without requested scrolling, and a viewport-bounded scrollable dialog. This targets iPhone focus zoom without disabling deliberate pinch zoom. The download/save outcome is still not browser-verifiable. The list uses short action labels and anchors the next surviving visible row during Archive/Delete/Unarchive rebuilds where possible; opening View still refreshes normally. Chrome verified the input size, diagnostics report consistency, narrow layouts and zero next-row movement in a long-list deletion check. Actual iPhone keyboard/zoom behavior remains a device check.

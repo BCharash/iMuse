@@ -1772,3 +1772,10 @@ Validation: 114 regression methods pass across sixteen suites. Chrome confirmed 
 Saved and Archived categories have independent View/Hide controls. Archive and Unarchive reuse the existing state/restore paths without migration; Delete is permanent after confirmation. Original chronology and current-player retention remain. Emergency unsaved copies retain explicit Discard protections. Appending and automatic cleanup remain later work. The agreed append source is the top saved recording; combined results must preserve originals.
 
 Validation: 116 automated methods pass. Temporary-profile Chrome checked actual UI/IndexedDB mutations, cancellation, archive/unarchive, permanent deletion, download markers after reload, preference mirroring during synthetic capture, final outcome, retained stop-prompt microphone ownership, and a 390 px layout without overflow. iPhone acceptance is pending. No deployment or commit is part of this change.
+
+
+# DJ041 — Filename input, concise actions and stop-diagnostics viewer
+
+13 November 2026, build 2026-11-13.4. User reports iPhone filename focus zoom and movement during deletion, and rejects a double-tap explanation. Use 18 px filename text and focus without requested scroll; retain deliberate zoom. Keep the dialog viewport-bounded. Shorten actions to Download, Archive, Delete and Diagnostics (Unarchive for archived entries). Diagnostics opens a dialog instead of downloading immediately; View/Hide, Copy and Download share the same report snapshot. Remove the obsolete small-icon styles. Mutation refreshes anchor a surviving visible row in the same category, preferring the next row after the action; View refreshes are not anchored.
+
+All 117 regression methods pass. Chrome verified dialog actions and input size, capture/download/archive workflows, 320/390 px fit, and zero next-row position change during a long-list deletion test. Real iPhone focus/keyboard/zoom acceptance remains pending. No double-tap suppression or viewport zoom lock was introduced.

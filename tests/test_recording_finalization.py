@@ -173,9 +173,9 @@ globalThis.testResult = 'pending';
 
     metadataStore.set('ui-delete', {id:'ui-delete',state:'completed',bytesStored:2048,chunkCount:2,startedAt:'2026-11-03T10:00:00Z'});
     await renderRecoverableSessions();
-    const savedRow = getLibraryRows().find(element => element.children?.some(child => child.textContent === 'Delete recording') && element.children[0].textContent.includes(formatRecordingSize(2048)));
+    const savedRow = getLibraryRows().find(element => element.children?.some(child => child.textContent === 'Delete') && element.children[0].textContent.includes(formatRecordingSize(2048)));
     const topBeforeDelete = window.lastRecording;
-    await savedRow.children.find(child => child.textContent === 'Archive recording').click();
+    await savedRow.children.find(child => child.textContent === 'Archive').click();
     assert(window.lastRecording === topBeforeDelete, 'deleting a saved row keeps the top in-memory recording');
     const deletedSection = getRecoveryPanel().children.find(element => element.getAttribute('aria-label')==='Archived Recordings')?.children[1];
     assert(deletedSection && deletedSection.children.some(row => row.children?.some(child => child.textContent?.includes(formatRecordingSize(2048)))), 'Recently Deleted includes file size in KB');
