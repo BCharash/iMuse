@@ -55,8 +55,20 @@ h1 {
     letter-spacing: 0.02em;
 }
 
-.app-title { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.app-title { display: flex; align-items: center; justify-content: center; gap: 1px; color: var(--navy); }
 .app-title img { width: 56px; height: 56px; flex: 0 0 56px; border-radius: 12px; }
+.app-title span { font-family: "Dancing Script", cursive; font-size: 52px; font-weight: 500; line-height: 1; letter-spacing: -.02em; transform: translateY(-3px); color: #386df2; }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+    .app-title span {
+        background: linear-gradient(110deg, #008fc9 0%, #386df2 45%, #a525e6 100%);
+        background-clip: text;
+        -webkit-background-clip: text;
+        color: transparent;
+    }
+}
+@media (forced-colors: active) {
+    .app-title span { background: none; color: CanvasText; }
+}
 
 .tagline {
     margin: 8px 0 2px;

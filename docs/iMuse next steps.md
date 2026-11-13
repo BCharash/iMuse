@@ -1,6 +1,6 @@
 # iMuse next steps
 
-Current source: **2026-11-13.12**, 13 November 2026. The user reports the updated interface and Combine work well. See the [session summary](2026-11-13-session-summary.md) for today's completed work and [Combine guide](combine-recordings.md) for the current implementation.
+Current source: **2026-11-13.14**, 13 November 2026. The user reports the updated interface and Combine work well. See the [session summary](2026-11-13-session-summary.md) for today's completed work and [Combine guide](combine-recordings.md) for the current implementation.
 
 ## Immediate follow-up
 

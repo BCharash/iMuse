@@ -1,6 +1,6 @@
 # 13 November 2026 — recording library and Combine
 
-End-of-day production checkpoint: **2026-11-13.12**. The user reports that the changes look good and that Combine works. Automated/browser evidence and remaining device checks are distinguished below. This summary records today's final outcome; earlier proposals are not implementation instructions.
+End-of-day production checkpoint: **2026-11-13.14**. The user reports that the changes look good and that Combine works. Automated/browser evidence and remaining device checks are distinguished below. This summary records today's final outcome; earlier proposals are not implementation instructions.
 
 ## Main screen and recording library
 
@@ -48,3 +48,11 @@ User clarified that both command phases should display the countdown and that it
 ## Title and palette — build 2026-11-13.12
 
 Displayed the new user-provided iMuse icon next to the main title and matched Memora’s current light gray/white/navy/lavender palette. Applied the colors to panels, text accents, buttons, selected states and dividers, with distinct recording symbols and download reminders retained. No recording, recognition or storage behavior changed. Existing user asset changes were preserved; the file map reflects the available icons. Memora was inspected read-only.
+
+## Exploratory wordmark — build 2026-11-13.13
+
+Tried the icon as the iM part of iMuse with closely adjoining use lettering in Dancing Script. Matched the visible glyph height and vertical position to the waveform, retaining an accessible iMuse heading. This changes only the header's appearance and reuses the existing font/icon. Phone/desktop renders and font metrics were checked; user preference review remains.
+
+## Wordmark refinement — build 2026-11-13.14
+
+Reduced the flowing use lettering to just above the graphic's lowercase i rather than matching its M, and replaced navy with an icon-inspired cyan/blue/violet gradient. Updated vertical alignment; retained the existing artwork, close spacing and accessible name. Reviewed the phone appearance and checked 320/390/900 px fit; no functional changes.

@@ -1843,3 +1843,15 @@ Corrected Safari WebCodecs audio version support and outdated Cache API quota as
 13 November 2026, build 2026-11-13.12. User supplies icons/iMuse.png and asks for it beside the title and for the app to match Memora’s palette. Added a decorative 56 px title image and copied the current local Memora stylesheet’s background/surface/text/muted/navy/border tokens, lavender selection colors and neutral hover color. Updated existing selectors for buttons, settings selection, microphone/status accents, disabled controls and list dividers. Retained recognizable recording symbols and the existing blue download reminder. Memora itself, recording/voice/storage behavior and installed-app icon references are unchanged. Existing user icon additions/deletions are preserved and reflected in the file map.
 
 Validation: existing regression suite and isolated Chrome library/Combine checks, with additional icon load, exact theme-token, navy-button, lavender-selected-control and 320/390/900 px layout checks. Review the visible result on iPhone for final preference acceptance.
+
+
+# DJ052 — Explore a combined graphic/lettering wordmark
+
+13 November 2026, build 2026-11-13.13. User requests an exploratory title using the icon's iM waveform followed closely by the letters use, with matching visible height and flow. Reused Dancing Script (already loaded for the tagline), weight 500 at 70 px: measured use glyph height about 31.2 px, matching the visible waveform inside the 56 px icon. Adjusted vertical alignment by 10 px and kept a 1 px box gap. The accessible h1 name remains iMuse; artwork and visible suffix are decorative to assistive technology. Page title, application identity, installation assets and functionality are unchanged.
+
+Isolated Chrome checked font/icon loading, glyph measurements, accessible heading label and phone/desktop width fit; reviewed rendered title captures and adjusted alignment. This is a reversible appearance experiment for user review. No runtime tests were added or repeated for the header/CSS change.
+
+
+# DJ053 — Smaller, color-matched wordmark suffix
+
+13 November 2026, build 2026-11-13.14. User refines the experiment: use should match the lowercase i rather than the M, or be slightly larger. Reduced Dancing Script from 70 px to 52 px (visible ink about 23.2 px), adjusted its vertical offset to 3 px, and added a cyan/blue/violet text gradient matching the icon's palette. Solid blue is the unsupported-clipping fallback; forced-color mode uses system text. Kept the 56 px artwork, close spacing and accessible iMuse heading. Reviewed phone render and verified loaded font metrics and 320/390/900 px fit. Presentation only; no runtime tests repeated.

@@ -97,7 +97,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [icons/apple-touch-icon.png](icons/apple-touch-icon.png) | iOS home-screen touch icon. |
 | [icons/favicon-16.png](icons/favicon-16.png) | 16-pixel browser favicon. |
 | [icons/favicon-32-v2.png](icons/favicon-32-v2.png) | 32-pixel browser favicon variant. |
-| [icons/iMuse.png](icons/iMuse.png) | User-provided 180 px artwork displayed at 56 px beside the production title. |
+| [icons/iMuse.png](icons/iMuse.png) | User-provided 180 px artwork displayed at 56 px as the iM portion of the exploratory title wordmark, followed by flowing use lettering. |
 | [icons/favicon2.png](icons/favicon2.png) | Additional user-provided favicon artwork; not selected by the current page links. |
 | [icons/icon-192.png](icons/icon-192.png) | 192-pixel install icon referenced by the root app manifest. |
 | [icons/icon-512.png](icons/icon-512.png) | 512-pixel install icon referenced by the root app manifest. |
