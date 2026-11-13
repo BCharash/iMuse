@@ -29,6 +29,6 @@ The user's positive reports establish practical acceptance of the exercised work
 
 ## Future work and documentation
 
-[Waveform playback and recording editing](waveform-editing-project.md) is a separately documented future project: waveform/seek first, then trimming into a new copy, with long-file memory and cut precision designed explicitly. No editor code or dependency was added.
+[Waveform playback and recording editing](waveform-editing-project.md) is a separately documented future project: waveform/seek first, then trimming into a new copy, with long-file memory and cut precision designed explicitly. The brief subsequently incorporated the reviewed Gemini ideas: peak resolutions, viewport drawing, bounded decoding and an edit decision list, with corrected Safari/storage claims and explicit preview/resource limits. No editor code or dependency was added.
 
 The documentation index, roadmap, recording/voice guides, Combine guide, test guide and file map were synchronized. Removed stale Refresh instructions, conflicting current-build/test counts, obsolete append instructions and prototype resume gates from active guidance. The journal retains dated decisions with superseded status identified. This final documentation pass leaves application code and build .7 unchanged.
