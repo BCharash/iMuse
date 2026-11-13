@@ -1797,3 +1797,8 @@ All 122 methods across seventeen suites passed. Chrome decoded/playback-complete
 The production worker uses pinned local Mediabunny 1.65.2 to demux/remux compatible single-track AAC/M4A without PCM conversion or re-encoding. Original source segments are flattened/sorted chronologically, with repeated occurrences retained. Versioned packet/sample provenance is embedded in an MP4 uuid box and persisted with the new recording. Output packet/configuration/metadata readback precedes one atomic session/chunk transaction under the existing writer lock. Cancellation and failures publish no partial result; capture cannot start while combining. The prototype's short-clip WAV limits do not apply.
 
 Validation: 123 regression methods across seventeen suites pass. An isolated Chrome check generates real AAC/M4A clips, compares every encoded packet hash, decodes chronological tones, exercises nested/repeated sources and the production library's persistence, cancellation, unsupported-input failure, download marker and Archive/Unarchive paths. Narrow layout has no horizontal overflow at 390 px. iPhone playback/Files and large-combine memory remain device checks; browser evidence does not certify them. Details and retained check command: [Combine recordings](combine-recordings.md).
+
+
+# DJ044 — Library readability and archived download reminders
+
+13 November 2026, build 2026-11-13.7. Added a divider between Saved Recordings controls and the list, bold Combined recording designations in both categories, and Download requested/Not yet downloaded labels on archived entries. Reuses the existing persisted/session download marker without claiming download completion. Audio and storage behavior are unchanged.

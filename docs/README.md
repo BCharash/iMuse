@@ -2,7 +2,7 @@
 
 Updated 13 November 2026. Start here; current findings take precedence over older plans and journal entries.
 
-Current candidate: **2026-11-13.6** adds compatible M4A combining in Saved Recordings. Spoken prompts still prepare at startup for manual and voice controls, while wake-model loading is skipped when Audio commands is off. Warm model reuse remains; enabled-model UI blocking is still open. See [voice control](voice-control-refactor.md) and [recording reliability](recording-investigation.md).
+Current candidate: **2026-11-13.7** adds compatible M4A combining in Saved Recordings. Spoken prompts still prepare at startup for manual and voice controls, while wake-model loading is skipped when Audio commands is off. Warm model reuse remains; enabled-model UI blocking is still open. See [voice control](voice-control-refactor.md) and [recording reliability](recording-investigation.md).
 
 | Document | Purpose |
 | --- | --- |
@@ -21,7 +21,7 @@ Current candidate: **2026-11-13.6** adds compatible M4A combining in Saved Recor
 
 ## Current checkpoint
 
-Production source: **2026-11-13.6**. Latest implementation validation: **123 methods across seventeen suites**.
+Production source: **2026-11-13.7**. Latest implementation validation: **123 methods across seventeen suites**.
 
 - The main Audio commands button and Settings checkbox control one persisted preference, including during capture. Status below Microphone reports enabled with the selected phrase, or disabled. Temporary suspension is no longer a separate user function.
 - Recording completion says Audio recording successful or unsuccessful. The current player is followed by Download and confirmed permanent Delete. Recovery warnings remain with recovery entries.
@@ -43,3 +43,5 @@ Routine screen-lock status text is hidden; screen-lock prevention remains active
 Filename entry uses 18 px text and prevents focus-driven scrolling. List actions are Download, Archive, Delete and Diagnostics; archived rows offer Unarchive/Delete. Diagnostics opens a Stop diagnostics dialog with View/Hide, Copy and Download of the same JSON snapshot. Mutation refreshes preserve a surviving visible row where possible; deliberate pinch zoom remains available. iPhone focus/keyboard behavior still needs device acceptance.
 
 **Combine validation, 13 November:** generated real AAC/M4A clips retain every encoded packet unchanged; decoded tones confirm chronology. Browser checks also cover nested/repeated sources, cancellation, incompatible-input failure, real library persistence, download markers, Archive/Unarchive and 390 px layout. The separate Combine prototype is removed; the wake-word/Silero lab remains. iPhone combined-file playback/Files saving and long-combine resource use await device checks.
+
+Build 2026-11-13.7: a divider separates Saved controls from the list; Combined recording is bold in saved and archived entries; archived rows show Download requested or Not yet downloaded before deletion. These labels report initiation, not a confirmed external save.

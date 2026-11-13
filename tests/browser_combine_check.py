@@ -99,6 +99,8 @@ try:
  let all=await store.getAllSessions(),ac=all.find(s=>s.combineMetadata);
  if(rows()[0].getAttribute('data-recording-id')!==ac.id||!row(ac.id).querySelector('summary').textContent.includes('(2)'))throw Error('New item top/sources');
  if(!button(row(ac.id),'Download').classList.contains('recording-download-pending'))throw Error('Fresh download reminder');
+ if(row(ac.id).querySelector('strong')?.textContent!=='Combined recording')throw Error('Combined designation not bold');
+ if(getComputedStyle(row(ac.id)).borderTopStyle!=='solid')throw Error('Missing divider below Combine controls');
  for(const original of combineFixtures){const chunks=await store.getChunks(original.session.id);if(chunks.length!==1||chunks[0].blob.size!==original.blob.size)throw Error('Original changed');}
  button(saved(),'Combine').click();await until(()=>saved().querySelectorAll('input').length===4);
  for(const id of [ac.id,'source-1']){const box=row(id).querySelector('input');box.checked=true;box.dispatchEvent(new Event('change'));}
@@ -126,6 +128,8 @@ try:
  // Archive/unarchive retains the full combined history and original ID.
  button(row(abc.id),'Archive').click();await until(()=>!row(abc.id));
  const archived=document.getElementById('recordings-archived');button(document.querySelector('[aria-label="Archived Recordings"]'),'View').click();await until(()=>document.getElementById('recordings-archived').querySelector('[data-recording-id]'));
+ const archivedRow=document.getElementById('recordings-archived').querySelector(`[data-recording-id="${abc.id}"]`);
+ if(!archivedRow.textContent.includes('Download requested')||archivedRow.querySelector('strong')?.textContent!=='Combined recording')throw Error('Archived designation/download reminder');
  button(document.getElementById('recordings-archived').querySelector(`[data-recording-id="${abc.id}"]`),'Unarchive').click();await until(()=>row(abc.id));
  if((await store.getSession(abc.id)).combineMetadata.segments.length!==3)throw Error('History lost after archive');
  return {saved:rows().length,originalsPreserved:true,nestedSaved:true,cancelNoPartial:true,unsupportedNoPartial:true,downloadMarker:true,archiveHistory:true};

@@ -338,7 +338,8 @@ button:active {
 .stop-diagnostics-dialog pre {white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
 
 /* Separate neighboring recordings in both library categories. */
-.recording-category-body > [data-recording-id] + [data-recording-id] {
+.recording-category-body > [data-recording-id] + [data-recording-id],
+.recording-combine-controls + [data-recording-id] {
     border-top:1px solid #c7c5bf;
     padding-top:14px;
 }

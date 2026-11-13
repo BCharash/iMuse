@@ -14,6 +14,13 @@ export function createRecordingLibrary({
     let combineMessage = '', combineProgress = null, combineCancel = null;
     const combineSelection = new Set();
 
+    function markCombined(label, item) {
+        if (!item.combineMetadata) return;
+        const designation = document.createElement('strong');
+        designation.textContent = 'Combined recording';
+        label.append(document.createTextNode(' — '), designation);
+    }
+
     function sourcesDisclosure(row, item) {
         const metadata = item.combineMetadata;
         if (!metadata?.segments?.length) return;
@@ -227,7 +234,6 @@ export function createRecordingLibrary({
             else if (item.state === "interrupted") label.textContent += " — interrupted recording";
             addCombineSelection(row,item);
             row.appendChild(label);
-            if(item.combineMetadata)label.textContent+=' — Combined recording';
             const recoverButton = document.createElement("button");
             recoverButton.type = "button";
             recoverButton.textContent = "▶";
@@ -246,6 +252,7 @@ export function createRecordingLibrary({
             const requested=Boolean(item.downloadRequestedAt)||wasDownloadRequested(item.id);
             downloadButton.className=requested?'':'recording-download-pending';
             if(!busy)label.textContent+=requested?' — Download requested':' — Not yet downloaded';
+            markCombined(label,item);
             downloadButton.disabled = busy;
             downloadButton.addEventListener("click", async () => {
                 const requested=await exportSavedSession(item.id, downloadButton);
@@ -398,6 +405,9 @@ export function createRecordingLibrary({
                 const label = document.createElement("span");
                 label.style.flex = "1 1 12rem";
                 label.textContent = `${formatDate(item.startedAt)} — ${formatRecordingSize(item.bytesStored)} — archived ${formatDate(item.deletedAt)}`;
+                label.textContent += (Boolean(item.downloadRequestedAt) || wasDownloadRequested(item.id))
+                    ? ' — Download requested' : ' — Not yet downloaded';
+                markCombined(label,item);
                 row.appendChild(label);
                 const restoreButton = document.createElement("button");
                 restoreButton.type = "button";
