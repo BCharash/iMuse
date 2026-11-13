@@ -1,6 +1,6 @@
 # iMuse documentation
 
-Updated 13 November 2026. Current production source: **2026-11-13.8**. Current guides take precedence over historical journal entries and archived proposals.
+Updated 13 November 2026. Current production source: **2026-11-13.9**. Current guides take precedence over historical journal entries and archived proposals.
 
 | Document | Purpose |
 | --- | --- |

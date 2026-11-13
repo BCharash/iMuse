@@ -365,4 +365,4 @@ button:active {
 .recording-ready-status[hidden] { display: none; }
 #suspendAudioCommands { display: block; margin: 0 auto 10px; }
 #suspendAudioCommands[hidden] { display: none; }
-#audioCommandsSuspensionStatus { margin: 0 auto; }
+#audioCommandsSuspensionStatus { margin: 0 auto; font-size: 16px; }

@@ -1,6 +1,6 @@
 # Recording reliability and iPhone background capture
 
-Updated 13 November 2026. Current production source: **2026-11-13.8**. Preservation stages and component extractions are complete. Use the [active roadmap](iMuse%20next%20steps.md) for future work and the [journal](design-journal.md) for dated decisions.
+Updated 13 November 2026. Current production source: **2026-11-13.9**. Preservation stages and component extractions are complete. Use the [active roadmap](iMuse%20next%20steps.md) for future work and the [journal](design-journal.md) for dated decisions.
 
 ## Recording list and download reminders
 

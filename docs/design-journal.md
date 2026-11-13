@@ -1817,3 +1817,8 @@ Corrected Safari WebCodecs audio version support and outdated Cache API quota as
 # DJ047 — Independent recording-readiness status and main-page order
 
 13 November 2026, build 2026-11-13.8. User requests prominent Ready to record below Stop, then Microphone, audio-command toggle and command status. Added a separate 18 px readiness element controlled by recording-control state and availability; success text no longer replaces readiness. Removed (not listening) from initial and released-microphone inactive labels. Combine also hides readiness while it owns the disabled Record control. Existing recording, microphone, storage and voice sequencing remain. All 123 regression methods pass; isolated Chrome checks validate DOM order, font size and readiness before capture, during finalization and alongside successful completion.
+
+
+# DJ048 — Larger audio-command status
+
+13 November 2026, build 2026-11-13.9. Increased the main-page audio-command status from 12 px to 16 px for readability, including the enabled wake phrase and disabled state. Ready to record remains 18 px. CSS-only presentation change plus build identification; no recording/recognition behavior changed. Diff/whitespace checked; runtime tests were not repeated for this font-size adjustment.
