@@ -2,7 +2,7 @@
 
 Updated 12 November 2026. Start here; current findings take precedence over older plans and journal entries.
 
-Current candidate: **2026-11-13.1** prepares spoken prompts at startup for manual and voice controls, while skipping wake-model loading when Audio commands is off. Warm model reuse remains; enabled-model UI blocking is still open. See [voice control](voice-control-refactor.md) and [recording reliability](recording-investigation.md).
+Current candidate: **2026-11-13.3** prepares spoken prompts at startup for manual and voice controls, while skipping wake-model loading when Audio commands is off. Warm model reuse remains; enabled-model UI blocking is still open. See [voice control](voice-control-refactor.md) and [recording reliability](recording-investigation.md).
 
 | Document | Purpose |
 | --- | --- |
@@ -20,7 +20,7 @@ Current candidate: **2026-11-13.1** prepares spoken prompts at startup for manua
 
 ## Current checkpoint
 
-Production source: **2026-11-13.1**. Latest implementation validation: **116 methods across sixteen suites**.
+Production source: **2026-11-13.3**. Latest implementation validation: **117 methods across sixteen suites**.
 
 - The main Audio commands button and Settings checkbox control one persisted preference, including during capture. Status below Microphone reports enabled with the selected phrase, or disabled. Temporary suspension is no longer a separate user function.
 - Recording completion says Audio recording successful or unsuccessful. The current player is followed by Download Recording and confirmed permanent Delete. Recovery warnings remain with recovery entries.
@@ -36,3 +36,5 @@ Appending and automatic cleanup are deferred until phase-one acceptance. Appendi
 Use Next steps for priorities, Recording reliability for preservation and device checks, Voice control for settings/ownership, and Wake evaluation for lab operation. Journal entries and Archive documents record dated evidence; their old defaults, test counts and implementation instructions are historical.
 
 The intermittent startup menu issue was reported mainly after updates and is currently absent. Single-tap Chrome checks did not reproduce automatic closing. No menu suppression or cache reset is implemented. Installed-iPhone background capture remains a separate unresolved issue; earlier Safari-tab success does not certify every device or installed mode.
+
+Routine screen-lock status text is hidden; screen-lock prevention remains active and capture/interruption notices remain available. Opening Saved or Archived Recordings silently rereads the list; the Refresh recordings button and routine refresh feedback are removed.

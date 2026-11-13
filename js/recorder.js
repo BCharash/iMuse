@@ -553,7 +553,11 @@ function refreshIdleWakeStatus() {
 }
 
 function setLifecycleStatus(message) {
-    if (lifecycleStatus) lifecycleStatus.textContent = message;
+    if (!lifecycleStatus) return;
+    // Keep capture/interruption notices, without routine screen-lock commentary.
+    const screenLockNotice = /screen lock|screen locking|screen will stay awake/i.test(message);
+    lifecycleStatus.textContent = screenLockNotice ? "" : message;
+    lifecycleStatus.hidden = screenLockNotice || !message;
 }
 
 async function initializeWakeWord() {

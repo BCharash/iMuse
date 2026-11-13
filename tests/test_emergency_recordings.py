@@ -198,6 +198,28 @@ globalThis.testResult='pending';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack));
 """)
 
+    def test_view_silently_refreshes_saved_and_archived_including_empty_lists(self):
+        evaluate(MOCKS + LIBRARY_SOURCE + r"""
+globalThis.testResult='pending';
+(async()=>{
+ const records=new Map();let reads=0;
+ const library=createRecordingLibrary({container:location,status,getAllSessions:async()=>{reads++;return [...records.values()];},getEmergencyRecordings:()=>new Map(),isSessionWriting:()=>false});
+ const section=name=>getRecoveryPanel().children.find(node=>node.getAttribute('aria-label')===name);
+ const toggle=name=>section(name).children[0].children[1];
+ await library.render();
+ assert(!getRecoveryPanel().hidden&&reads===1,'empty categories remain available for discovering another tab recording');
+ records.set('external',{id:'external',state:'completed'});
+ await toggle('Saved Recordings').click();
+ assert(reads===2&&getLibraryRows().length===1,'View discovers a newly stored recording');
+ await toggle('Saved Recordings').click();assert(reads===2&&section('Saved Recordings').children[1].hidden,'Hide does not fetch');
+ records.set('archived',{id:'archived',state:'deleted'});
+ await toggle('Archived Recordings').click();
+ assert(reads===3&&section('Archived Recordings').children[1].children.some(row=>row.getAttribute('data-recording-id')==='archived'),'Archived View also fetches current storage');
+ assert(!getRecoveryPanel().children.some(node=>node.textContent==='Refresh recordings'),'manual refresh removed');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack));
+""")
+
     def test_recording_library_component(self):
         evaluate(MOCKS + LIBRARY_SOURCE + LIBRARY_TESTS)
 

@@ -14,7 +14,7 @@ The current player remains separate from library playback and retains its Blob a
 
 Download Recording uses Memora's blue halo/thin outline pulse, with reduced-motion support. It stops reminding after a download request is initiated, not after verified file saving. Cancelling the filename dialog does not mark a request. A serialized metadata update records `downloadRequestedAt` without changing audio counters/state or recreating a permanently deleted session. Saved rows show Not yet downloaded or Download requested. Downloading again remains available. No automatic cleanup is implemented.
 
-Final recording outcome is Audio recording successful or Audio recording unsuccessful. Structural checks still run and retain diagnostic metadata; user-facing completion text no longer recites those checks. Recovery entries retain missing/unsaved-data warnings. Refresh recordings retains its checking/updated/no-change/failure feedback.
+Final recording outcome is Audio recording successful or Audio recording unsuccessful. Structural checks still run and retain diagnostic metadata; user-facing completion text no longer recites those checks. Recovery entries retain missing/unsaved-data warnings. Opening either category silently refreshes stored recordings; no Refresh button or routine refresh message is shown.
 
 ## Current code ownership
 
