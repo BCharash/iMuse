@@ -1,6 +1,6 @@
 # iMuse Design Journal
 
-Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated snapshots. DJ012 records the installed failure; DJ013 records preservation; DJ014–DJ016 record library/store/recovery extractions. DJ025 records the earlier roadmap/transcription priority; DJ026 records the accepted wake refactor and build identity. DJ038 records the startup policy corrected in build 2026-11-12.11. Older proposals, test counts and labels are historical, not current instructions.
+Current navigation: [documentation index](README.md), [recording investigation](recording-investigation.md), and [active roadmap](iMuse%20next%20steps.md). Entries are dated snapshots. DJ012 records the installed failure; DJ013 records preservation; DJ014–DJ016 record library/store/recovery extractions. DJ025 records the earlier roadmap/transcription priority; DJ026 records the accepted wake refactor and build identity. DJ038 records the startup policy corrected in build 2026-11-12.11. DJ040–DJ044 record the 13 November library/Combine work; the [daily summary](2026-11-13-session-summary.md) records its final state. Older proposals, test counts and labels are historical, not current instructions.
 
 ---
 
@@ -1781,13 +1781,9 @@ Validation: 116 automated methods pass. Temporary-profile Chrome checked actual 
 All 117 regression methods pass. Chrome verified dialog actions and input size, capture/download/archive workflows, 320/390 px fit, and zero next-row position change during a long-list deletion test. Real iPhone focus/keyboard/zoom acceptance remains pending. No double-tap suppression or viewport zoom lock was introduced.
 
 
-# DJ042 — Isolated Combine/provenance prototype
+# DJ042 — Isolated Combine/provenance prototype (superseded)
 
-13 November 2026. User replaces capture-time append with a Saved Recordings Combine workflow and authorizes an isolated three-recording test plus metadata example. Added combine-lab.html and separate core/UI modules; production code/build/recording storage are untouched. The lab decodes short compatible-channel inputs to 48 kHz and writes PCM16 WAV with a private imUS JSON chunk. This is a new bounded experiment, not a recovery of the missing lossless M4A implementation.
-
-Versioned metadata separates artifact creation from source capture, snapshots parents/original sources and tracks segment occurrences with source/output/parent frame boundaries. Nested combinations flatten by original source date, so A/C plus B becomes A/B/C; repeated sources remain distinct. This policy needs review before production. Inputs are limited to 30 seconds/5 MiB each, output to 90 seconds; no 90-minute-file support is claimed.
-
-All 122 methods across seventeen suites passed. Chrome decoded/playback-completed A/B/C tones, verified embedded-file reimport/nesting/repeated source uses, imported three independently generated AAC/M4A files to stereo WAV, and confirmed zero microphone requests and a reviewed 390 px layout. iPhone and real filesystem roundtrip remain pending. The lab guide owns details and resume gates; no production integration, commit or deployment is included.
+13 November 2026. A short-lived PCM-WAV prototype demonstrated three-source chronology, nested source history and repeated occurrences; the user reported it worked. It was removed when production M4A Combine was authorized and implemented in DJ043. Its HTML, modules, lab-specific test and guide are gone. Its WAV format, duration limits and production-integration gates are no longer applicable. The wake-word/Silero lab remains independent and available.
 
 
 # DJ043 — Production M4A Combine replaces the prototype
@@ -1802,3 +1798,10 @@ Validation: 123 regression methods across seventeen suites pass. An isolated Chr
 # DJ044 — Library readability and archived download reminders
 
 13 November 2026, build 2026-11-13.7. Added a divider between Saved Recordings controls and the list, bold Combined recording designations in both categories, and Download requested/Not yet downloaded labels on archived entries. Reuses the existing persisted/session download marker without claiming download completion. Audio and storage behavior are unchanged.
+
+
+# DJ045 — Future waveform/editing project and current-document cleanup
+
+13 November 2026. User requests a separate future project for a Voice Memos-style waveform and recording editing, with no code. Added a dedicated brief covering waveform/seek/zoom first, trimming into a preserved-original copy next, long-file peak summaries, iPhone resource measurement, packet-versus-exact cuts, provenance and acceptance boundaries. Dependency, UI and processing decisions remain open; this is not implementation authorization.
+
+Added a daily summary of the main-screen/library work, production Combine and readability changes. Consolidated current build/test counts, removed stale Refresh-button and append/prototype instructions from active guidance, and corrected the obsolete short-duration acceptance prerequisite in light of the user's >90-minute capture report. Synchronized index, roadmap, recording/voice/Combine/test guides and file map. User feedback is recorded separately from remaining iPhone/Files/large-combine evidence. Application code and build 2026-11-13.7 are unchanged; validation for this pass is documentation/link/inventory checking, not a new runtime test run.

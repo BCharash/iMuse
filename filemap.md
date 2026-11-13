@@ -22,6 +22,8 @@ Current iPhone prompt behavior and recurrence guidance: [recording investigation
 | Lab queue and fresh-Silero comparison | [js/lab/app.js](js/lab/app.js) |
 | Current status and decisions | [docs/README.md](docs/README.md) |
 | Combine saved recordings and source history | [docs/combine-recordings.md](docs/combine-recordings.md) |
+| Future waveform playback and editing | [docs/waveform-editing-project.md](docs/waveform-editing-project.md) |
+| Today’s completed work | [docs/2026-11-13-session-summary.md](docs/2026-11-13-session-summary.md) |
 | Upcoming and deferred work | [docs/iMuse next steps.md](docs/iMuse%20next%20steps.md) |
 | Running regression checks | [tests/README.md](tests/README.md) |
 
@@ -229,6 +231,8 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | File | Function |
 | --- | --- |
 | [docs/Hey iMuse Heed Training Handoff.md](docs/Hey%20iMuse%20Heed%20Training%20Handoff.md) | Training/export provenance and integration decision: current default 0.75 supersedes the earlier 0.80 proposal. |
+| [docs/2026-11-13-session-summary.md](docs/2026-11-13-session-summary.md) | Final summary of 13 November screen/library/Combine changes, validation, acceptance and future-project boundary. |
+| [docs/waveform-editing-project.md](docs/waveform-editing-project.md) | Separate future waveform/seek/trim proposal; long-file resource strategy, provenance, precision and acceptance decisions before coding. |
 | [docs/combine-recordings.md](docs/combine-recordings.md) | Production Combine workflow, compatibility, embedded packet provenance, verification and device checks. |
 | [docs/examples/combine-metadata-v1.json](docs/examples/combine-metadata-v1.json) | Browser-generated production M4A packet-history example with three original sources and two direct parents. |
 | [docs/README.md](docs/README.md) | Start here for current implementation status, acceptance evidence and links to authoritative subject guides. |

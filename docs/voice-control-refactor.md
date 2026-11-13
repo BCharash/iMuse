@@ -1,6 +1,6 @@
 # Voice control: current architecture and validation
 
-Updated 12 November 2026. Production source **2026-11-13.4**. Current validation and priorities are in the [index](README.md) and [next steps](iMuse%20next%20steps.md). Earlier build-by-build decisions remain in the [journal](design-journal.md).
+Updated 13 November 2026. Production source **2026-11-13.7**. Current validation and priorities are in the [index](README.md) and [next steps](iMuse%20next%20steps.md). Earlier build-by-build decisions remain in the [journal](design-journal.md).
 
 ## Startup and spoken prompts
 
@@ -24,7 +24,7 @@ The existing normalized microphone tap feeds the speech worker independently of 
 
 Advanced diagnostics records a `speech-gate` event for each completed current candidate decision: state, pass/reject, threshold, qualifying blocks/peak, lookback, and bypass reason when applicable. This adds no raw audio logging or persistent speech history.
 
-Automated verification: 116 methods across sixteen suites. An isolated Chrome check used the real local ONNX/WASM model to reject digital silence and accept a bundled spoken prompt, confirmed zero microphone requests during preparation/UI changes, and checked the Settings layout at 390 and 880 pixels. This is wiring/model execution evidence, not false-positive/negative rates, iPhone performance, screen-lock capture or microphone/device acceptance.
+Current regression checkpoint: 123 methods across seventeen suites (see the [test guide](../tests/README.md)). Earlier model-specific verification: An isolated Chrome check used the real local ONNX/WASM model to reject digital silence and accept a bundled spoken prompt, confirmed zero microphone requests during preparation/UI changes, and checked the Settings layout at 390 and 880 pixels. This is wiring/model execution evidence, not false-positive/negative rates, iPhone performance, screen-lock capture or microphone/device acceptance.
 
 Focused device checks: enable Audio commands; verify paused defaults and ready status; record without speech gating, pause and deliberately say the wake phrase, then complete the usual command sequence. Test both engines, both state switches, both switches off, immediate post-pause phrases, suspension, repeated pause/resume and starting/stopping another recording. Confirm recorded audio/export remains intact. Observe threshold/decision diagnostics during quiet, noise, conversation and intended phrases before changing defaults. The separate lab remains available for detailed labeling/comparison.
 

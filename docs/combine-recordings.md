@@ -1,6 +1,6 @@
 # Combine saved recordings
 
-Implemented in production build **2026-11-13.6**. The separate PCM-WAV Combine
+Implemented in production build **2026-11-13.6**; current UI checkpoint **2026-11-13.7**. The separate PCM-WAV Combine
 prototype has been removed. The wake-word/Silero lab is unchanged.
 
 ## Using Combine
@@ -11,7 +11,10 @@ prototype has been removed. The wake-word/Silero lab is unchanged.
    remain available. The result has the normal playback, Download, Archive,
    Delete and Diagnostics controls, plus **Sources (N)**.
 4. Expand Sources to see the original capture dates, names and segment durations.
-   Download reminders work independently for the new result.
+   Download reminders work independently for the new result. The **Combined recording**
+   designation is bold in Saved and Archived Recordings. A divider separates Saved
+   controls from the list, and neighboring recordings have separators. Archived
+   rows show Download requested or Not yet downloaded before deletion.
 
 Cancel exits selection or stops processing before saving. The final database
 transaction cannot be cancelled halfway through. A failed combine preserves
@@ -87,3 +90,5 @@ On iPhone, use three disposable recordings: combine all three, play/seek and
 download the result; then combine A/C with B and expand Sources. Confirm original
 files remain and the new M4A plays in Files. The existing successful >90-minute
 recording need not be repeated solely for this change.
+
+Waveform playback and trimming are separate future work; see the [project brief](waveform-editing-project.md). Today’s full changes and acceptance report are in the [13 November summary](2026-11-13-session-summary.md).

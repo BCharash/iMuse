@@ -1,18 +1,16 @@
 # Recording reliability and iPhone background capture
 
-Updated 12 November 2026. Current production source: **2026-11-13.4**. Preservation stages and component extractions are complete. Use the [active roadmap](iMuse%20next%20steps.md) for future work and the [journal](design-journal.md) for dated decisions.
-
-Refresh recordings rereads the library without reloading the app. While running it shows Refreshing… and disables repeat activation. The adjacent status reports an updated list, no changes, or a read failure. An empty result stays visible after a manual refresh so its feedback is not lost. Capture and stored audio are unaffected.
+Updated 13 November 2026. Current production source: **2026-11-13.7**. Preservation stages and component extractions are complete. Use the [active roadmap](iMuse%20next%20steps.md) for future work and the [journal](design-journal.md) for dated decisions.
 
 ## Recording list and download reminders
 
-Saved Recordings and Archived Recordings each have View/Hide controls. Saved rows provide playback, Download, Archive and confirmed permanent Delete. Archived rows provide Unarchive and confirmed individual/bulk permanent deletion. Unarchiving preserves the recording start date and its chronological position. The newest saved recording remains first. Category visibility survives list refreshes within the page; recovery copies force Saved open so unsaved-data warnings remain visible.
+Saved Recordings and Archived Recordings each have View/Hide controls. Saved rows provide playback, Download, Archive, confirmed permanent Delete and Diagnostics. A divider separates the controls from the list; separators distinguish adjacent recordings. Combined recording is bold in both categories, with expandable Sources history. Archived rows provide Unarchive and confirmed individual/bulk permanent deletion. Unarchiving preserves the recording start date and its chronological position. The newest saved recording remains first. Category visibility survives list refreshes within the page; recovery copies force Saved open so unsaved-data warnings remain visible.
 
-Archive uses the existing internal `deleted` state and restore path; it does not delete chunks. Legacy Archived Recordings entries therefore become Archived Recordings without a schema migration. Permanent deletion retains existing idle/writer guards. Recovery copies with unsaved memory retain their explicit warned Discard action rather than silently losing that tail through ordinary archive controls.
+Archive uses the existing internal `deleted` state and restore path; it does not delete chunks. Legacy Recently Deleted entries therefore appear as Archived Recordings without a schema migration. Permanent deletion retains existing idle/writer guards. Recovery copies with unsaved memory retain their explicit warned Discard action rather than silently losing that tail through ordinary archive controls.
 
 The current player remains separate from library playback and retains its Blob after library deletion. Its own Delete button permanently deletes after confirmation and clears that player. Library actions leave a different current player intact.
 
-Download uses Memora's blue halo/thin outline pulse, with reduced-motion support. It stops reminding after a download request is initiated, not after verified file saving. Cancelling the filename dialog does not mark a request. A serialized metadata update records `downloadRequestedAt` without changing audio counters/state or recreating a permanently deleted session. Saved rows show Not yet downloaded or Download requested. Downloading again remains available. No automatic cleanup is implemented.
+Download uses Memora's blue halo/thin outline pulse, with reduced-motion support. It stops reminding after a download request is initiated, not after verified file saving. Cancelling the filename dialog does not mark a request. A serialized metadata update records `downloadRequestedAt` without changing audio counters/state or recreating a permanently deleted session. Saved and archived rows show Not yet downloaded or Download requested. Downloading again remains available. No automatic cleanup is implemented.
 
 Final recording outcome is Audio recording successful or Audio recording unsuccessful. Structural checks still run and retain diagnostic metadata; user-facing completion text no longer recites those checks. Recovery entries retain missing/unsaved-data warnings. Opening either category silently refreshes stored recordings; no Refresh button or routine refresh message is shown.
 
@@ -115,7 +113,7 @@ Use the check to measure/mark the quiet room, then household conversation/noise,
 
 The user reported Stage 2 seemed to work and Stage 3 looked okay. During the failure test, emergency audio remained accessible after another recording: 233,965 bytes versus an eight-chunk committed prefix of 213,314 bytes. Endings sounded alike; extra bytes do not establish an audible improvement. A separate exported-file comparison was not explicitly confirmed. Disappearing PWA recordings were not established as a regression: previous deletion/reinstallation made the baseline uncertain, and Safari still held its recordings.
 
-These are reported outcomes, not full device certification or traces for every acceptance step. Long-duration, locked-screen and current dialog-layout acceptance remain distinct checks. Record exact deployed revision, device/OS, container and microphone when reporting new results.
+These are reported outcomes, not full device certification or traces for every acceptance step. The user has also reported a successful recording exceeding 90 minutes. This is separate from locked-screen acquisition, complete playback/export evidence and current dialog-layout checks; do not treat another duration run as an automatic prerequisite. Record exact deployed revision, device/OS, container and microphone when reporting new results.
 
 ## iPhone background problem: separate and unresolved
 
@@ -135,7 +133,7 @@ From the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-The last verified implementation checkpoint has **sixteen suites and 117 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
+The last verified implementation checkpoint has **seventeen suites and 123 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
 
 The suites execute production functions with controlled DOM/storage/lock/timer mocks. They do not prove native player rendering, actual IndexedDB behavior, browser permission decisions, container decoding, background capture or multi-hour memory reliability.
 
@@ -143,10 +141,10 @@ The suites execute production functions with controlled DOM/storage/lock/timer m
 
 Use disposable recordings in an updated build. Do not clear site data or reinstall to test preservation.
 
-1. **Normal capture:** record, pause/resume, Stop, and check beginning/middle/end. Verify the normal saved status, saved **▶** player, download, and unchanged top player. Close the dialog and check a disposable Delete/Restore round trip, including KB in Archived Recordings.
+1. **Normal capture:** record, pause/resume, Stop, and check beginning/middle/end. Verify the normal saved status, saved **▶** player, download, and unchanged top player. Close the dialog and check a disposable Archive/Unarchive round trip, then confirmed permanent Delete; inspect KB and download-request status in Archived Recordings.
 2. **Storage failure:** enable **Settings → Storage → Advanced storage settings → Recording preservation test → Enable failure testing for this page**. Record/count for ten seconds, then tap **Simulate storage failure** while recording. Expect automatic stop and a positive unsaved-byte result. Play/export its single entry, make a second normal recording, then play/export the first again. Keep the page open until exports are checked; disable the test afterward. Starting the second recording must not release the first's emergency audio.
 3. **Reload recovery:** separately, without needed memory-only audio in the page, reload during capture. Load committed audio and verify interrupted history remains; some ending loss is possible.
-4. **Ownership:** prefer two updated Mac tabs at the same URL. Record in A; B must refuse a competing recording or mutation of A's live session. Stop A, then Refresh recordings in B and verify normal playback/download. Do not confuse this with iPhone background capture.
+4. **Ownership:** prefer two updated Mac tabs at the same URL. Record in A; B must refuse a competing recording or mutation of A's live session. Stop A, then open Saved Recordings → View in B (Hide/View if already open) and verify normal playback/download. Do not confuse this with iPhone background capture.
 5. **Protection:** open Settings, read status, close/reopen and check that it refreshes. Grants can differ by browser/container. Refusal does not block recording or mean recordings disappear on normal closure.
 
 Stuck writes, missing stop events, encoder errors and malformed structures are simulated in automated tests. Do not fill storage or manually corrupt saved chunks. For real delayed finalization, export available audio before closure and report the exact notice and whether it eventually finishes.
@@ -167,3 +165,7 @@ Build 2026-11-13.4 uses 18 px filename input, focus without requested scrolling,
 ## Production Combine — 2026-11-13.6
 
 Saved Recordings now offers independent Combine selection, creating a new compatible M4A/AAC artifact and retaining originals. Work runs in a separate worker under the existing storage writer lock; Record waits during processing/saving. Configuration checks, complete-source structural checks, output packet/history readback and atomic session/Blob publication precede success. Cancel/failure leaves originals intact. The new output uses normal library download reminders, playback, archive and deletion paths. See [Combine recordings](combine-recordings.md) for the packet-based provenance schema, exact browser evidence and remaining iPhone/long-combine checks. Capture, stop announcements and wake recognition are unchanged.
+
+## Future waveform/editing project
+
+Waveform playback, seeking and later trimming into a new copy are proposed separately in the [future project brief](waveform-editing-project.md). No editor is implemented. See the [13 November summary](2026-11-13-session-summary.md) for today’s complete changes and acceptance boundary.

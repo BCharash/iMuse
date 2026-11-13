@@ -1,20 +1,25 @@
 # iMuse next steps
 
-**Production Combine checkpoint, 13 November — 2026-11-13.6:** [Saved Recordings Combine](combine-recordings.md) creates new compatible M4A/AAC files, retains originals and embeds source history. Nested chronological ordering and repeated occurrences are preserved. The separate Combine prototype is removed; the wake/Silero lab stays. Next: iPhone playback/seek/Files acceptance using disposable recordings and resource measurements for larger combinations.
+Current source: **2026-11-13.7**, 13 November 2026. The user reports the updated interface and Combine work well. See the [session summary](2026-11-13-session-summary.md) for today's completed work and [Combine guide](combine-recordings.md) for the current implementation.
 
-## Phase-one acceptance — 2026-11-13.4
+## Immediate follow-up
 
-Check on iPhone and Mac: both audio-command controls mirror each other during capture/pause, main button text remains readable, command status is below Microphone, completion/player/download/delete order, pulse and cancelled/completed download requests, reload persistence, View/Hide, Archive/Unarchive chronology and confirmed permanent deletion. Use disposable recordings for deletion. Preserve the separate iOS 27 installed-PWA background and lightweight Swift feasibility plans. The user has already recorded more than 90 minutes; review existing playback/seek/export evidence instead of requiring another duration test merely to repeat it.
+1. On iPhone, combine disposable recordings, play/seek the result, and download/open it in Files. Check nested Sources history and that originals remain. Record the exact build, browser/container and device if a problem occurs.
+2. Measure memory and preparation/finalization time for representative larger combinations. The existing >90-minute successful capture should not be repeated merely as a prerequisite; capture duration and combine resource use are different evidence.
+3. Revisit filename keyboard/focus zoom or deletion-position behavior only if the problem recurs. The 18 px input, bounded dialogs and surviving-row anchoring are implemented; the user reports the revised UI looks good.
+4. Verify off-window/lock-screen acquisition on the installed iPhone PWA using the current iOS version. Keep this separate from the successful ordinary capture, browser mock tests and desktop results.
 
-## Combine replaces the append proposal
+The capture-time append selector is superseded and will not be implemented under the Combine task. Automatic cleanup of old download-requested recordings remains deferred; initiation is not a verified backup.
 
-Capture-time appending and an Appending Recording label are superseded. Combine is a separate Saved Recordings operation. New combined files rise to the top; originals remain until the user archives/deletes them. Automatic cleanup of old download-requested recordings remains future work under a separate retention policy; a download request is not verified external backup.
+## Separate future project: waveform playback and editing
+
+The [waveform/editing brief](waveform-editing-project.md) records the proposed sequence: waveform/seek/zoom first, then trim and Save edited copy, with optional section removal later. It is documentation only. Before implementation, choose the UI, bounded waveform-generation strategy, long-recording resource budget, cut precision and provenance extension. It is independent of Combine and does not require a Swift migration.
 
 ## Next acceptance
 
 1. Check iPhone startup with Audio commands off: prompts prepare, voice models do not. Enable commands and check readiness, wake/commands and warm off/on reuse. Enabled-model UI stalls remain open; worker isolation requires separate design and validation.
 2. Check all spoken prompts at full/reduced volume, speaker/Bluetooth, Safari/PWA. Yes/preview is user-accepted; the other messages still need acceptance. Confirm stop timing, disabled New Recording until cleanup, saved playback/download and another recording.
-3. Retain production Silero acceptance: pause on/recording off defaults, immediate post-pause wake, both engines and state switches, suspension and manual controls. Preserve user tuning.
+3. Retain production Silero acceptance: pause on/recording off defaults, immediate post-pause wake, both engines and state switches, the unified on/off preference and manual controls. Preserve user tuning.
 4. Investigate reproducible failures with one hypothesis and detailed diagnostics. The intermittent menu issue was mainly reported after updates, is currently absent, and was not reproduced by single emulated touches. Do not add tap suppression speculatively.
 
 ## Deferred work
@@ -43,16 +48,16 @@ The following were not established as completed by the latest background tests. 
 | Work | Required evidence |
 | --- | --- |
 | Recovered-recording UI persistence | Load after reload using ▶, play/download, reload again, verify availability and interruption history remain |
-| iPhone session duration | 10–15-minute supported-mode recording, then 30-minute finalization/seek/export; inspect beginning/middle/end |
+| Long-recording evidence | User reports >90-minute capture. Review beginning/middle/end, seeking and downloaded playback evidence for the actual supported device/container; repeat duration testing only when a changed pathway or unresolved failure warrants it |
 | Persistence failure/backpressure | Automated coverage and a reported short device test exist; broader device/long-file acceptance remains |
 | Unexpected stop and acquisition stall | Error/stop classification is implemented and mock-tested; actual acquisition-stall detection and foreground repair remain open |
 | Voice/controller regressions | Wake race fixes are user-accepted and automatically covered; retain stale-session/arming/load and command-shutdown checks when changing their boundaries |
-| Bulk permanent deletion | Use disposable recordings: cancel changes nothing; confirm deletes only selected deleted sessions; preserve other recordings |
+| Bulk permanent deletion | Use disposable recordings: cancel changes nothing; confirm deletes only selected archived sessions; preserve other recordings |
 | Deployment/versioning | Build display/diagnostic identity implemented; generated asset fingerprinting and cache-consistent deployment remain to be assessed without clearing IndexedDB |
 
 Do not restart the Record UI redesign or bounded-queue implementation. Recheck the temporary TensorFlow getUserMedia override only when changing listener ownership or investigating a reproducible interaction; it is not necessary for the installed-lab failure.
 
-## Later roadmap, retained but not started by this update
+## Other future work
 
 1. **Further preservation and long-file work.** Structural checks and interrupted outcomes are implemented. Consider automatic persistence retries for emergency tails and audit `getAll()`/Blob memory before choosing another architecture. A future separate finalized artifact needs commit/readback validation while preserving original chunks. Container decoding and audible completeness remain distinct from structural checks; migrations must be nondestructive.
 2. **UUID and provenance metadata.** Capture and combined outputs have their own IDs; titles never define identity. Combine now stores and embeds original source snapshots and ordered occurrences, including repeats and packet boundaries, without a schema change. Broader original-file metadata embedding/import remains future work.

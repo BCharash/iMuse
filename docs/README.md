@@ -1,47 +1,40 @@
 # iMuse documentation
 
-Updated 13 November 2026. Start here; current findings take precedence over older plans and journal entries.
-
-Current candidate: **2026-11-13.7** adds compatible M4A combining in Saved Recordings. Spoken prompts still prepare at startup for manual and voice controls, while wake-model loading is skipped when Audio commands is off. Warm model reuse remains; enabled-model UI blocking is still open. See [voice control](voice-control-refactor.md) and [recording reliability](recording-investigation.md).
+Updated 13 November 2026. Current production source: **2026-11-13.7**. Current guides take precedence over historical journal entries and archived proposals.
 
 | Document | Purpose |
 | --- | --- |
-| [Combine recordings](combine-recordings.md) | Production M4A combining, source history, compatibility and validation |
-| [Repository file map](../filemap.md) | Find every source file, model, test, asset and archived guide by folder or task |
-| [Recording reliability](recording-investigation.md) | Current behavior, evidence, limitations and one manual acceptance checklist |
-| [Wake-word and filename lab](wake-word-evaluation.md) | Wake evidence, current lab use and why live Whisper verification was rejected |
-| [Voice control](voice-control-refactor.md) | Accepted wake refactor/race fixes, command ownership, Settings, diagnostics and regression checks |
-| [Regression tests](../tests/README.md) | One test command, suite purposes and testing limits |
-| [Build identification](build-versioning.md) | Production numbering convention, runtime display, diagnostic metadata and caching limits |
-| [Next steps](iMuse%20next%20steps.md) | Current priorities and remaining acceptance work; implementation versus testing status |
-| [Memora integration handoff](iMuse%20Memora%20integration%20handoff.md) | Record-to-Transcribe contract, source ownership, and integration boundaries |
-| [Swift migration proposal](iMuse%20Swift%20migration%20plan.md) | Conditional native recorder/transcription scope, feasibility gates and recording priority |
-| [Design journal](design-journal.md) | Historical decisions; DJ027 records download naming and the accepted retained-player download fix |
-| [Archive index](Archive/README.md) | Superseded reviews, detailed earlier roadmap, installation checklists, and voice/headset experiments |
+| [13 November session summary](2026-11-13-session-summary.md) | Today's completed screen/library changes, production Combine, evidence and remaining checks |
+| [Next steps](iMuse%20next%20steps.md) | Active priorities, remaining acceptance and deferred work |
+| [Combine recordings](combine-recordings.md) | Current M4A workflow, compatibility, source history and storage behavior |
+| [Future waveform/editing project](waveform-editing-project.md) | Separate proposal for waveform playback and later editing; no implementation yet |
+| [Recording reliability](recording-investigation.md) | Preservation, ownership, iPhone background findings and focused manual checks |
+| [Voice control](voice-control-refactor.md) | Wake/command/Silero settings, startup, prompts, diagnostics and ownership |
+| [Wake-word and filename lab](wake-word-evaluation.md) | Retained lab, evaluation evidence and deferred queue investigation |
+| [Regression tests](../tests/README.md) | Test commands, current coverage and verification limits |
+| [Repository file map](../filemap.md) | Every repository file, organized by folder and task |
+| [Build identification](build-versioning.md) | Numbering, diagnostic identity and caching limits |
+| [Memora integration handoff](iMuse%20Memora%20integration%20handoff.md) | Recording/transcription ownership and integration boundaries |
+| [Swift migration proposal](iMuse%20Swift%20migration%20plan.md) | Separate native feasibility and conditional scope |
+| [Design journal](design-journal.md) | Dated decisions and experiments; historical instructions may be superseded |
+| [Archive index](Archive/README.md) | Older reviews, roadmaps and experiments |
 
 ## Current checkpoint
 
-Production source: **2026-11-13.7**. Latest implementation validation: **123 methods across seventeen suites**.
+- Audio-command button and Settings checkbox share one persisted preference. Status below Microphone reports enabled with the selected wake phrase, or disabled.
+- Completion says Audio recording successful/unsuccessful, followed by the current player, Download and confirmed Delete. Recovery warnings and structural checks remain.
+- Saved and Archived Recordings have View/Hide; opening View silently rereads storage. Archive retains audio, Unarchive preserves original chronology, and Delete permanently removes after confirmation. Recovery copies retain explicit Discard protections.
+- Download pulses until initiation. Saved and archived rows report Download requested or Not yet downloaded; neither wording verifies successful external saving. Cancel retains the reminder; downloading again remains available.
+- Production Combine creates a new compatible M4A without re-encoding, preserves originals, and embeds original source history. Nested chronology and repeated occurrences are retained. Combined recording is bold, Sources expands its history, and dividers distinguish controls and recordings. The temporary Combine prototype is removed; the wake/Silero lab remains.
+- Filename input is 18 px; dialogs are viewport-bounded. Mutations preserve a surviving visible row where possible. Diagnostics opens View/Hide, Copy and Download of one snapshot. Deliberate pinch zoom remains available.
+- All six prompts prepare at startup. Recognition models wait until Audio commands is enabled and ready models are reused. Heed / Hey iMuse is first/default at 0.75, preserving saved tuning; Silero defaults to pause evaluation on and recording evaluation off.
 
-- The main Audio commands button and Settings checkbox control one persisted preference, including during capture. Status below Microphone reports enabled with the selected phrase, or disabled. Temporary suspension is no longer a separate user function.
-- Recording completion says Audio recording successful or unsuccessful. The current player is followed by Download and confirmed permanent Delete. Recovery warnings remain with recovery entries.
-- Saved Recordings and Archived Recordings have independent View/Hide controls. Archive retains a recording; Unarchive preserves its original date/order. Delete permanently removes the selected recording after confirmation. Legacy Recently Deleted entries appear as archived without migration or audio deletion.
-- Download gently pulses until a download is initiated. A cancelled filename dialog keeps the reminder. Download requested persists per recording; it does not prove the file reached Files successfully. The button remains usable for another download.
-- All six prompts prepare at startup. Recognition models wait until Audio commands is enabled; ready models are reused. Enabled-model UI blocking remains open.
-- Heed / Hey iMuse is first/default at 0.75, preserving saved tuning. Production Silero defaults to pause evaluation on and recording evaluation off.
+## Acceptance and open work
 
-Combine is independent of capture: select finished Saved Recordings, create a new M4A in original chronological order, preserve originals, and expand Sources to inspect history. Nested results retain original segments and repeated occurrences. Automatic cleanup remains deferred. See [Combine recordings](combine-recordings.md).
+The user reports today's changes and Combine work well. The latest implementation validation is **123 methods across seventeen suites**, plus isolated Chrome checks of real AAC packet preservation, decoded order, nested/repeated history, real library/IndexedDB behavior, cancellation/errors, download markers, archive/unarchive and narrow layout.
 
-## Reading order and evidence
+Targeted iPhone checks remain for combined playback/seek/Files exports, filename keyboard/zoom if it recurs, and large-combination resource use. The user has already recorded more than 90 minutes; that does not certify every background or export scenario, and does not require another duration run by default.
 
-Use Next steps for priorities, Recording reliability for preservation and device checks, Voice control for settings/ownership, and Wake evaluation for lab operation. Journal entries and Archive documents record dated evidence; their old defaults, test counts and implementation instructions are historical.
+Installed-iPhone PWA background capture, enabled-model startup responsiveness and the remaining prompt/device combinations are separate open investigations. The intermittent post-update menu issue is currently absent and was not reproduced by single emulated touches; no speculative tap suppression or site-data clearing is prescribed. Screen-lock prevention remains active without routine status text.
 
-The intermittent startup menu issue was reported mainly after updates and is currently absent. Single-tap Chrome checks did not reproduce automatic closing. No menu suppression or cache reset is implemented. Installed-iPhone background capture remains a separate unresolved issue; earlier Safari-tab success does not certify every device or installed mode.
-
-Routine screen-lock status text is hidden; screen-lock prevention remains active and capture/interruption notices remain available. Opening Saved or Archived Recordings silently rereads the list; the Refresh recordings button and routine refresh feedback are removed.
-
-Filename entry uses 18 px text and prevents focus-driven scrolling. List actions are Download, Archive, Delete and Diagnostics; archived rows offer Unarchive/Delete. Diagnostics opens a Stop diagnostics dialog with View/Hide, Copy and Download of the same JSON snapshot. Mutation refreshes preserve a surviving visible row where possible; deliberate pinch zoom remains available. iPhone focus/keyboard behavior still needs device acceptance.
-
-**Combine validation, 13 November:** generated real AAC/M4A clips retain every encoded packet unchanged; decoded tones confirm chronology. Browser checks also cover nested/repeated sources, cancellation, incompatible-input failure, real library persistence, download markers, Archive/Unarchive and 390 px layout. The separate Combine prototype is removed; the wake-word/Silero lab remains. iPhone combined-file playback/Files saving and long-combine resource use await device checks.
-
-Build 2026-11-13.7: a divider separates Saved controls from the list; Combined recording is bold in saved and archived entries; archived rows show Download requested or Not yet downloaded before deletion. These labels report initiation, not a confirmed external save.
+Automatic cleanup, waveform/editing, native feasibility, transcription/naming and version-maintenance upgrades remain future work. See Next steps and the individual project briefs before starting implementation. This documentation pass changes no application code or production build.
