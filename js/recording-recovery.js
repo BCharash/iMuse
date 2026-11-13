@@ -100,12 +100,12 @@ export function createRecordingRecovery({
                     return;
                 }
                 status.textContent = "Emergency download started. Check the exported audio before closing or reloading iMuse; the emergency copy remains available here.";
-                return;
+                return true;
             }
             const prepared = await recordingStorage.run(async () => {
                 assertSessionIdle(id);
                 const item = await boundedStorageRead(getSession(id));
-                if (!item || item.state === "deleted") throw new Error("This session is unavailable. Restore a deleted recording before loading it.");
+                if (!item || item.state === "deleted") throw new Error("This session is unavailable. Unarchive this recording before loading it.");
                 const chunks = await boundedStorageRead(getChunks(id));
                 const { blob, report } = assembleSavedAudio(item, chunks);
                 return { blob, report, item };
@@ -115,7 +115,8 @@ export function createRecordingRecovery({
                 status.textContent = "Download canceled. Recording retained.";
                 return;
             }
-            status.textContent = `Download started.${integrityNotice(prepared.report)} Check the exported audio before deleting the original.`;
+            status.textContent = `Recording download requested.${integrityNotice(prepared.report)}`;
+            return true;
         } catch (error) {
             console.error("Could not export saved recording:", error);
             status.textContent = `Could not export audio: ${error.message || "unknown error"}`;
@@ -137,7 +138,7 @@ export function createRecordingRecovery({
             await recordingStorage.run(async () => {
                 assertSessionIdle(id);
                 const item = await boundedStorageRead(getSession(id));
-                if (!item || item.state === "deleted") throw new Error("This session is unavailable. Restore a deleted recording before loading it.");
+                if (!item || item.state === "deleted") throw new Error("This session is unavailable. Unarchive this recording before loading it.");
                 const chunks = await boundedStorageRead(getChunks(id));
                 const { blob, report } = assembleSavedAudio(item, chunks);
                 // Recover availability, not a claim of uninterrupted capture.
@@ -152,7 +153,7 @@ export function createRecordingRecovery({
                 });
                 present(blob, id, item);
                 status.textContent = state === "completed"
-                    ? "Recording loaded. Saved chunks passed structural checks; check playback."
+                    ? "Audio recording successful."
                     : `Available audio loaded from an interrupted recording.${integrityNotice(report)} Check playback for missing sections.`;
                 await renderRecoverableSessions();
             });
@@ -198,10 +199,10 @@ export function createRecordingRecovery({
             finalBlob = emergencyRecordings.get(id)?.blob || finalBlob;
             showPlayback(finalBlob, id, current.metadata);
             status.textContent = emergencyRecordings.get(id)?.unsavedBytes
-                ? `Recording was interrupted. Available audio includes unsaved data; download before closing or reloading.${integrityNotice(assembly.report)}`
+                ? "Audio recording unsuccessful."
                 : current.metadata.state === "completed"
-                ? "Received audio saved. Saved chunks passed structural checks; check playback."
-                : `Recording was interrupted. Available audio is saved.${integrityNotice(assembly.report)} Check playback for missing sections.`;
+                ? "Audio recording successful."
+                : "Audio recording unsuccessful.";
         } catch (error) {
             logRecordingEvent(current, "finalization-error", { error: String(error) });
             console.error("Could not finalize persisted recording:", error);
@@ -231,9 +232,7 @@ export function createRecordingRecovery({
             if (error.integrityReport) current.metadata.integrityReport = error.integrityReport;
             current.metadata.lastUpdatedAt = new Date().toISOString();
             try { await putSession(current.metadata); } catch (saveError) { console.error(saveError); }
-            status.textContent = finalBlob.size
-                ? "Storage failed. Emergency audio is available; download it before closing iMuse and check for missing sections."
-                : "Recording could not be finalized. No playable audio was available.";
+            status.textContent = "Audio recording unsuccessful.";
         }
     }
 

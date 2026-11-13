@@ -49,7 +49,7 @@ globalThis.testResult='pending';
  document.body.children[0].children[1].children[2].children[0].events.click();
  assert(await next===null,'cancel button cancels');
  globalThis.testResult='PASS';
-})().catch(e=>globalThis.testResult=String(e.stack));
+})().catch(e=>globalThis.testResult=String(e)+String(e.stack));
 ''')
 
     def test_current_playback_creates_download_and_uses_original_start(self):
@@ -59,6 +59,8 @@ const controls={hidden:true,children:[],insertBefore(button,before){assert(befor
 const deleteButton={parentElement:controls};controls.children.push(deleteButton);
 const document={getElementById:id=>controls.children.find(child=>child.id===id),createElement:()=>({events:{},addEventListener(type,fn){this.events[type]=fn;}})};
 const window={lastRecording:null},status={},recordingControls=controls;
+const downloadRequests=new Set(),recordingStore={markDownloadRequested:async()=>{}};
+const console={warn(){}};async function renderRecoverableSessions(){}
 const audioPlayer={hidden:true,load(){},pause(){},removeAttribute(){}},URL={createObjectURL:()=> 'blob:current',revokeObjectURL(){}};
 let recordingUrl=null,displayedSessionId=null,displayedRecordingFilename=null;
 const metadata={startedAt:'2026-11-05T14:32:08Z',downloadStamp:'2026-11-05_14-32-08'};
@@ -78,7 +80,7 @@ globalThis.testResult='pending';
  assert(button&&controls.hidden===false&&audioPlayer.hidden===false,'current playback exposes download control');
  await button.events.click();
  assert(requested.blob===blob&&requested.name==='2026-11-05_14-32-08_iMuse','current audio uses original start time');
- assert(!button.disabled&&status.textContent.includes('Download started'),'success restores button');
+ assert(!button.disabled&&status.textContent.includes('download requested'),'success restores button');
  showPlayback(blob,'current',metadata);
  assert(controls.children.length===2,'repeated playback does not duplicate control');
  downloaded=false;await button.events.click();
@@ -92,7 +94,7 @@ globalThis.testResult='pending';
  clearPlayback();
  assert(window.lastRecording===null&&displayedRecordingFilename===null&&controls.hidden&&audioPlayer.hidden,'clearing player clears audio and filename together');
  globalThis.testResult='PASS';
-})().catch(e=>globalThis.testResult=String(e.stack));
+})().catch(e=>globalThis.testResult=String(e)+String(e.stack));
 ''')
 
     def test_actual_download_waits_for_choice_and_keeps_format(self):
@@ -111,7 +113,7 @@ globalThis.testResult='pending';
  choice='prefix_Meeting';assert(await downloadAudioBlob(blob,'prefix_iMuse')===true,'confirmation succeeds');
  assert(link.download==='prefix_Meeting.m4a'&&created===1&&clicked===1,'selected name and actual format used');
  globalThis.testResult='PASS';
-})().catch(e=>globalThis.testResult=String(e.stack));
+})().catch(e=>globalThis.testResult=String(e)+String(e.stack));
 ''')
 
     def test_cancel_preserves_emergency_and_releases_storage_before_choice(self):
@@ -139,7 +141,7 @@ globalThis.testResult='pending';
  await recovery.exportSavedSession('saved',button);
  assert(downloads===2&&!locked&&!button.disabled&&status.textContent.includes('canceled'),'saved download choice runs outside writer lock');
  globalThis.testResult='PASS';
-})().catch(e=>globalThis.testResult=String(e.stack));
+})().catch(e=>globalThis.testResult=String(e)+String(e.stack));
 ''')
 
 if __name__ == '__main__':

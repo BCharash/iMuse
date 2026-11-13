@@ -10,7 +10,7 @@ Current iPhone prompt behavior and recurrence guidance: [recording investigation
 | --- | --- |
 | Recording controls and main player | [js/recorder.js](js/recorder.js) |
 | Download name dialog and filename rules | [js/recording-download.js](js/recording-download.js) |
-| Saved recordings and Recently Deleted | [js/recording-library.js](js/recording-library.js) |
+| Saved recordings and Archived Recordings | [js/recording-library.js](js/recording-library.js) |
 | Stored audio chunks and database operations | [js/recording-store.js](js/recording-store.js) |
 | Writer lock and storage-operation ordering | [js/recording-storage-coordinator.js](js/recording-storage-coordinator.js) |
 | Recovery, finalization and emergency audio | [js/recording-recovery.js](js/recording-recovery.js) |
@@ -108,11 +108,11 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [js/recorder.js](js/recorder.js) | Production coordinator: capture/start/pause/stop, pending audio writes, wake/silence graph, session guards, main player and current-download wiring. |
 | [js/recording-download.js](js/recording-download.js) | Download filename dialog, local date/time formatting, description sanitization and filename preview; changes no saved-list title. |
 | [js/recording-integrity.js](js/recording-integrity.js) | Checks chunk ordering/counts/byte totals and derives completion/interruption outcomes; does not prove audible continuity. |
-| [js/recording-library.js](js/recording-library.js) | Saved/Recently Deleted lists, saved-player dialog, download actions, restore and deletion selection/confirmation UI. |
+| [js/recording-library.js](js/recording-library.js) | Saved/Archived lists, saved-player dialog, download actions, restore and deletion selection/confirmation UI. |
 | [js/recording-recovery.js](js/recording-recovery.js) | Chunk-to-Blob assembly, saved playback/export, finalization/watchdog and retained emergency audio. |
 | [js/recording-storage-coordinator.js](js/recording-storage-coordinator.js) | Serializes storage operations and manages exclusive writer ownership using Web Locks. |
 | [js/recording-store.js](js/recording-store.js) | Production IndexedDB schema/version and session/chunk/diagnostic reads, writes, restore and deletion transactions. |
-| [js/settings.js](js/settings.js) | Settings controls, persisted preferences, validation, microphone reports/meter and settings-change notifications. |
+| [js/settings.js](js/settings.js) | Settings controls, persisted preferences shared with the main audio-command button, validation, microphone reports/meter and settings-change notifications. |
 | [js/speech-detection-core.js](js/speech-detection-core.js) | Production speech state policy, score decisions, 16 kHz streaming resampling and Silero 64-sample context. |
 | [js/speech-detection-worker.js](js/speech-detection-worker.js) | Dedicated production continuous Silero worker; loads pinned local assets and resets recurrent state/history per listening interval. |
 | [js/speech-detection.js](js/speech-detection.js) | Warmed speech-worker lifecycle, bounded pending packets, timeout/error handling and stale-result cancellation; owns no microphone. |

@@ -1,12 +1,24 @@
 # Recording reliability and iPhone background capture
 
-Updated 12 November 2026. Current production source: **2026-11-12.11**. Preservation stages and component extractions are complete. Use the [active roadmap](iMuse%20next%20steps.md) for future work and the [journal](design-journal.md) for dated decisions.
+Updated 12 November 2026. Current production source: **2026-11-13.1**. Preservation stages and component extractions are complete. Use the [active roadmap](iMuse%20next%20steps.md) for future work and the [journal](design-journal.md) for dated decisions.
 
 Refresh recordings rereads the library without reloading the app. While running it shows Refreshing… and disables repeat activation. The adjacent status reports an updated list, no changes, or a read failure. An empty result stays visible after a manual refresh so its feedback is not lost. Capture and stored audio are unaffected.
 
+## Recording list and download reminders
+
+Saved Recordings and Archived Recordings each have View/Hide controls. Saved rows provide playback, Download Recording, Archive recording and confirmed permanent Delete recording. Archived rows provide Unarchive recording and confirmed individual/bulk permanent deletion. Unarchiving preserves the recording start date and its chronological position. The newest saved recording remains first. Category visibility survives list refreshes within the page; recovery copies force Saved open so unsaved-data warnings remain visible.
+
+Archive uses the existing internal `deleted` state and restore path; it does not delete chunks. Legacy Archived Recordings entries therefore become Archived Recordings without a schema migration. Permanent deletion retains existing idle/writer guards. Recovery copies with unsaved memory retain their explicit warned Discard action rather than silently losing that tail through ordinary archive controls.
+
+The current player remains separate from library playback and retains its Blob after library deletion. Its own Delete button permanently deletes after confirmation and clears that player. Library actions leave a different current player intact.
+
+Download Recording uses Memora's blue halo/thin outline pulse, with reduced-motion support. It stops reminding after a download request is initiated, not after verified file saving. Cancelling the filename dialog does not mark a request. A serialized metadata update records `downloadRequestedAt` without changing audio counters/state or recreating a permanently deleted session. Saved rows show Not yet downloaded or Download requested. Downloading again remains available. No automatic cleanup is implemented.
+
+Final recording outcome is Audio recording successful or Audio recording unsuccessful. Structural checks still run and retain diagnostic metadata; user-facing completion text no longer recites those checks. Recovery entries retain missing/unsaved-data warnings. Refresh recordings retains its checking/updated/no-change/failure feedback.
+
 ## Current code ownership
 
-[recording-library.js](../js/recording-library.js) now owns the Saved/Recently Deleted lists, selection and confirmation controls, saved-player dialog and its object URL. It receives callbacks for reading sessions, recovery/export, deletion/restore, diagnostics and pausing current playback. Constructing it does not acquire a microphone, open a database, or render the page.
+[recording-library.js](../js/recording-library.js) now owns the Saved/Archived Recordings lists, selection and confirmation controls, saved-player dialog and its object URL. It receives callbacks for reading sessions, recovery/export, deletion/restore, diagnostics and pausing current playback. Constructing it does not acquire a microphone, open a database, or render the page.
 
 [recording-store.js](../js/recording-store.js) owns recording database initialization, session/chunk reads and writes, delete/restore transactions and diagnostic-event I/O. It receives the existing write coordinator and an idle-session guard. It keeps the database name, version 2, keys, indexes and transaction behavior. Construction is lazy; opening/readiness remain explicit. A blocked open that later succeeds closes the unused connection instead of silently marking failed initialization ready.
 
@@ -29,12 +41,12 @@ After discussing voice-extraction risks, the user approved a lower-risk unused-c
 | Completion checks | Sequences, chunk data, counts, byte totals and known received counts are checked. Unexpected stops, encoder errors, failed checks and delayed finalization retain interrupted/error outcomes. |
 | Delayed finalization | A 10-second watchdog offers available audio; relevant reads have a 2-second fallback. Timers need JavaScript execution. Pending writes retain ownership until they settle; a new recording waits rather than competing with them. |
 | Browser protection | One nonblocking persistence request at initialization. Opening Settings checks the current grant and displays status; there are no manual protection buttons. |
-| Saved recordings | **▶** opens a separate player dialog. The top player retains the current in-memory recording. Rows show KB, Download audio, Delete and a small download button beside Stop diagnostics. Recently Deleted also shows KB. |
-| Deletion | Delete moves saved audio to Recently Deleted. Interrupted recovery copies offer **Discard…**, with confirmation that unsaved audio will be lost; the committed prefix moves to Recently Deleted before memory is released. Pending writers remain protected. Permanent deletion is explicit. |
+| Saved recordings | **▶** opens a separate player dialog. The top player retains the current in-memory recording. Rows show KB, Download audio, Delete and a small download button beside Stop diagnostics. Archived Recordings also shows KB. |
+| Deletion | Archive moves saved recordings to Archived Recordings; Delete permanently removes after confirmation. Interrupted recovery copies offer **Discard…**, with confirmation that unsaved audio will be lost; the committed prefix moves to Archived Recordings before memory is released. Pending writers remain protected. Permanent deletion is explicit. |
 
 The IndexedDB schema remains version 2. These changes do not migrate/clear recordings or add a file picker to capture. Normal audio cues remain; interruption-warning code, setting and WAV have been removed completely.
 
-Recovery copies already use the recorder's original format, typically M4A/AAC on supported devices. Their difference is storage state, not a conversion requirement. The list explicitly marks interruption and memory-only audio. Confirming Discard clears that recovery copy and its own player, preserving a different current recording. Cancellation or a failed soft-delete leaves it retained; a still-writing session cannot be discarded. Only the previously committed prefix can be restored from Recently Deleted after a successful discard.
+Recovery copies already use the recorder's original format, typically M4A/AAC on supported devices. Their difference is storage state, not a conversion requirement. The list explicitly marks interruption and memory-only audio. Confirming Discard clears that recovery copy and its own player, preserving a different current recording. Cancellation or a failed soft-delete leaves it retained; a still-writing session cannot be discarded. Only the previously committed prefix can be restored from Archived Recordings after a successful discard.
 
 ## What is and is not protected
 
@@ -123,7 +135,7 @@ From the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-The last verified implementation checkpoint has **sixteen suites and 114 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
+The last verified implementation checkpoint has **sixteen suites and 116 test methods**, covering preservation, storage/recovery, voice control/diagnostics, microphone checks/meter and retained labs. See [tests/README.md](../tests/README.md) for suite responsibilities and limits. Python is a development runner; tests do not access real recordings or a microphone.
 
 The suites execute production functions with controlled DOM/storage/lock/timer mocks. They do not prove native player rendering, actual IndexedDB behavior, browser permission decisions, container decoding, background capture or multi-hour memory reliability.
 
@@ -131,7 +143,7 @@ The suites execute production functions with controlled DOM/storage/lock/timer m
 
 Use disposable recordings in an updated build. Do not clear site data or reinstall to test preservation.
 
-1. **Normal capture:** record, pause/resume, Stop, and check beginning/middle/end. Verify the normal saved status, saved **▶** player, download, and unchanged top player. Close the dialog and check a disposable Delete/Restore round trip, including KB in Recently Deleted.
+1. **Normal capture:** record, pause/resume, Stop, and check beginning/middle/end. Verify the normal saved status, saved **▶** player, download, and unchanged top player. Close the dialog and check a disposable Delete/Restore round trip, including KB in Archived Recordings.
 2. **Storage failure:** enable **Settings → Storage → Advanced storage settings → Recording preservation test → Enable failure testing for this page**. Record/count for ten seconds, then tap **Simulate storage failure** while recording. Expect automatic stop and a positive unsaved-byte result. Play/export its single entry, make a second normal recording, then play/export the first again. Keep the page open until exports are checked; disable the test afterward. Starting the second recording must not release the first's emergency audio.
 3. **Reload recovery:** separately, without needed memory-only audio in the page, reload during capture. Load committed audio and verify interrupted history remains; some ending loss is possible.
 4. **Ownership:** prefer two updated Mac tabs at the same URL. Record in A; B must refuse a competing recording or mutation of A's live session. Stop A, then Refresh recordings in B and verify normal playback/download. Do not confuse this with iPhone background capture.

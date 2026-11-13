@@ -1763,3 +1763,12 @@ Validation: 114 regression methods pass across sixteen suites. Chrome confirmed 
 # DJ039 — Consolidate current documentation
 
 12 November 2026. Replaced stacked, conflicting current-build notes in the index, voice guide, recording guide and roadmap with the final .11 behavior. Removed obsolete diagnostics labels/instructions, old test-count appendices and completed training work from deferred lists. Retained historical investigations and journal entries as dated evidence. Documentation only; runtime behavior/build unchanged.
+
+
+# DJ040 — Phase-one recording interface and library actions
+
+13 November 2026, build 2026-11-13.1. Unified the main audio-command button and Settings preference, moved concise command status below Microphone and fixed hover text contrast. Simplified final recording outcome while retaining structural checks/recovery warnings. Added Download Recording reminders using Memora's 2.4-second blue halo/black outline with reduced-motion support; only a requested download, not verified saving, clears the reminder. Persisted request metadata uses the write coordinator and cannot recreate deleted recordings.
+
+Saved and Archived categories have independent View/Hide controls. Archive and Unarchive reuse the existing state/restore paths without migration; Delete is permanent after confirmation. Original chronology and current-player retention remain. Emergency unsaved copies retain explicit Discard protections. Appending and automatic cleanup remain later work. The agreed append source is the top saved recording; combined results must preserve originals.
+
+Validation: 116 automated methods pass. Temporary-profile Chrome checked actual UI/IndexedDB mutations, cancellation, archive/unarchive, permanent deletion, download markers after reload, preference mirroring during synthetic capture, final outcome, retained stop-prompt microphone ownership, and a 390 px layout without overflow. iPhone acceptance is pending. No deployment or commit is part of this change.

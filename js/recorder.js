@@ -98,6 +98,7 @@ let activeSession = null;
 let recordingUrl = null;
 let displayedSessionId = null;
 let displayedRecordingFilename = null;
+const downloadRequests = new Set();
 let startRequest = 0;
 let lastRecordingPeakBytes = 0;
 const speechDetector = createSpeechDetection({ onStatus: message => {
@@ -131,6 +132,7 @@ const recordingLibrary = createRecordingLibrary({
     recoverSession, exportSavedSession, moveSessionToRecentlyDeleted, getSession,
     deleteSessionData, restoreRecentlyDeletedSession, downloadRecordingEvents,
     discardEmergencyRecording: id => recordingRecovery.discardEmergencyRecording(id),
+    wasDownloadRequested: id => downloadRequests.has(id),
     pauseCurrentPlayback: () => audioPlayer.pause()
 });
 // Deliberately session-only: enabling a test must not affect a later page load.
@@ -646,14 +648,17 @@ const voiceController = createVoiceController({
 function syncAudioCommandsSuspension() {
     const button=document.getElementById('suspendAudioCommands'),note=document.getElementById('audioCommandsSuspensionStatus');
     if(!button||!note)return;
-    button.hidden=note.hidden=!getSettings().audioCommands;
-    button.textContent=voiceController.suspended?'Resume audio commands':'Suspend audio commands';
-    button.setAttribute('aria-pressed',String(voiceController.suspended));
-    note.textContent=voiceController.suspended?'Audio command actions suspended. Use the recording buttons.':'Audio commands enabled. You can temporarily suspend their actions here.';
+    const enabled=getSettings().audioCommands;
+    button.hidden=note.hidden=false;
+    button.textContent=enabled?'Suspend audio commands':'Resume audio commands';
+    button.setAttribute('aria-pressed',String(enabled));
+    const phrase=getSettings().wakeEngine==='heed'?'Hey iMuse':'Hey Friday';
+    note.textContent=enabled?`Audio commands enabled — “${phrase}”.`:'Audio commands disabled.';
 }
 document.getElementById('suspendAudioCommands')?.addEventListener('click',()=>{
-    if(!getSettings().audioCommands)return;
-    voiceController.setSuspended(!voiceController.suspended);syncAudioCommandsSuspension();refreshIdleWakeStatus();
+    const toggle=document.getElementById('audioCommandsToggle');
+    toggle.checked=!getSettings().audioCommands;
+    toggle.dispatchEvent(new Event('change'));
 });
 syncAudioCommandsSuspension();
 function preloadCommandModel() { return voiceController.preload(); }
@@ -1111,12 +1116,10 @@ function clearPlayback() {
     }
 }
 
-function setAudioCommandsToggleLocked(locked) {
-    const toggle = document.getElementById("audioCommandsToggle");
-    if (toggle) {
-        toggle.disabled = locked;
-        toggle.title = locked ? "Stop this recording before changing Audio commands." : "";
-    }
+function setAudioCommandsToggleLocked() {
+    // The main button and checkbox are the same preference, including capture.
+    const toggle=document.getElementById('audioCommandsToggle');
+    if(toggle){toggle.disabled=false;toggle.title='';}
 }
 
 function setReadyUI() {
@@ -1127,7 +1130,8 @@ function setReadyUI() {
 }
 
 function showPlayback(blob, sessionId = null, metadata = null) {
-    ensureCurrentDownloadButton();
+    const downloadButton=ensureCurrentDownloadButton();
+    downloadButton.className=(metadata?.downloadRequestedAt || downloadRequests.has(sessionId))?'':'recording-download-pending';
     window.lastRecording = blob;
     displayedSessionId = sessionId;
     // Retain the name with the audio, independent of later database deletion.
@@ -1172,8 +1176,22 @@ function sessionFilename(item) {
     return `${stamp}_iMuse`;
 }
 
-function exportSavedSession(id, button) {
-    return recordingRecovery.exportSavedSession(id, button);
+async function noteDownloadRequested(id) {
+    if (id) downloadRequests.add(id);
+    if (id===displayedSessionId) {
+        const button=document.getElementById('downloadRecordingButton');
+        if(button)button.className='';
+    }
+    const emergency=emergencyRecordings.get(id);
+    if(emergency)emergency.metadata.downloadRequestedAt=new Date().toISOString();
+    try { if(id)await recordingStore.markDownloadRequested(id); }
+    catch(error){console.warn('Could not retain download reminder state:',error);}
+    await renderRecoverableSessions();
+}
+async function exportSavedSession(id, button) {
+    const requested=await recordingRecovery.exportSavedSession(id, button);
+    if(requested===true)await noteDownloadRequested(id);
+    return requested;
 }
 
 function ensureCurrentDownloadButton() {
@@ -1182,14 +1200,16 @@ function ensureCurrentDownloadButton() {
     button = document.createElement("button");
     button.id = "downloadRecordingButton";
     button.type = "button";
-    button.textContent = "Download audio file";
+    button.textContent = "Download Recording";
     button.addEventListener("click", async () => {
         button.disabled = true;
         try {
             if (!window.lastRecording) throw new Error("No recording is currently loaded.");
             const blob = window.lastRecording;
+            const downloadSessionId = displayedSessionId;
             const downloaded = await downloadAudioBlob(blob, displayedRecordingFilename);
-            status.textContent = downloaded ? "Download started. Check the exported audio before deleting the original." : "Download canceled. Recording retained.";
+            if(downloaded)await noteDownloadRequested(downloadSessionId);
+            status.textContent = downloaded ? "Recording download requested." : "Download canceled. Recording retained.";
         } catch (error) {
             status.textContent = `Could not download audio: ${error.message || "unknown error"}`;
         } finally {
@@ -1626,6 +1646,7 @@ pauseButton.addEventListener("click", () => {
 });
 
 deleteButton.addEventListener("click", async () => {
+    if(!window.confirm("Permanently delete this recording? This cannot be undone."))return;
     startRequest++;
     closeCommandWindow({ restorePauseReminder: false });
     const current = activeSession;
@@ -1659,7 +1680,8 @@ deleteButton.addEventListener("click", async () => {
         }
     } else if (savedSessionId) {
         try {
-            await moveSessionToRecentlyDeleted(savedSessionId);
+            if(emergencyRecordings.has(savedSessionId))await recordingRecovery.discardEmergencyRecording(savedSessionId);
+            await deleteSessionData(savedSessionId);
         } catch (error) {
             console.error("Could not move recording to Recently Deleted:", error);
             status.textContent = "Could not delete recording. Check saved recordings.";
@@ -1668,7 +1690,7 @@ deleteButton.addEventListener("click", async () => {
     }
     clearPlayback();
     setReadyUI();
-    if (!current) status.textContent = "Recording moved to Recently Deleted. It can be restored.";
+    if (!current) status.textContent = "Recording permanently deleted.";
     try { await renderRecoverableSessions(); } catch (error) { console.error(error); }
 });
 

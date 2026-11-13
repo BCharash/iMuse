@@ -13,7 +13,7 @@ globalThis.testResult = 'pending';
     const first = emergencyRecordings.get('first');
     assert(first.blob.content === 'header-firsttail-first', 'finalization preserves committed prefix and unsaved tail');
     assert(window.lastRecording === first.blob, 'emergency initially loaded');
-    const rows = () => getRecoveryPanel().children.filter(element => element.children.some(child => child.className === 'saved-audio-open'));
+    const rows = () => getLibraryRows();
     await renderRecoverableSessions();
     assert(location.children.includes(getRecoveryPanel()), 'unified recordings panel visible');
     assert(rows().length === 1, 'one row for saved prefix plus emergency');
@@ -130,7 +130,7 @@ globalThis.testResult = 'pending';
     });
     assert(location.children.length===0 && calls.length===0,'constructor is inert');
     await library.render();
-    const rows=()=>getRecoveryPanel().children.filter(e=>e.children.some(child=>child.className==='saved-audio-open'));
+    const rows=()=>getLibraryRows();
     assert(rows().length===3,'one row per session including emergency override');
     const saved=rows()[0],live=rows()[1],emergency=rows()[2];
     assert(live.children[1].disabled && live.children[2].disabled && live.children[3].disabled,'active row protected');
@@ -140,16 +140,16 @@ globalThis.testResult = 'pending';
     saved.children[1].click();
     assert(getSavedPlayback()?.id==='saved','callback opens player for selected saved session');
     await saved.children[2].click();
-    saved.children[4].children[0].click();
+    saved.children[5].children[0].click();
     assert(calls.some(c=>c[0]==='export'&&c[1]==='saved') && calls.some(c=>c[0]==='diagnostics'&&c[1]==='saved'),'exports and diagnostics delegate by ID');
     await saved.children[3].click();
     assert(records.get('saved').state==='deleted' && getSavedPlayback()===null,'soft delete closes own dialog');
-    const deleted=()=>getRecoveryPanel().children.find(e=>e.getAttribute('aria-label')==='Recently Deleted recordings');
-    const deletedRows=()=>deleted().children.filter(e=>e.children.some(child=>child.textContent==='Restore'));
-    const restore=deletedRows()[0].children.find(e=>e.textContent==='Restore');
+    const deleted=()=>getRecoveryPanel().children.find(e=>e.getAttribute('aria-label')==='Archived Recordings')?.children[1];
+    const deletedRows=()=>deleted().children.filter(e=>e.children.some(child=>child.textContent==='Unarchive recording'));
+    const restore=deletedRows()[0].children.find(e=>e.textContent==='Unarchive recording');
     await restore.click();
     assert(records.get('saved').state==='completed','restore delegates and updates library');
-    const bar=deleted().children[2],selectAll=bar.children[0].children[0],bulk=bar.children[2];
+    const bar=deleted().children[1],selectAll=bar.children[0].children[0],bulk=bar.children[2];
     selectAll.checked=true;selectAll.events.change();
     await bulk.click();
     assert(permanentlyDeleted.length===0,'cancelled bulk deletion preserves records');
@@ -157,7 +157,7 @@ globalThis.testResult = 'pending';
     await bulk.click();
     assert(permanentlyDeleted.sort().join(',')==='deleted-a,deleted-b','bulk deletion affects selected deleted sessions only');
     assert(records.has('saved') && records.has('live') && records.has('emergency') && emergencies.size===1,'other sessions and emergency source remain');
-    assert(!deleted(),'empty Recently Deleted section disappears');
+    assert(deletedRows().length===0,'empty Archived section retains its disclosure without stale rows');
     const emergencyRow=rows().find(row=>row.children[3].textContent==='Discard…');
     await emergencyRow.children[3].click();
     assert(emergencies.size===0 && records.get('emergency').state==='deleted','confirmed discard delegates explicit action');
@@ -170,6 +170,33 @@ class EmergencyRecordingsTests(unittest.TestCase):
     def test_emergency_preservation(self):
         syntax_source = re.sub(r"^import .*?;\n", "", SOURCE, flags=re.M)
         evaluate("new Function(" + json.dumps(syntax_source) + ");\n" + MOCKS + FUNCTIONS + TESTS)
+
+    def test_saved_categories_download_reminder_and_permanent_delete(self):
+        evaluate(MOCKS + LIBRARY_SOURCE + r"""
+globalThis.testResult='pending';
+(async()=>{
+ const records=new Map([['older',{id:'older',state:'completed',startedAt:'2026-11-01T12:00:00Z'}],['newer',{id:'newer',state:'completed',startedAt:'2026-11-02T12:00:00Z'}]]);
+ let confirmed=false,downloaded=false;window.confirm=()=>confirmed;
+ const library=createRecordingLibrary({container:location,status,getAllSessions:async()=>[...records.values()],getEmergencyRecordings:()=>new Map(),isSessionWriting:()=>false,
+ recoverSession(){},exportSavedSession:async()=>downloaded,moveSessionToRecentlyDeleted:async id=>records.get(id).state='deleted',getSession:async id=>records.get(id),deleteSessionData:async id=>records.delete(id),restoreRecentlyDeletedSession:async id=>records.get(id).state='completed',downloadRecordingEvents(){},pauseCurrentPlayback(){},discardEmergencyRecording(){}});
+ await library.render();
+ const saved=()=>getRecoveryPanel().children.find(node=>node.getAttribute('aria-label')==='Saved Recordings');
+ const archive=()=>getRecoveryPanel().children.find(node=>node.getAttribute('aria-label')==='Archived Recordings');
+ assert(saved().children[1].hidden&&archive().children[1].hidden,'categories initially collapsed');
+ saved().children[0].children[1].click();await library.render();assert(!saved().children[1].hidden,'View state survives refresh');
+ let row=getLibraryRows()[0];assert(row.children[0].textContent.includes('11/2')||row.children[0].textContent.includes('02'),'newest date heads saved list');
+ const download=row.children[2];assert(download.className==='recording-download-pending','new recording reminds user to download');
+ await download.click();assert(download.className==='recording-download-pending','cancelled download retains reminder');
+ downloaded=true;await download.click();assert(download.className==='','download request stops reminder without requiring completion');
+ const del=row.children.find(node=>node.textContent==='Delete recording');await del.click();assert(records.has('newer'),'cancelled permanent deletion preserves recording');
+ await row.children.find(node=>node.textContent==='Archive recording').click();assert(records.get('newer').state==='deleted','archive retains stored recording');
+ await archive().children[1].children.find(node=>node.children.some(child=>child.textContent==='Unarchive recording')).children.find(node=>node.textContent==='Unarchive recording').click();
+ assert(records.get('newer').startedAt==='2026-11-02T12:00:00Z'&&records.get('newer').state==='completed','unarchive preserves date');
+ confirmed=true;row=getLibraryRows()[0];await row.children.find(node=>node.textContent==='Delete recording').click();
+ assert(!records.has('newer')&&records.has('older'),'confirmed delete permanently removes only chosen saved recording');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack));
+""")
 
     def test_recording_library_component(self):
         evaluate(MOCKS + LIBRARY_SOURCE + LIBRARY_TESTS)

@@ -1,12 +1,27 @@
-// Saved/Recently Deleted UI owns its DOM, dialog and playback URL. Capture,
+// Saved/Archived Recordings UI owns its DOM, dialog and playback URL. Capture,
 // storage transactions, recovery decisions and emergency audio remain in recorder.
 export function createRecordingLibrary({
     container, status, getAllSessions, getEmergencyRecordings, isSessionWriting,
     recoverSession, exportSavedSession, moveSessionToRecentlyDeleted, getSession,
     deleteSessionData, restoreRecentlyDeletedSession, downloadRecordingEvents,
-    pauseCurrentPlayback, discardEmergencyRecording
+    pauseCurrentPlayback, discardEmergencyRecording, wasDownloadRequested = () => false
 }) {
     let recoveryPanel = null;
+    const categoryOpen = {saved:false, archived:false};
+    function category(panel, title, key, count) {
+        const section=document.createElement('section');
+        section.className='recording-category';
+        section.setAttribute('aria-label', title);
+        const header=document.createElement('div');header.className='recording-category-header';
+        const heading=document.createElement('h3');heading.textContent=`${title} (${count})`;
+        const toggle=document.createElement('button');toggle.type='button';
+        const body=document.createElement('div');body.className='recording-category-body';body.id=`recordings-${key}`;
+        const sync=()=>{body.hidden=!categoryOpen[key];toggle.textContent=body.hidden?'View':'Hide';toggle.setAttribute('aria-expanded',String(!body.hidden));};
+        toggle.setAttribute('aria-controls',body.id);
+        toggle.addEventListener('click',()=>{categoryOpen[key]=!categoryOpen[key];sync();});
+        sync();header.append(heading,toggle);section.append(header,body);panel.appendChild(section);
+        return body;
+    }
     let savedPlayback = null;
     let savedPlaybackRequest = 0;
     let refreshing = false, refreshMessage = "", lastListSnapshot = null;
@@ -88,7 +103,7 @@ export function createRecordingLibrary({
         recoveryPanel.style.border = "1px solid #b8b8b8";
         recoveryPanel.style.borderRadius = "0.5rem";
         const heading = document.createElement("h2");
-        heading.textContent = "Saved recordings";
+        heading.textContent = "Recordings";
         heading.style.fontSize = "1.1rem";
         recoveryPanel.appendChild(heading);
         container.appendChild(recoveryPanel);
@@ -122,7 +137,7 @@ export function createRecordingLibrary({
         if (!readError) lastListSnapshot = snapshot;
         panel.replaceChildren();
         const heading = document.createElement("h2");
-        heading.textContent = "Saved recordings";
+        heading.textContent = "Recordings";
         heading.style.fontSize = "1.1rem";
         panel.appendChild(heading);
         const refresh = document.createElement("button");
@@ -141,13 +156,12 @@ export function createRecordingLibrary({
             notice.textContent = "Saved recordings could not be read. Any available emergency audio is listed below. Browser data has not been cleared.";
             panel.appendChild(notice);
         }
-        if (sessions.length) {
-            const explanation = document.createElement("p");
-            explanation.textContent = "Saved recordings remain available after reopening. Interrupted audio may be incomplete.";
-            panel.appendChild(explanation);
-        }
+        if(emergencyRecordings.size)categoryOpen.saved=true;
+        const savedBody=category(panel,'Saved Recordings','saved',sessions.length);
+        if(!sessions.length){const empty=document.createElement('p');empty.textContent='No saved recordings.';savedBody.appendChild(empty);}
         for (const item of sessions) {
             const row = document.createElement("div");
+            row.setAttribute("data-recording-id",item.id);
             row.style.display = "flex";
             row.style.flexWrap = "wrap";
             row.style.alignItems = "center";
@@ -177,32 +191,48 @@ export function createRecordingLibrary({
             row.appendChild(recoverButton);
             const downloadButton = document.createElement("button");
             downloadButton.type = "button";
-            downloadButton.textContent = "Download audio";
+            downloadButton.textContent = "Download Recording";
+            const requested=Boolean(item.downloadRequestedAt)||wasDownloadRequested(item.id);
+            downloadButton.className=requested?'':'recording-download-pending';
+            if(!busy)label.textContent+=requested?' — Download requested':' — Not yet downloaded';
             downloadButton.disabled = busy;
-            downloadButton.addEventListener("click", () => exportSavedSession(item.id, downloadButton));
+            downloadButton.addEventListener("click", async () => {
+                const requested=await exportSavedSession(item.id, downloadButton);
+                if(requested===true)downloadButton.className='';
+            });
             row.appendChild(downloadButton);
+            if(!emergency){
+                const archiveButton=document.createElement('button');archiveButton.type='button';archiveButton.textContent='Archive recording';archiveButton.disabled=busy;
+                archiveButton.addEventListener('click',async()=>{
+                    archiveButton.disabled=true;
+                    try{await moveSessionToRecentlyDeleted(item.id);if(savedPlayback?.id===item.id)closeSavedPlayback();status.textContent='Recording archived.';await renderRecoverableSessions();}
+                    catch(error){status.textContent=`Could not archive recording: ${error.message||error}`;archiveButton.disabled=false;}
+                });
+                row.appendChild(archiveButton);
+            }
             const discardButton = document.createElement("button");
             discardButton.type = "button";
-            discardButton.textContent = emergency ? "Discard…" : "Delete";
+            discardButton.textContent = emergency ? "Discard…" : "Delete recording";
             discardButton.disabled = busy || (!!emergency && isSessionWriting(item.id));
             if (emergency && discardButton.disabled) discardButton.title = "Wait for recording and pending storage to finish before discarding.";
             discardButton.addEventListener("click", async () => {
-                if (emergency && !window.confirm("Discard this interrupted recording's recovery copy? Audio held only in memory will be lost. The portion already saved will move to Recently Deleted. Download first if you want to keep the full recording.")) return;
+                if (emergency && !window.confirm("Discard this interrupted recording's recovery copy? Audio held only in memory will be lost. The portion already saved will move to Archived Recordings. Download first if you want to keep the full recording.")) return;
+                if(!emergency&&!window.confirm('Permanently delete this recording? This cannot be undone.'))return;
                 discardButton.disabled = true;
                 try {
                     if (emergency) await discardEmergencyRecording(item.id);
-                    else await moveSessionToRecentlyDeleted(item.id);
+                    else await deleteSessionData(item.id);
                     if (savedPlayback?.id === item.id) closeSavedPlayback();
                     // Saved-list actions leave the current in-memory player intact.
                     status.textContent = emergency
-                        ? "Recovery copy discarded. Only the previously saved portion can be restored from Recently Deleted."
-                        : "Recording moved to Recently Deleted. It can be restored.";
+                        ? "Recovery copy discarded. Only the previously saved portion can be restored from Archived Recordings."
+                        : "Recording permanently deleted.";
                     await renderRecoverableSessions();
                 } catch (error) {
                     console.error(error);
                     status.textContent = emergency
                         ? "Could not discard the recovery copy. It remains available; wait for pending storage to finish and try again."
-                        : "Could not move the recording to Recently Deleted.";
+                        : "Could not permanently delete recording.";
                     discardButton.disabled = false;
                 }
             });
@@ -231,16 +261,12 @@ export function createRecordingLibrary({
                 row.appendChild(diagnostics);
 
             }
-            panel.appendChild(row);
+            savedBody.appendChild(row);
         }
+        const section=category(panel,'Archived Recordings','archived',deletedSessions.length);
         if (deletedSessions.length) {
-            const section = document.createElement("section");
-            section.setAttribute("aria-label", "Recently Deleted recordings");
-            const heading = document.createElement("h3");
-            heading.textContent = `Recently Deleted (${deletedSessions.length})`;
-            section.appendChild(heading);
             const note = document.createElement("p");
-            note.textContent = "Deleted recordings remain in browser storage until permanently deleted. Browser storage is not a guaranteed backup.";
+            note.textContent = "Archived recordings remain stored until you permanently delete them.";
             section.appendChild(note);
             const selectionBar = document.createElement("div");
             selectionBar.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;margin:.75rem 0";
@@ -248,7 +274,7 @@ export function createRecordingLibrary({
             selectAllLabel.style.cssText = "display:inline-flex;align-items:center;gap:.35rem";
             const selectAll = document.createElement("input");
             selectAll.type = "checkbox";
-            selectAll.setAttribute("aria-label", "Select all recently deleted recordings");
+            selectAll.setAttribute("aria-label", "Select all archived recordings");
             selectAllLabel.append(selectAll, document.createTextNode("Select all"));
             const selectionCount = document.createElement("span");
             const deleteSelectedButton = document.createElement("button");
@@ -282,7 +308,7 @@ export function createRecordingLibrary({
                 for (const id of ids) {
                     try {
                         const current = await getSession(id);
-                        if (!current || current.state !== "deleted") throw new Error("Recording is no longer in Recently Deleted.");
+                        if (!current || current.state !== "deleted") throw new Error("Recording is no longer in Archived Recordings.");
                         await deleteSessionData(id);
                         if (savedPlayback?.id === id) closeSavedPlayback();
                         deleted++;
@@ -309,6 +335,7 @@ export function createRecordingLibrary({
             updateSelection();
             for (const item of deletedSessions) {
                 const row = document.createElement("div");
+            row.setAttribute("data-recording-id",item.id);
                 row.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem";
                 const selectionBox = document.createElement("input");
                 selectionBox.type = "checkbox";
@@ -323,11 +350,11 @@ export function createRecordingLibrary({
                 row.appendChild(selectionBox);
                 const label = document.createElement("span");
                 label.style.flex = "1 1 12rem";
-                label.textContent = `${formatDate(item.startedAt)} — ${formatRecordingSize(item.bytesStored)} — deleted ${formatDate(item.deletedAt)}`;
+                label.textContent = `${formatDate(item.startedAt)} — ${formatRecordingSize(item.bytesStored)} — archived ${formatDate(item.deletedAt)}`;
                 row.appendChild(label);
                 const restoreButton = document.createElement("button");
                 restoreButton.type = "button";
-                restoreButton.textContent = "Restore";
+                restoreButton.textContent = "Unarchive recording";
                 restoreButton.addEventListener("click", async () => {
                     restoreButton.disabled = true;
                     try {
@@ -342,13 +369,13 @@ export function createRecordingLibrary({
                 row.appendChild(restoreButton);
                 const permanentButton = document.createElement("button");
                 permanentButton.type = "button";
-                permanentButton.textContent = "Delete Permanently";
+                permanentButton.textContent = "Delete recording";
                 permanentButton.addEventListener("click", async () => {
                     if (!window.confirm("Permanently delete this recording and its saved audio? This cannot be undone.")) return;
                     permanentButton.disabled = true;
                     try {
                         const current = await getSession(item.id);
-                        if (!current || current.state !== "deleted") throw new Error("Recording is no longer in Recently Deleted.");
+                        if (!current || current.state !== "deleted") throw new Error("Recording is no longer in Archived Recordings.");
                         await deleteSessionData(item.id);
                         if (savedPlayback?.id === item.id) closeSavedPlayback();
                         status.textContent = "Recording permanently deleted.";
@@ -361,8 +388,9 @@ export function createRecordingLibrary({
                 row.appendChild(permanentButton);
                 section.appendChild(row);
             }
-            panel.appendChild(section);
+
         }
+        if(!deletedSessions.length){const empty=document.createElement('p');empty.textContent='No archived recordings.';section.appendChild(empty);}
         return {changed, error:readError};
     }
 

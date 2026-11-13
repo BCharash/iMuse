@@ -31,7 +31,7 @@ Passing a recording to Transcribe, exporting, suggesting a title, or creating a 
 - Manual Stop finalizes directly. Spoken Stop requests Yes/No confirmation: Yes finalizes; No/timeout leaves capture paused. Wake during recording pauses before command listening; wake while paused acknowledges “Yes?”. Silence/manual pause do not themselves start a command listener.
 - Keep ordinary startup/pause/resume/stopped/confirmation WAV cues and periodic paused reminder tones. The external iPhone background-transition beep is distinct from those application cues.
 - Support exposed headset microphones through selection. Physical headset media-button controls were retired on both platforms; do not import the older desktop control pathway.
-- Ordinary deletion uses Recently Deleted; permanent deletion is explicit. Writer ownership protects active/finalizing sessions, and unsaved emergency copies cannot be deleted through saved-list controls. The separate saved-player dialog leaves the top in-memory player intact. Integration must retain the storage-coordination boundary.
+- Archive moves recordings to Archived Recordings; Unarchive restores their original chronological position. Delete is permanent after confirmation. Writer ownership protects active/finalizing sessions, and unsaved emergency copies cannot be deleted through saved-list controls. The separate saved-player dialog leaves the top in-memory player intact. Integration must retain the storage-coordination boundary.
 
 ## Integration sequence, when scheduled
 

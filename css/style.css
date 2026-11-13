@@ -259,3 +259,77 @@ button:active {
 .voice-diagnostics-section { grid-template-columns:minmax(0,1fr); margin-top:14px; }
 .voice-diagnostics-section > div { min-width:0; }
 .voice-diagnostics-section h4 { margin:0; }
+
+/* Keep Search Index updates and unsaved iPhone transcript exports conspicuous.
+   The blue glow pulses independently from a separate thin black outline. */
+.recording-download-pending:not(:disabled) {
+    position: relative;
+    isolation: isolate;
+    background: #0878F9;
+    color: #FFFFFF;
+    border: 2px solid #005ACB;
+    font-weight: 700;
+    box-shadow: 0 0 0 3px rgb(8 120 249 / 20%), 0 3px 10px rgb(0 72 180 / 22%);
+    animation: search-index-blue-halo 2.4s ease-in-out infinite;
+}
+
+.recording-download-pending:not(:disabled)::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border: 1px solid #111111;
+    border-radius: 15px;
+    pointer-events: none;
+    animation: search-index-black-outline 2.4s ease-in-out infinite;
+}
+
+.recording-download-pending:not(:disabled):hover {
+    background: #0067E8;
+    border-color: #004FAF;
+    opacity: 1;
+}
+
+.recording-download-pending:not(:disabled):focus-visible {
+    outline: 3px solid #003F91;
+    outline-offset: 9px;
+}
+
+@keyframes search-index-blue-halo {
+    0%,
+    100% {
+        box-shadow: 0 0 0 3px rgb(8 120 249 / 24%), 0 3px 10px rgb(0 72 180 / 22%);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgb(8 120 249 / 18%), 0 4px 15px rgb(0 72 180 / 34%);
+    }
+}
+
+@keyframes search-index-black-outline {
+    0%,
+    100% {
+        inset: -6px;
+        border-color: rgb(17 17 17 / 85%);
+    }
+    50% {
+        inset: -9px;
+        border-color: rgb(17 17 17 / 95%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .recording-download-pending:not(:disabled),
+    .recording-download-pending:not(:disabled)::after {
+        animation: none;
+    }
+}
+
+
+
+.voice-suspend-button:hover,.voice-suspend-button:active {background:#e9f5fb;color:var(--accent-dark)}
+#audioCommandsSuspensionStatus {max-width:none;margin:6px auto 12px;text-align:center}
+.recording-category {border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:16px}
+.recording-category-header {display:flex;align-items:center;justify-content:space-between;gap:12px}
+.recording-category-header h2,.recording-category-header h3 {margin:0;font-size:1.1rem}
+.recording-category-body[hidden] {display:none}
+.recording-download-state {font-size:12px;color:var(--muted)}
+#recordingControls {flex-wrap:wrap}

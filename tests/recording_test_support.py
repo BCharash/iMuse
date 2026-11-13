@@ -112,11 +112,13 @@ let recordingUrl = null, displayedSessionId = null, displayedRecordingFilename =
 let recordingStore = {isOpen: () => Boolean(db)};
 let lastRecordingPeakBytes = 0, startRequest = 0, recordingLease = null;
 const microphoneLevelCheck={stop:()=>Promise.resolve()};
+function getLibraryRows(){const walk=node=>[node,...(node.children||[]).flatMap(walk)];return walk(getRecoveryPanel()).filter(node=>(node.children||[]).some(child=>child.className==='saved-audio-open'));}
 function getRecoveryPanel() { return location.children.find(element => element.id === 'recoveryPanel'); }
 function getSavedPlayback() {
     const dialog = document.body.children.find(element => element.className === 'saved-audio-dialog');
     return dialog ? {dialog, player:dialog.children[1], id:dialog.getAttribute('data-session-id')} : null;
 }
+const downloadRequests = new Set();
 const writingSessions = new Set();
 let leaseAcquisitions = 0, leaseReleases = 0;
 const recordingStorage = {

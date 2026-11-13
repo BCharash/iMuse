@@ -1,6 +1,6 @@
 # Voice control: current architecture and validation
 
-Updated 12 November 2026. Production source **2026-11-12.11**. Current validation and priorities are in the [index](README.md) and [next steps](iMuse%20next%20steps.md). Earlier build-by-build decisions remain in the [journal](design-journal.md).
+Updated 12 November 2026. Production source **2026-11-13.1**. Current validation and priorities are in the [index](README.md) and [next steps](iMuse%20next%20steps.md). Earlier build-by-build decisions remain in the [journal](design-journal.md).
 
 ## Startup and spoken prompts
 
@@ -24,7 +24,7 @@ The existing normalized microphone tap feeds the speech worker independently of 
 
 Advanced diagnostics records a `speech-gate` event for each completed current candidate decision: state, pass/reject, threshold, qualifying blocks/peak, lookback, and bypass reason when applicable. This adds no raw audio logging or persistent speech history.
 
-Automated verification: 114 methods across sixteen suites. An isolated Chrome check used the real local ONNX/WASM model to reject digital silence and accept a bundled spoken prompt, confirmed zero microphone requests during preparation/UI changes, and checked the Settings layout at 390 and 880 pixels. This is wiring/model execution evidence, not false-positive/negative rates, iPhone performance, screen-lock capture or microphone/device acceptance.
+Automated verification: 116 methods across sixteen suites. An isolated Chrome check used the real local ONNX/WASM model to reject digital silence and accept a bundled spoken prompt, confirmed zero microphone requests during preparation/UI changes, and checked the Settings layout at 390 and 880 pixels. This is wiring/model execution evidence, not false-positive/negative rates, iPhone performance, screen-lock capture or microphone/device acceptance.
 
 Focused device checks: enable Audio commands; verify paused defaults and ready status; record without speech gating, pause and deliberately say the wake phrase, then complete the usual command sequence. Test both engines, both state switches, both switches off, immediate post-pause phrases, suspension, repeated pause/resume and starting/stopping another recording. Confirm recorded audio/export remains intact. Observe threshold/decision diagnostics during quiet, noise, conversation and intended phrases before changing defaults. The separate lab remains available for detailed labeling/comparison.
 
@@ -66,11 +66,13 @@ Accepted build **2026-11-05.3** adds these protections:
 
 These checks add no deliberate wait or extra model inference. They do not forcibly cancel in-flight work; a pending operation retains its own busy flag until it finishes. Tests that documented unwanted behavior now assert the corrected outcomes. The [archived checkpoint](Archive/voice-control-history-2026-11-05.md) retains the original observations and staged validation.
 
-## Temporary suspension and grouped Settings
+## Unified audio-command preference and grouped Settings
 
-The persisted Audio commands checkbox remains locked during an active recording, including pause. A separate **Suspend audio commands / Resume audio commands** button beside Record/Stop appears when enabled. Suspension lasts for the page, survives another recording until resumed, resets when the preference is disabled and is not saved in localStorage. It suppresses voice actions while capture and wake analysis continue; it cancels pending command episodes and invalidates delayed voice Resume actions. Manual Pause/Resume/Stop remain available. A pause or prompt already initiated is not rolled back.
+The main Suspend/Resume audio commands button mirrors the Settings Audio commands checkbox. Both update the same persisted preference and remain usable during capture; changing the preference does not stop MediaRecorder. Turning commands off closes command listening and disarms wake actions. Turning them on prepares/arms recognition through the existing loading and session guards. The former temporary page-only suspension is not exposed as a separate user function.
 
-Settings has Microphone, Voice commands and Storage selectors with a shared selected-panel highlight and category-specific Advanced areas. Voice commands has a bold caption/On badge for the saved preference, separate from temporary suspension. While idle, status describes the preference/readiness for the next recording. Microphone processing is under Advanced microphone settings. Switching away stops hidden microphone previews/polling. The preservation test appears directly under Storage/Advanced, unchecked/off by default, and still requires explicit enablement plus an active qualifying recording.
+The status directly below Microphone says Audio commands enabled — “Hey iMuse” (or the selected Voicute phrase) or Audio commands disabled. The old detailed wake-status node is hidden from the main screen; diagnostics retain technical evidence. Main button hover/active colors preserve readable text.
+
+Settings retains Microphone, Voice commands and Storage categories and their Advanced areas. Prompt volume remains usable with commands off. Microphone-processing changes still apply to a subsequent recording. The preservation failure test remains off by default under Advanced storage settings. Switching away from the microphone-level disclosure stops its temporary check, not actual recording.
 
 ## Protected behavior and automated evidence
 
@@ -122,7 +124,7 @@ The user accepted build 2026-11-05.3. For future changes, use a short recording 
 - Manual recording, pause/resume, Stop, playback and a second recording while retaining the first.
 - Wake while recording/paused; Go; Stop with Yes, No and timeout; spoken prompts and paused reminders.
 - Manual Stop during command startup, followed promptly by another recording.
-- Suspension during normal capture, acknowledgement/confirmation and a quick Suspend/Resume; late words cannot act and manual controls remain usable.
+- Turn Audio commands off/on from either main button or Settings during capture and pause; verify matching preference/status, preserved capture and no stale command action.
 - Settings categories, preference locking, processing/diagnostic placement and saved audio playback/export.
 
 Record build, device/browser, microphone and failed scenario. Add a headset check when microphone/listener ownership changes. The unspecified device details of the successful user check remain unspecified; the iPhone installed-app background-capture issue is separate and unresolved.

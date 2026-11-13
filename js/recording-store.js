@@ -167,6 +167,16 @@ export function createRecordingStore({
         return result.sort((a, b) => a.sequence - b.sequence);
     }
 
+    // Read/modify under the writer coordinator so a download marker cannot
+    // overwrite newer capture counters or lifecycle metadata.
+    async function markDownloadRequested(id) {
+        return recordingStorage.run(async () => {
+            const item = await getSession(id);
+            if (!item) return;
+            await putSessionNow({...item, downloadRequestedAt:new Date().toISOString()});
+        });
+    }
+
     async function deleteSessionData(id) {
         return recordingStorage.run(async () => {
             assertSessionIdle(id);
@@ -201,7 +211,7 @@ export function createRecordingStore({
         return recordingStorage.run(async () => {
             assertSessionIdle(id);
             const item = await getSession(id);
-            if (!item || item.state !== "deleted") throw new Error("This deleted recording is no longer available.");
+            if (!item || item.state !== "deleted") throw new Error("This archived recording is no longer available.");
             const { previousState, deletedAt, ...rest } = item;
             const state = previousState === "completed" ? "completed" : "interrupted";
             await putSessionNow({ ...rest, state, lastUpdatedAt: new Date().toISOString() });
@@ -216,7 +226,7 @@ export function createRecordingStore({
         // Only for operations already inside the same coordinator.run callback;
         // queuing again there would deadlock. Normal callers use putSession.
         putSessionOwned: putSessionNow,
-        deleteSessionData, moveSessionToRecentlyDeleted, restoreRecentlyDeletedSession,
+        markDownloadRequested, deleteSessionData, moveSessionToRecentlyDeleted, restoreRecentlyDeletedSession,
         appendEvent, getRecordingEvents
     };
 }

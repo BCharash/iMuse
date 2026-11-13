@@ -28,7 +28,7 @@ const testDatabase = {transaction() {
             Promise.resolve().then(() => {
                 request.result = name === SESSION_STORE ? {...current.metadata} : undefined;
                 request.onsuccess?.();
-                if (--pending === 0) tx.oncomplete?.();
+                if (--pending === 0) Promise.resolve().then(()=>tx.oncomplete?.());
             });
             return request;
         }

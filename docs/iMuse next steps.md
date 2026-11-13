@@ -1,6 +1,14 @@
 # iMuse next steps
 
-Updated 12 November 2026. Production source **2026-11-12.11**; latest implementation checks: **114 methods across sixteen suites**. This is the active queue; older plans and journal entries do not authorize new implementation.
+## Phase-one acceptance — 2026-11-13.1
+
+Check on iPhone and Mac: both audio-command controls mirror each other during capture/pause, main button text remains readable, command status is below Microphone, completion/player/download/delete order, pulse and cancelled/completed download requests, reload persistence, View/Hide, Archive/Unarchive chronology and confirmed permanent deletion. Use disposable recordings for deletion. Preserve the separate iOS 27 installed-PWA background and lightweight Swift feasibility plans. The user has already recorded more than 90 minutes; review existing playback/seek/export evidence instead of requiring another duration test merely to repeat it.
+
+## Agreed later append workflow — not implemented
+
+After phase one succeeds, an append selector will target the first entry in Saved Recordings and label the Record control Appending Recording. A newly finished recording becomes the latest/top saved entry. To expose an older target, the user archives intervening newer entries. Show the target explicitly before starting. Create a new combined recording and preserve originals until the user chooses deletion; do not byte-concatenate independent media containers. Automatic cleanup of older download-requested recordings is also deferred pending a separate retention policy; a download request is not a verified external backup.
+
+Updated 12 November 2026. Production source **2026-11-13.1**; latest implementation checks: **116 methods across sixteen suites**. This is the active queue; older plans and journal entries do not authorize new implementation.
 
 ## Next acceptance
 
@@ -23,7 +31,7 @@ Native feasibility waits for suitable equipment and real-device capture tests. P
 - Microphone selection including exposed Shokz inputs, with acquisition/release centralized in the microphone manager. Headset media-button controls are retired on **both** desktop and mobile.
 - Selectable Heed/Voicute wake engines; TensorFlow Go/Stop and Yes/No listeners; serialized normal spoken responses and paused reminder tones. No always-on idle wake before first Record.
 - Extracted wake loading/inference with latest-load, session/detector/arming-cycle guards and guarded error reporting; readable production build identity in Settings and diagnostic exports. AudioWorklet migration and fresh-Silero comparison remain separate experiments; continuous Silero now optionally checks production wake acceptance in selected states.
-- Unified saved-recording playback/export, retained emergency copies, interrupted/error history, structural checks, Recently Deleted, restore and explicit permanent deletion. Source audio is not released by starting another recording or requesting an export. Recovery does not imply normal completion.
+- Unified saved-recording playback/export, retained emergency copies, interrupted/error history, structural checks, Archived Recordings, restore and explicit permanent deletion. Source audio is not released by starting another recording or requesting an export. Recovery does not imply normal completion.
 - Serialized session/chunk updates, exclusive writer coordination through finalization, delayed-finalization recovery actions and browser-controlled persistent-storage requests/reporting.
 
 The earlier seven-minute MacBook test reported about 27 KB peak pending audio with no accumulating queue. It is not multi-hour or iPhone memory certification. General syntax checks and mocked tests are not microphone/device acceptance.

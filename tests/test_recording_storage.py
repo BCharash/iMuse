@@ -254,6 +254,26 @@ class RecordingStorageTests(unittest.TestCase):
         wiring = STORE_WIRING.replace("const recordingStore", "let recordingStore") + "const firstStore = recordingStore;\n"
         evaluate(coordinator + STORE_SOURCE + mock + functions + wiring + tests)
 
+    def test_download_marker_preserves_audio_state_and_survives_archive(self):
+        wiring = STORE_WIRING.replace("const recordingStore", "let recordingStore")
+        evaluate(coordinator + STORE_SOURCE + mock + functions + wiring + r"""
+globalThis.testResult='pending';
+(async()=>{
+ await openDatabase();
+ const original={id:'downloaded',state:'completed',chunkCount:8,bytesStored:12345,startedAt:'2026-11-01T12:00:00Z'};
+ sessions.set(original.id,original);
+ await drain(recordingStore.markDownloadRequested(original.id));
+ const marked=sessions.get(original.id),stamp=marked.downloadRequestedAt;
+ assert(stamp&&marked.chunkCount===8&&marked.bytesStored===12345&&marked.state==='completed','download request adds metadata without altering capture');
+ await drain(moveSessionToRecentlyDeleted(original.id));
+ await drain(restoreRecentlyDeletedSession(original.id));
+ assert(sessions.get(original.id).downloadRequestedAt===stamp&&sessions.get(original.id).startedAt===original.startedAt,'unarchive retains reminder and original chronology');
+ sessions.delete(original.id);await drain(recordingStore.markDownloadRequested(original.id));
+ assert(!sessions.has(original.id),'marking retained playback never recreates a permanently deleted session');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack));
+""")
+
     def test_store_schema_and_open_failures(self):
         evaluate(STORE_SOURCE + schema_tests)
 
