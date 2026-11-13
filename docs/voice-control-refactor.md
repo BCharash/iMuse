@@ -1,6 +1,6 @@
 # Voice control: current architecture and validation
 
-Updated 13 November 2026. Production source **2026-11-13.14**. Current validation and priorities are in the [index](README.md) and [next steps](iMuse%20next%20steps.md). Earlier build-by-build decisions remain in the [journal](design-journal.md).
+Updated 13 November 2026. Production source **2026-11-13.15**. Current validation and priorities are in the [index](README.md) and [next steps](iMuse%20next%20steps.md). Earlier build-by-build decisions remain in the [journal](design-journal.md).
 
 ## Startup and spoken prompts
 

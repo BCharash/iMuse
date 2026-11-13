@@ -36,6 +36,7 @@ iMuse/
 ├── audio/                 Spoken response files
 ├── css/                   Production styles
 ├── icons/                 Application/browser icons
+├── fonts/                 Local display font, license and source notes
 ├── js/                    Production modules
 │   ├── heed/              Heed wake engine and model
 │   ├── voicute/           Voicute integration
@@ -55,6 +56,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 ## Jump to a folder
 
 - [Root and page entry points](#root-and-page-entry-points)
+- [Bundled display font](#bundled-display-font)
 - [Production interface and audio prompts](#production-interface-and-audio-prompts)
 - [Production JavaScript](#production-javascript)
 - [Heed wake engine](#heed-wake-engine)
@@ -81,6 +83,14 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [lab-sw.js](lab-sw.js) | Service worker for the lab URL scopes; caches lab code and offline model/runtime assets, without controlling the production page. |
 | [lab.html](lab.html) | Separate recorder/wake/filename experiment page. Its results do not establish production behavior. |
 | [manifest.json](manifest.json) | Production installable-web-app identity, start URL, colors and icon references. |
+
+## Bundled display font
+
+| File | Function |
+| --- | --- |
+| [fonts/DancingScript.ttf](fonts/DancingScript.ttf) | Local variable font: tagline weight 400 and wordmark suffix weight 500, matching the Memora copy. |
+| [fonts/OFL.txt](fonts/OFL.txt) | SIL Open Font License 1.1 for Dancing Script. |
+| [fonts/README.md](fonts/README.md) | Font source, original filename, checksum, usage and runtime boundary. |
 
 ## Production interface and audio prompts
 

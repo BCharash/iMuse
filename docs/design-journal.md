@@ -1855,3 +1855,10 @@ Isolated Chrome checked font/icon loading, glyph measurements, accessible headin
 # DJ053 — Smaller, color-matched wordmark suffix
 
 13 November 2026, build 2026-11-13.14. User refines the experiment: use should match the lowercase i rather than the M, or be slightly larger. Reduced Dancing Script from 70 px to 52 px (visible ink about 23.2 px), adjusted its vertical offset to 3 px, and added a cyan/blue/violet text gradient matching the icon's palette. Solid blue is the unsupported-clipping fallback; forced-color mode uses system text. Kept the 56 px artwork, close spacing and accessible iMuse heading. Reviewed phone render and verified loaded font metrics and 320/390/900 px fit. Presentation only; no runtime tests repeated.
+
+
+# DJ054 — Bundle Dancing Script locally in iMuse
+
+13 November 2026, build 2026-11-13.15. User requests the same local-font approach used in Memora. Copied the identical unchanged Dancing Script variable TTF and SIL OFL license into fonts/, documented source/checksum, and replaced the Google Fonts CSS import with local @font-face. Both tagline (400) and wordmark suffix (500) retain the existing family, sizing, color and placement. Other text uses existing system fonts. No application/model/storage logic changed, and no overall offline-readiness claim is added.
+
+Browser acceptance uses a fresh temporary profile with fonts.googleapis.com and fonts.gstatic.com blocked. Checks cover both weights loading from the local TTF, no remote font resources, unchanged use glyph metrics and phone/desktop fit. File map, local links and diff checked; runtime tests were not repeated for the static font-source change.

@@ -1,4 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500&display=swap');
+@font-face {
+    font-family: "Dancing Script";
+    src: url("../fonts/DancingScript.ttf") format("truetype");
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+}
 
 /* iMuse — visual foundation */
 

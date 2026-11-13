@@ -1,6 +1,6 @@
 # 13 November 2026 — recording library and Combine
 
-End-of-day production checkpoint: **2026-11-13.14**. The user reports that the changes look good and that Combine works. Automated/browser evidence and remaining device checks are distinguished below. This summary records today's final outcome; earlier proposals are not implementation instructions.
+End-of-day production checkpoint: **2026-11-13.15**. The user reports that the changes look good and that Combine works. Automated/browser evidence and remaining device checks are distinguished below. This summary records today's final outcome; earlier proposals are not implementation instructions.
 
 ## Main screen and recording library
 
@@ -56,3 +56,7 @@ Tried the icon as the iM part of iMuse with closely adjoining use lettering in D
 ## Wordmark refinement — build 2026-11-13.14
 
 Reduced the flowing use lettering to just above the graphic's lowercase i rather than matching its M, and replaced navy with an icon-inspired cyan/blue/violet gradient. Updated vertical alignment; retained the existing artwork, close spacing and accessible name. Reviewed the phone appearance and checked 320/390/900 px fit; no functional changes.
+
+## Local display font — build 2026-11-13.15
+
+Bundled the same Dancing Script font as Memora, including its license/source/checksum. The tagline and use suffix now load locally through @font-face, replacing the Google Fonts import while retaining their current appearance. Verified local loading with Google Fonts blocked, unchanged wordmark metrics and phone/desktop fit. No recording, recognition, storage or global offline behavior changed.
