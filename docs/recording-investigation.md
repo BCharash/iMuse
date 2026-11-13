@@ -163,3 +163,7 @@ The user reported the microphone check and countdown worked. Automated coverage 
 ## Filename dialog and list position
 
 Build 2026-11-13.4 uses 18 px filename input, focus without requested scrolling, and a viewport-bounded scrollable dialog. This targets iPhone focus zoom without disabling deliberate pinch zoom. The download/save outcome is still not browser-verifiable. The list uses short action labels and anchors the next surviving visible row during Archive/Delete/Unarchive rebuilds where possible; opening View still refreshes normally. Chrome verified the input size, diagnostics report consistency, narrow layouts and zero next-row movement in a long-list deletion check. Actual iPhone keyboard/zoom behavior remains a device check.
+
+## Production Combine — 2026-11-13.6
+
+Saved Recordings now offers independent Combine selection, creating a new compatible M4A/AAC artifact and retaining originals. Work runs in a separate worker under the existing storage writer lock; Record waits during processing/saving. Configuration checks, complete-source structural checks, output packet/history readback and atomic session/Blob publication precede success. Cancel/failure leaves originals intact. The new output uses normal library download reminders, playback, archive and deletion paths. See [Combine recordings](combine-recordings.md) for the packet-based provenance schema, exact browser evidence and remaining iPhone/long-combine checks. Capture, stop announcements and wake recognition are unchanged.

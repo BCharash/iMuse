@@ -4,11 +4,82 @@ export function createRecordingLibrary({
     container, status, getAllSessions, getEmergencyRecordings, isSessionWriting,
     recoverSession, exportSavedSession, moveSessionToRecentlyDeleted, getSession,
     deleteSessionData, restoreRecentlyDeletedSession, downloadRecordingEvents,
-    pauseCurrentPlayback, discardEmergencyRecording, wasDownloadRequested = () => false
+    pauseCurrentPlayback, discardEmergencyRecording, wasDownloadRequested = () => false,
+    combineRecordings
 }) {
     let recoveryPanel = null;
     let renderGeneration = 0;
     const categoryOpen = {saved:false, archived:false};
+    let combineMode = false, combineController = null, combineSaving = false;
+    let combineMessage = '', combineProgress = null, combineCancel = null;
+    const combineSelection = new Set();
+
+    function sourcesDisclosure(row, item) {
+        const metadata = item.combineMetadata;
+        if (!metadata?.segments?.length) return;
+        const details = document.createElement('details');
+        details.className = 'recording-sources';
+        const summary = document.createElement('summary');
+        summary.textContent = `Sources (${metadata.segments.length})`;
+        const list = document.createElement('ol');
+        for (const segment of metadata.segments) {
+            const source = metadata.sources.find(source => source.id === segment.sourceId);
+            const entry = document.createElement('li');
+            entry.textContent = `${formatDate(segment.capturedAt)} — ${source?.filename || 'Recording'} — ${(segment.sampleCount / metadata.sampleRate).toFixed(1)} s`;
+            list.appendChild(entry);
+        }
+        details.append(summary, list); row.appendChild(details);
+    }
+
+    function combineToolbar(body, sessions, emergencies) {
+        if (!combineRecordings) return () => {};
+        const available = new Set(sessions.filter(item => item.state === 'completed' && item.integrityReport?.ok !== false && !emergencies.has(item.id) && !isSessionWriting(item.id)).map(item => item.id));
+        for (const id of combineSelection) if (!available.has(id)) combineSelection.delete(id);
+        const toolbar = document.createElement('div'); toolbar.className = 'recording-combine-controls';
+        const action = document.createElement('button'); action.type = 'button';
+        action.textContent = combineMode ? `Combine selected (${combineSelection.size})` : 'Combine';
+        const sync = () => { action.textContent = combineMode ? `Combine selected (${combineSelection.size})` : 'Combine'; action.disabled = Boolean(combineController) || (combineMode ? combineSelection.size < 2 : available.size < 2); };
+        action.addEventListener('click', async () => {
+            if (!combineMode) { combineMode = true; combineSelection.clear(); await renderRecoverableSessions({preservePosition:true}); return; }
+            if (combineController || combineSelection.size < 2) return;
+            combineController = new AbortController(); combineSaving = false; combineMessage = 'Preparing combined recording…';
+            const controller = combineController;
+            const ids = [...combineSelection];
+            await renderRecoverableSessions({preservePosition:true});
+            try {
+                await combineRecordings(ids, {signal:controller.signal, onProgress:(message,options={}) => {
+                    combineMessage = message; combineSaving = Boolean(options.saving);
+                    if (combineProgress) combineProgress.textContent = message;
+                    if (combineCancel) combineCancel.disabled = combineSaving;
+                }});
+                combineMode = false; combineSelection.clear(); categoryOpen.saved = true;
+                status.textContent = 'Combined recording saved. Original recordings kept.';
+            } catch (error) {
+                status.textContent = controller.signal.aborted ? 'Combine cancelled. Original recordings kept.' : `Could not combine recordings: ${error.message || error}`;
+            } finally {
+                combineController = null; combineSaving = false; combineMessage = '';
+                await renderRecoverableSessions({preservePosition:true});
+            }
+        });
+        toolbar.appendChild(action);
+        if (combineMode) {
+            combineCancel = document.createElement('button'); combineCancel.type = 'button'; combineCancel.textContent = 'Cancel'; combineCancel.disabled = combineSaving;
+            combineCancel.addEventListener('click', async () => {
+                if (combineController) { if (!combineSaving) combineController.abort(); return; }
+                combineMode = false; combineSelection.clear(); await renderRecoverableSessions({preservePosition:true});
+            }); toolbar.appendChild(combineCancel);
+        }
+        combineProgress = document.createElement('span'); combineProgress.setAttribute('role','status'); combineProgress.textContent = combineMessage;
+        toolbar.appendChild(combineProgress); body.appendChild(toolbar); sync();
+        return (row,item) => {
+            if (!combineMode) return;
+            const box = document.createElement('input'); box.type = 'checkbox'; box.value = item.id;
+            box.setAttribute('aria-label',`Select recording from ${formatDate(item.startedAt)} to combine`);
+            box.checked = combineSelection.has(item.id); box.disabled = Boolean(combineController) || !available.has(item.id);
+            box.addEventListener('change', () => { if(box.checked)combineSelection.add(item.id);else combineSelection.delete(item.id);sync(); });
+            row.appendChild(box);
+        };
+    }
     function category(panel, title, key, count) {
         const section=document.createElement('section');
         section.className='recording-category';
@@ -135,6 +206,7 @@ export function createRecordingLibrary({
         }
         if(emergencyRecordings.size)categoryOpen.saved=true;
         const savedBody=category(panel,'Saved Recordings','saved',sessions.length);
+        const addCombineSelection=combineToolbar(savedBody,sessions,emergencyRecordings);
         if(!sessions.length){const empty=document.createElement('p');empty.textContent='No saved recordings.';savedBody.appendChild(empty);}
         for (const item of sessions) {
             const row = document.createElement("div");
@@ -153,7 +225,9 @@ export function createRecordingLibrary({
                 : `${formatDate(item.startedAt)} — ${formatRecordingSize(item.bytesStored)}${busy ? " — recording or finishing" : ""}`;
             if (item.integrityReport?.ok === false) label.textContent += " — audio may be incomplete";
             else if (item.state === "interrupted") label.textContent += " — interrupted recording";
+            addCombineSelection(row,item);
             row.appendChild(label);
+            if(item.combineMetadata)label.textContent+=' — Combined recording';
             const recoverButton = document.createElement("button");
             recoverButton.type = "button";
             recoverButton.textContent = "▶";
@@ -232,6 +306,8 @@ export function createRecordingLibrary({
                 row.appendChild(diagnosticButton);
 
             }
+            sourcesDisclosure(row,item);
+            if(combineController && row.querySelectorAll)for(const button of row.querySelectorAll('button'))button.disabled=true;
             savedBody.appendChild(row);
         }
         const section=category(panel,'Archived Recordings','archived',deletedSessions.length);
@@ -357,6 +433,8 @@ export function createRecordingLibrary({
                     }
                 });
                 row.appendChild(permanentButton);
+                sourcesDisclosure(row,item);
+                if(combineController && row.querySelectorAll)for(const button of row.querySelectorAll('button,input'))button.disabled=true;
                 section.appendChild(row);
             }
 

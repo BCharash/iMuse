@@ -10,6 +10,7 @@ Python 3 runs JavaScript through Node when available, otherwise the macOS JavaSc
 
 | Suite | Why retained |
 | --- | --- |
+| `test_recording_combine.py` | Production packet provenance: chronology, nested/repeated occurrences, embedded M4A history, invalid ranges/configuration, worker cancellation/failure/cleanup |
 | `test_speech_detection.py` | Production state policy, threshold/history boundaries, persisted settings, warmed worker lifetime, queue/timeout/error cancellation, late results, resampler continuity and Silero input context |
 | `test_recording_download.py` | Local timestamps, portable names, dialog preview/confirmation/cancellation, single-dialog ownership, actual download format and URL behavior, current-playback button creation/start-time naming and retained downloads without database metadata, and saved/emergency cancellation outside the writer lock |
 | `test_emergency_recordings.py` | Emergency retention and recorder/library integration; a separate test exercises the complete library module directly, including dialog ownership and deletion/restore/bulk cancellation |
@@ -27,7 +28,7 @@ Python 3 runs JavaScript through Node when available, otherwise the macOS JavaSc
 | `test_recorder_lab.py` | New recorder lab: warmed Whisper worker limits, bounded shadow verification/strict phrase matching/latency/deadlines, immediate pre-roll dispatch, opening-sentence phrase filenames, review clip bounds/WAV and gap/Stop handling, TP/FP/TN/FN comparisons, review playback guards and saved labels, continuous anti-alias resampling, speech/level gates, failed writes/late tails, actual encoder-start fallback, model-before-microphone ordering/cancellation, idempotent cleanup, final data after microphone loss, silent AudioWorklet packets, scripts and offline asset integrity |
 | `test_wake_lab.py` | Archived comparison lab clip boundaries/grouping, WAV encoding, script parsing, review playback/labels, local storage, portable audio/run-log archives, MP3 worker wiring/failure retention, original-audio comparison, playback blocking and safe history clearing |
 
-There are sixteen suites with one hundred seventeen test methods. `recording_test_support.py` contains the shared engine bridge, source extraction and recorder fixtures. Complete library/store/recovery modules and actual recorder wiring run in integration checks; direct component tests supply fake callbacks, DOM or IndexedDB services. Test suites do not import another suite. Each JavaScript evaluation has a fresh context. Individual files still run with `python3 tests/test_recording_storage.py`, for example.
+There are seventeen suites with one hundred twenty-two test methods. `recording_test_support.py` contains the shared engine bridge, source extraction and recorder fixtures. Complete library/store/recovery modules and actual recorder wiring run in integration checks; direct component tests supply fake callbacks, DOM or IndexedDB services. Test suites do not import another suite. Each JavaScript evaluation has a fresh context. Individual files still run with `python3 tests/test_recording_storage.py`, for example.
 
 Retain all sixteen suites: each covers an active production boundary or a still-available lab. The archived comparison suite remains useful while its HTML tool and saved-review database remain supported. No Python test file is removed by the documentation cleanup.
 
@@ -48,3 +49,7 @@ Phase one, build 2026-11-13.1: 116 methods pass. Added download-marker state/cou
 Build 2026-11-13.3: 117 methods pass. Opening either recording category silently rereads storage, including initially empty lists; Hide does not fetch. The Refresh button and routine action messages are removed.
 
 Build 2026-11-13.4: all 117 methods pass. The existing stop-diagnostics export test now covers opening without automatic download, View, matching Copy content and JSON export/build metadata. Chrome checked the 18 px input, short actions, diagnostics controls, persistent download requests and capture, plus zero movement of the next visible row after deletion. iPhone focus zoom is not certified by Chrome.
+
+Production Combine checkpoint, build 2026-11-13.6: **123 methods across seventeen suites pass**. Storage tests additionally cover atomic combined publication, aborted commits, rejected inputs and competing writer locks while preserving originals.
+
+Run `python3 tests/browser_combine_check.py` for actual AAC packet hashes, decoded tone ordering, nested/repeated sources and the real IndexedDB/library workflow. Requires Chrome (`CHROME_BIN` can override the macOS path); uses synthetic audio, an isolated temporary profile and denied filesystem downloads. No real microphone or production-site data is used. See [Combine recordings](../docs/combine-recordings.md) for device limits. This replaces the removed standalone Combine lab.

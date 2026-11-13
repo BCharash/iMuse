@@ -111,6 +111,8 @@ const URL = {createObjectURL: () => 'blob:test', revokeObjectURL: url => revoked
 let recordingUrl = null, displayedSessionId = null, displayedRecordingFilename = null, activeSession = null, db = null;
 let recordingStore = {isOpen: () => Boolean(db)};
 let lastRecordingPeakBytes = 0, startRequest = 0, recordingLease = null;
+let combiningRecording = false;
+async function combineRecordings() { throw Error('Combine is exercised by its dedicated tests.'); }
 const microphoneLevelCheck={stop:()=>Promise.resolve()};
 function getLibraryRows(){const walk=node=>[node,...(node.children||[]).flatMap(walk)];return walk(getRecoveryPanel()).filter(node=>(node.children||[]).some(child=>child.className==='saved-audio-open'));}
 function getRecoveryPanel() { return location.children.find(element => element.id === 'recoveryPanel'); }

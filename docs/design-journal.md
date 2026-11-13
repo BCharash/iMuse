@@ -1779,3 +1779,21 @@ Validation: 116 automated methods pass. Temporary-profile Chrome checked actual 
 13 November 2026, build 2026-11-13.4. User reports iPhone filename focus zoom and movement during deletion, and rejects a double-tap explanation. Use 18 px filename text and focus without requested scroll; retain deliberate zoom. Keep the dialog viewport-bounded. Shorten actions to Download, Archive, Delete and Diagnostics (Unarchive for archived entries). Diagnostics opens a dialog instead of downloading immediately; View/Hide, Copy and Download share the same report snapshot. Remove the obsolete small-icon styles. Mutation refreshes anchor a surviving visible row in the same category, preferring the next row after the action; View refreshes are not anchored.
 
 All 117 regression methods pass. Chrome verified dialog actions and input size, capture/download/archive workflows, 320/390 px fit, and zero next-row position change during a long-list deletion test. Real iPhone focus/keyboard/zoom acceptance remains pending. No double-tap suppression or viewport zoom lock was introduced.
+
+
+# DJ042 — Isolated Combine/provenance prototype
+
+13 November 2026. User replaces capture-time append with a Saved Recordings Combine workflow and authorizes an isolated three-recording test plus metadata example. Added combine-lab.html and separate core/UI modules; production code/build/recording storage are untouched. The lab decodes short compatible-channel inputs to 48 kHz and writes PCM16 WAV with a private imUS JSON chunk. This is a new bounded experiment, not a recovery of the missing lossless M4A implementation.
+
+Versioned metadata separates artifact creation from source capture, snapshots parents/original sources and tracks segment occurrences with source/output/parent frame boundaries. Nested combinations flatten by original source date, so A/C plus B becomes A/B/C; repeated sources remain distinct. This policy needs review before production. Inputs are limited to 30 seconds/5 MiB each, output to 90 seconds; no 90-minute-file support is claimed.
+
+All 122 methods across seventeen suites passed. Chrome decoded/playback-completed A/B/C tones, verified embedded-file reimport/nesting/repeated source uses, imported three independently generated AAC/M4A files to stereo WAV, and confirmed zero microphone requests and a reviewed 390 px layout. iPhone and real filesystem roundtrip remain pending. The lab guide owns details and resume gates; no production integration, commit or deployment is included.
+
+
+# DJ043 — Production M4A Combine replaces the prototype
+
+13 November 2026, build 2026-11-13.6. User authorizes production integration and removal of the separate Combine lab. Saved Recordings offers initially empty selection, Combine selected (two or more), Cancel and Sources disclosures. A new result rises to the top with normal controls and its own download reminder; originals remain intact. The wake-word/Silero lab remains.
+
+The production worker uses pinned local Mediabunny 1.65.2 to demux/remux compatible single-track AAC/M4A without PCM conversion or re-encoding. Original source segments are flattened/sorted chronologically, with repeated occurrences retained. Versioned packet/sample provenance is embedded in an MP4 uuid box and persisted with the new recording. Output packet/configuration/metadata readback precedes one atomic session/chunk transaction under the existing writer lock. Cancellation and failures publish no partial result; capture cannot start while combining. The prototype's short-clip WAV limits do not apply.
+
+Validation: 123 regression methods across seventeen suites pass. An isolated Chrome check generates real AAC/M4A clips, compares every encoded packet hash, decodes chronological tones, exercises nested/repeated sources and the production library's persistence, cancellation, unsupported-input failure, download marker and Archive/Unarchive paths. Narrow layout has no horizontal overflow at 390 px. iPhone playback/Files and large-combine memory remain device checks; browser evidence does not certify them. Details and retained check command: [Combine recordings](combine-recordings.md).

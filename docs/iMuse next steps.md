@@ -1,14 +1,14 @@
 # iMuse next steps
 
+**Production Combine checkpoint, 13 November — 2026-11-13.6:** [Saved Recordings Combine](combine-recordings.md) creates new compatible M4A/AAC files, retains originals and embeds source history. Nested chronological ordering and repeated occurrences are preserved. The separate Combine prototype is removed; the wake/Silero lab stays. Next: iPhone playback/seek/Files acceptance using disposable recordings and resource measurements for larger combinations.
+
 ## Phase-one acceptance — 2026-11-13.4
 
 Check on iPhone and Mac: both audio-command controls mirror each other during capture/pause, main button text remains readable, command status is below Microphone, completion/player/download/delete order, pulse and cancelled/completed download requests, reload persistence, View/Hide, Archive/Unarchive chronology and confirmed permanent deletion. Use disposable recordings for deletion. Preserve the separate iOS 27 installed-PWA background and lightweight Swift feasibility plans. The user has already recorded more than 90 minutes; review existing playback/seek/export evidence instead of requiring another duration test merely to repeat it.
 
-## Agreed later append workflow — not implemented
+## Combine replaces the append proposal
 
-After phase one succeeds, an append selector will target the first entry in Saved Recordings and label the Record control Appending Recording. A newly finished recording becomes the latest/top saved entry. To expose an older target, the user archives intervening newer entries. Show the target explicitly before starting. Create a new combined recording and preserve originals until the user chooses deletion; do not byte-concatenate independent media containers. Automatic cleanup of older download-requested recordings is also deferred pending a separate retention policy; a download request is not a verified external backup.
-
-Updated 12 November 2026. Production source **2026-11-13.4**; latest implementation checks: **116 methods across sixteen suites**. This is the active queue; older plans and journal entries do not authorize new implementation.
+Capture-time appending and an Appending Recording label are superseded. Combine is a separate Saved Recordings operation. New combined files rise to the top; originals remain until the user archives/deletes them. Automatic cleanup of old download-requested recordings remains future work under a separate retention policy; a download request is not verified external backup.
 
 ## Next acceptance
 
@@ -55,9 +55,9 @@ Do not restart the Record UI redesign or bounded-queue implementation. Recheck t
 ## Later roadmap, retained but not started by this update
 
 1. **Further preservation and long-file work.** Structural checks and interrupted outcomes are implemented. Consider automatic persistence retries for emergency tails and audit `getAll()`/Blob memory before choosing another architecture. A future separate finalized artifact needs commit/readback validation while preserving original chunks. Container decoding and audible completeness remain distinct from structural checks; migrations must be nondestructive.
-2. **UUID and provenance metadata.** New capture and combined outputs have their own IDs; titles never define identity. Preserve source dates/IDs, ordered segment occurrences (including repeated use), verified durations/offsets and export/reimport metadata. Existing recordings need a non-destructive backfill design before schema changes.
+2. **UUID and provenance metadata.** Capture and combined outputs have their own IDs; titles never define identity. Combine now stores and embeds original source snapshots and ordered occurrences, including repeats and packet boundaries, without a schema change. Broader original-file metadata embedding/import remains future work.
 3. **Optional naming after finalization.** Download-only editable descriptions are implemented; persisted saved-list titles remain separate future work; optional opening-audio model suggestion after safe persistence and only while recording is inactive; compare Base/Tiny and inspect Memora's current model management before reuse. Naming failure cannot change audio or recording status.
-4. **Separate Combine workflow.** A Combine Recordings button below Saved Recordings; select and order library recordings, produce a new recording, preserve originals. No capture-time append mode or new standalone Combine tab. Use compatible AAC/M4A remuxing only with verified format checks; independent MP4 files cannot be byte-concatenated. Detailed requirements remain in the [archived roadmap](Archive/roadmap-2026-11-01.md).
+4. **Combine follow-up.** Compatible M4A/AAC remuxing and source history are implemented; see [current behavior and remaining device checks](combine-recordings.md). Broader format conversion, external import and very large-file memory work remain separate future decisions.
 5. **Memora integration.** Use its existing Transcribe, file management, Edit/Combine and Search; expose a narrow non-destructive audio handoff. See the [integration contract](iMuse%20Memora%20integration%20handoff.md). Do not make Whisper a recording dependency.
 
 Deferred: idle wake listening; reversible command-audio removal; headset media-button revival; native implementation. The [Swift proposal](iMuse%20Swift%20migration%20plan.md) now includes possible native transcription and multiple cached models, while retaining Memora and web iMuse. Full Memora feature parity is not agreed.

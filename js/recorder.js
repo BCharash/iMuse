@@ -14,6 +14,7 @@ import { createRecordingStorageCoordinator } from "./recording-storage-coordinat
 import { createRecordingRecovery } from "./recording-recovery.js";
 import { createRecordingLibrary } from "./recording-library.js";
 import { createRecordingStore, RECORDING_DB_NAME } from "./recording-store.js";
+import { inspectRecordingChunks } from "./recording-integrity.js";
 
 const recordButton = document.getElementById("recordButton");
 const pauseButton = document.getElementById("pauseButton");
@@ -95,6 +96,7 @@ const recordingStore = createRecordingStore({
 const MAX_PENDING_AUDIO_BYTES = 8 * 1024 * 1024;
 
 let activeSession = null;
+let combiningRecording = false;
 let recordingUrl = null;
 let displayedSessionId = null;
 let displayedRecordingFilename = null;
@@ -133,6 +135,7 @@ const recordingLibrary = createRecordingLibrary({
     deleteSessionData, restoreRecentlyDeletedSession, downloadRecordingEvents,
     discardEmergencyRecording: id => recordingRecovery.discardEmergencyRecording(id),
     wasDownloadRequested: id => downloadRequests.has(id),
+    combineRecordings,
     pauseCurrentPlayback: () => audioPlayer.pause()
 });
 // Deliberately session-only: enabling a test must not affect a later page load.
@@ -506,7 +509,7 @@ function setRecordingControlState(state) {
     recordButton.setAttribute("aria-label", action);
     recordButton.title = action;
     recordButton.classList.toggle("is-recording", state === "recording");
-    recordButton.disabled = state === "preparing" || state === "finalizing";
+    recordButton.disabled = combiningRecording || state === "preparing" || state === "finalizing";
     pauseButton.disabled = !["recording", "paused"].includes(state);
     publishMicrophoneCheckState();
 }
@@ -1191,6 +1194,36 @@ async function downloadAudioBlob(blob, filenameBase) {
     return true;
 }
 
+async function combineRecordings(ids, {signal, onProgress = () => {}} = {}) {
+    if (combiningRecording || activeSession || writingSessions.size || recordButton.disabled) {
+        throw new Error("Stop and finish recording before combining saved recordings.");
+    }
+    combiningRecording = true;
+    recordButton.disabled = true;
+    try {
+        const {runRecordingCombine} = await import('./recording-combine.js');
+        return await recordingStore.combineSessions(ids, async recordings => {
+            const inputs = recordings.map(({session, chunks}) => {
+                const {parts, report} = inspectRecordingChunks(session, chunks);
+                if (!report.ok) throw new Error("A selected recording has missing or incomplete stored audio.");
+                return {session, filename:sessionFilename(session)+'.m4a', blob:new Blob(parts,{type:session.mimeType})};
+            });
+            const {blob, metadata} = await runRecordingCombine(inputs,{signal,onProgress});
+            if (signal?.aborted) throw new Error("Combine cancelled.");
+            onProgress('Saving combined recording…', {saving:true});
+            const now = metadata.createdAt;
+            return {blob, session:{id:metadata.id, startedAt:now, stoppedAt:now, state:'completed',
+                mimeType:'audio/mp4', chunkCount:1, receivedChunkCount:1, bytesStored:blob.size,
+                lastPersistedAt:now, durationMs:metadata.sampleCount/metadata.sampleRate*1000,
+                combineMetadata:metadata, integrityReport:{ok:true,issues:[],savedChunks:1,
+                    availableBytes:blob.size,checkedAt:now}}};
+        });
+    } finally {
+        combiningRecording = false;
+        setRecordingControlState('idle');
+    }
+}
+
 function sessionFilename(item) {
     const stamp = item?.downloadStamp || localRecordingStamp(item?.startedAt);
     return `${stamp}_iMuse`;
@@ -1274,6 +1307,7 @@ async function initialize() {
 }
 
 async function startRecording() {
+    if (combiningRecording) { status.textContent = "Wait for combining to finish before starting a recording."; return; }
     if (writingSessions.size) {
         status.textContent = "The previous recording is still finishing. Use its available audio below and keep this page open.";
         return;

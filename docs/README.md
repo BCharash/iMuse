@@ -1,11 +1,12 @@
 # iMuse documentation
 
-Updated 12 November 2026. Start here; current findings take precedence over older plans and journal entries.
+Updated 13 November 2026. Start here; current findings take precedence over older plans and journal entries.
 
-Current candidate: **2026-11-13.5** prepares spoken prompts at startup for manual and voice controls, while skipping wake-model loading when Audio commands is off. Warm model reuse remains; enabled-model UI blocking is still open. See [voice control](voice-control-refactor.md) and [recording reliability](recording-investigation.md).
+Current candidate: **2026-11-13.6** adds compatible M4A combining in Saved Recordings. Spoken prompts still prepare at startup for manual and voice controls, while wake-model loading is skipped when Audio commands is off. Warm model reuse remains; enabled-model UI blocking is still open. See [voice control](voice-control-refactor.md) and [recording reliability](recording-investigation.md).
 
 | Document | Purpose |
 | --- | --- |
+| [Combine recordings](combine-recordings.md) | Production M4A combining, source history, compatibility and validation |
 | [Repository file map](../filemap.md) | Find every source file, model, test, asset and archived guide by folder or task |
 | [Recording reliability](recording-investigation.md) | Current behavior, evidence, limitations and one manual acceptance checklist |
 | [Wake-word and filename lab](wake-word-evaluation.md) | Wake evidence, current lab use and why live Whisper verification was rejected |
@@ -20,7 +21,7 @@ Current candidate: **2026-11-13.5** prepares spoken prompts at startup for manua
 
 ## Current checkpoint
 
-Production source: **2026-11-13.5**. Latest implementation validation: **117 methods across sixteen suites**.
+Production source: **2026-11-13.6**. Latest implementation validation: **123 methods across seventeen suites**.
 
 - The main Audio commands button and Settings checkbox control one persisted preference, including during capture. Status below Microphone reports enabled with the selected phrase, or disabled. Temporary suspension is no longer a separate user function.
 - Recording completion says Audio recording successful or unsuccessful. The current player is followed by Download and confirmed permanent Delete. Recovery warnings remain with recovery entries.
@@ -29,7 +30,7 @@ Production source: **2026-11-13.5**. Latest implementation validation: **117 met
 - All six prompts prepare at startup. Recognition models wait until Audio commands is enabled; ready models are reused. Enabled-model UI blocking remains open.
 - Heed / Hey iMuse is first/default at 0.75, preserving saved tuning. Production Silero defaults to pause evaluation on and recording evaluation off.
 
-Appending and automatic cleanup are deferred until phase-one acceptance. Appending will target the top saved recording and create a new combined recording while preserving originals; no append code is included here. See [Next steps](iMuse%20next%20steps.md).
+Combine is independent of capture: select finished Saved Recordings, create a new M4A in original chronological order, preserve originals, and expand Sources to inspect history. Nested results retain original segments and repeated occurrences. Automatic cleanup remains deferred. See [Combine recordings](combine-recordings.md).
 
 ## Reading order and evidence
 
@@ -40,3 +41,5 @@ The intermittent startup menu issue was reported mainly after updates and is cur
 Routine screen-lock status text is hidden; screen-lock prevention remains active and capture/interruption notices remain available. Opening Saved or Archived Recordings silently rereads the list; the Refresh recordings button and routine refresh feedback are removed.
 
 Filename entry uses 18 px text and prevents focus-driven scrolling. List actions are Download, Archive, Delete and Diagnostics; archived rows offer Unarchive/Delete. Diagnostics opens a Stop diagnostics dialog with View/Hide, Copy and Download of the same JSON snapshot. Mutation refreshes preserve a surviving visible row where possible; deliberate pinch zoom remains available. iPhone focus/keyboard behavior still needs device acceptance.
+
+**Combine validation, 13 November:** generated real AAC/M4A clips retain every encoded packet unchanged; decoded tones confirm chronology. Browser checks also cover nested/repeated sources, cancellation, incompatible-input failure, real library persistence, download markers, Archive/Unarchive and 390 px layout. The separate Combine prototype is removed; the wake-word/Silero lab remains. iPhone combined-file playback/Files saving and long-combine resource use await device checks.

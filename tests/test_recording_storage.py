@@ -274,6 +274,38 @@ globalThis.testResult='pending';
 })().catch(error=>globalThis.testResult=String(error)+String(error.stack));
 """)
 
+    def test_combine_atomic_publication_and_failure_retains_originals(self):
+        wiring = STORE_WIRING.replace("const recordingStore", "let recordingStore")
+        evaluate(coordinator + STORE_SOURCE + mock + functions + wiring + r"""
+globalThis.testResult='pending';
+(async()=>{
+ await openDatabase();
+ for(const id of ['a','b']) {
+  sessions.set(id,{id,state:'completed',chunkCount:1,bytesStored:3});
+  chunks.set(JSON.stringify([id,0]),{sessionId:id,sequence:0,blob:{size:3},bytes:3});
+ }
+ const before=JSON.stringify([...sessions]),audioBefore=JSON.stringify([...chunks]);
+ const make=async inputs=>{assert(inputs.length===2&&inputs[0].chunks.length===1,'full inputs read under lock');return {session:{id:'combined',state:'completed',chunkCount:1,bytesStored:6},blob:{size:6,type:'audio/mp4'}};};
+ await drain(recordingStore.combineSessions(['b','a'],make));
+ assert(sessions.get('combined').state==='completed'&&chunks.has(JSON.stringify(['combined',0])),'new session and audio committed');
+ assert(JSON.stringify([...sessions].filter(([id])=>id!=='combined'))===before&&JSON.stringify([...chunks].filter(([key])=>!key.includes('combined')))===audioBefore,'original metadata and audio unchanged');
+ const size=sessions.size,chunkSize=chunks.size;
+ await rejects(recordingStore.combineSessions(['a','b'],async()=>{throw Error('bad AAC');}),'bad AAC');
+ assert(sessions.size===size&&chunks.size===chunkSize,'worker failure publishes nothing');
+ // Abort the publication transaction after its writes have been queued.
+ const realTransaction=db.transaction;
+ db.transaction=function(names,mode){const tx=realTransaction.call(db,names,mode);if(Array.isArray(names)&&mode==='readwrite')tx.aborted=true;return tx;};
+ await rejects(recordingStore.combineSessions(['a','b'],async()=>({session:{id:'aborted',state:'completed',bytesStored:6},blob:{size:6,type:'audio/mp4'}})),'aborted');
+ db.transaction=realTransaction;
+ assert(!sessions.has('aborted')&&!chunks.has(JSON.stringify(['aborted',0])),'transaction abort leaves neither half');
+ await rejects(recordingStore.combineSessions(['a','a'],make),'different');
+ sessions.get('b').state='deleted';await rejects(recordingStore.combineSessions(['a','b'],make),'finished');sessions.get('b').state='completed';
+ const lease=await second.hold();await rejects(recordingStore.combineSessions(['a','b'],make),'another tab');await lease.release();
+ assert(sessions.size===size&&chunks.size===chunkSize,'rejections preserve all originals');
+ globalThis.testResult='PASS';
+})().catch(error=>globalThis.testResult=String(error)+String(error.stack));
+""")
+
     def test_store_schema_and_open_failures(self):
         evaluate(STORE_SOURCE + schema_tests)
 

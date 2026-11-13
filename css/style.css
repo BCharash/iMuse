@@ -342,3 +342,14 @@ button:active {
     border-top:1px solid #c7c5bf;
     padding-top:14px;
 }
+
+.recording-combine-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  margin: .75rem 0;
+}
+.recording-sources { flex: 1 1 100%; font-size: 1rem; }
+.recording-sources summary { cursor: pointer; width: fit-content; }
+.recording-sources li { overflow-wrap: anywhere; margin: .35rem 0; }

@@ -1,0 +1,88 @@
+{
+  "format": "imuse-combined-recording",
+  "version": 1,
+  "id": "57a3b977-1854-4a37-af71-6203f0fe6e16",
+  "createdAt": "2026-11-13T10:25:24.115Z",
+  "sampleRate": 48000,
+  "channels": 2,
+  "packetCount": 87,
+  "sampleCount": 88751,
+  "parents": [
+    {
+      "id": "1a293b48-b3e9-4508-a1d6-4122e072627d",
+      "filename": "AC.m4a",
+      "createdAt": "2026-11-13T10:25:24.068Z",
+      "packetCount": 57
+    },
+    {
+      "id": "source-1",
+      "filename": "source-1.m4a",
+      "createdAt": "2026-02-02T12:00:00.000Z",
+      "packetCount": 30
+    }
+  ],
+  "sources": [
+    {
+      "id": "source-2",
+      "capturedAt": "2026-02-03T12:00:00.000Z",
+      "filename": "source-2.m4a",
+      "mimeType": "audio/mp4;codecs=mp4a.40.2",
+      "packetCount": 30,
+      "sampleCount": 30607
+    },
+    {
+      "id": "source-0",
+      "capturedAt": "2026-02-01T12:00:00.000Z",
+      "filename": "source-0.m4a",
+      "mimeType": "audio/mp4;codecs=mp4a.40.2",
+      "packetCount": 27,
+      "sampleCount": 27537
+    },
+    {
+      "id": "source-1",
+      "capturedAt": "2026-02-02T12:00:00.000Z",
+      "filename": "source-1.m4a",
+      "mimeType": "audio/mp4;codecs=mp4a.40.2",
+      "packetCount": 30,
+      "sampleCount": 30607
+    }
+  ],
+  "segments": [
+    {
+      "occurrenceId": "5ea8bfe4-3fe4-47b8-abb5-cfd8fd7131ee",
+      "sourceId": "source-0",
+      "capturedAt": "2026-02-01T12:00:00.000Z",
+      "sourcePacketStart": 0,
+      "outputPacketStart": 0,
+      "packetCount": 27,
+      "sampleCount": 27537,
+      "parentId": "1a293b48-b3e9-4508-a1d6-4122e072627d",
+      "parentOccurrenceId": "c3ad4eaf-99e9-482e-8160-f31518d71d5b",
+      "parentPacketStart": 0
+    },
+    {
+      "occurrenceId": "b1c72c46-cf63-4002-a3ac-4eca8c2f3fbc",
+      "sourceId": "source-1",
+      "capturedAt": "2026-02-02T12:00:00.000Z",
+      "sourcePacketStart": 0,
+      "outputPacketStart": 27,
+      "packetCount": 30,
+      "sampleCount": 30607,
+      "parentId": "source-1",
+      "parentOccurrenceId": "6628547e-d085-4cbd-8682-91f544f1649f",
+      "parentPacketStart": 0
+    },
+    {
+      "occurrenceId": "ee75d866-3051-42d4-ac4d-1c38277e91d8",
+      "sourceId": "source-2",
+      "capturedAt": "2026-02-03T12:00:00.000Z",
+      "sourcePacketStart": 0,
+      "outputPacketStart": 57,
+      "packetCount": 30,
+      "sampleCount": 30607,
+      "parentId": "1a293b48-b3e9-4508-a1d6-4122e072627d",
+      "parentOccurrenceId": "24bd2a9a-c18c-4e20-bbba-599351d2507b",
+      "parentPacketStart": 27
+    }
+  ]
+}

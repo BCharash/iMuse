@@ -1,6 +1,6 @@
 # iMuse file map
 
-Updated 12 November 2026. Paths are relative to the repository root. Click a filename to open it, or search this page for its exact name. Every tracked repository file is listed individually, including models, vendor runtimes and archived tools; this map also lists itself. Git internals, local OS files and generated Python caches are excluded.
+Updated 13 November 2026. Paths are relative to the repository root. Click a filename to open it, or search this page for its exact name. Every tracked repository file is listed individually, including models, vendor runtimes and archived tools; this map also lists itself. Git internals, local OS files and generated Python caches are excluded.
 
 Current iPhone prompt behavior and recurrence guidance: [recording investigation](docs/recording-investigation.md#iphone-stop-announcement-output-regression). The temporary isolated output check and audio substitution were reverted and are not part of this file inventory.
 
@@ -21,6 +21,7 @@ Current iPhone prompt behavior and recurrence guidance: [recording investigation
 | Production appearance | [css/style.css](css/style.css) |
 | Lab queue and fresh-Silero comparison | [js/lab/app.js](js/lab/app.js) |
 | Current status and decisions | [docs/README.md](docs/README.md) |
+| Combine saved recordings and source history | [docs/combine-recordings.md](docs/combine-recordings.md) |
 | Upcoming and deferred work | [docs/iMuse next steps.md](docs/iMuse%20next%20steps.md) |
 | Running regression checks | [tests/README.md](tests/README.md) |
 
@@ -37,6 +38,7 @@ iMuse/
 │   ├── heed/              Heed wake engine and model
 │   ├── voicute/           Voicute integration
 │   ├── tensorflow/        Command adapter and its diagnostic lab
+│   ├── vendor/            Pinned M4A container library and license
 │   └── lab/               Experimental code, models and runtimes
 ├── docs/                  Current guides
 │   └── Archive/           Historical guides and earlier review tool
@@ -57,6 +59,7 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 - [Voicute wake engine](#voicute-wake-engine)
 - [TensorFlow commands and diagnostic page](#tensorflow-commands-and-diagnostic-page)
 - [Current lab code](#current-lab-code)
+- [Production Combine](#production-combine)
 - [Lab model assets](#lab-model-assets)
 - [Lab vendor runtimes and licenses](#lab-vendor-runtimes-and-licenses)
 - [Current documentation](#current-documentation)
@@ -170,6 +173,18 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [js/lab/verification.js](js/lab/verification.js) | Bounded optional Whisper wake-verification request lifecycle, deadlines and stale-result protection; experimental. |
 | [js/lab/whisper-worker.js](js/lab/whisper-worker.js) | Local Whisper model loading and inference for lab naming/optional verification. |
 
+## Production Combine
+
+| File | Function |
+| --- | --- |
+| [js/recording-combine.js](js/recording-combine.js) | Creates the on-demand worker, forwards progress/result, and terminates it on completion, failure or cancellation. |
+| [js/recording-combine-worker.js](js/recording-combine-worker.js) | Worker entry point; receives Blob inputs and returns a combined artifact without microphone/database access. |
+| [js/recording-combine-mux.js](js/recording-combine-mux.js) | Checks compatible AAC/M4A tracks, copies encoded packets into a valid new container and verifies output readback. |
+| [js/recording-combine-metadata.js](js/recording-combine-metadata.js) | Packet-based provenance validation/planning, nested chronological occurrences and embedded MP4 uuid history. |
+| [js/vendor/mediabunny-1.65.2.mjs](js/vendor/mediabunny-1.65.2.mjs) | Unchanged pinned container library used only by the Combine worker. |
+| [js/vendor/mediabunny-LICENSE](js/vendor/mediabunny-LICENSE) | Mozilla Public License 2.0 for Mediabunny. |
+| [js/vendor/README.md](js/vendor/README.md) | Dependency version, upstream/source links, package hash, license and runtime boundary. |
+
 ## Lab model assets
 
 | File | Function |
@@ -214,6 +229,8 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | File | Function |
 | --- | --- |
 | [docs/Hey iMuse Heed Training Handoff.md](docs/Hey%20iMuse%20Heed%20Training%20Handoff.md) | Training/export provenance and integration decision: current default 0.75 supersedes the earlier 0.80 proposal. |
+| [docs/combine-recordings.md](docs/combine-recordings.md) | Production Combine workflow, compatibility, embedded packet provenance, verification and device checks. |
+| [docs/examples/combine-metadata-v1.json](docs/examples/combine-metadata-v1.json) | Browser-generated production M4A packet-history example with three original sources and two direct parents. |
 | [docs/README.md](docs/README.md) | Start here for current implementation status, acceptance evidence and links to authoritative subject guides. |
 | [docs/build-versioning.md](docs/build-versioning.md) | Production build numbering/display, diagnostic identity and deferred asset-fingerprinting direction. |
 | [docs/design-journal.md](docs/design-journal.md) | Dated design/implementation decisions and historical evidence; later entries supersede earlier plans. |
@@ -264,6 +281,8 @@ The current lab starts at `lab.html` and uses separate workers and storage. Its 
 | [tests/test_recorder_lab.py](tests/test_recorder_lab.py) | New recorder lab: warmed Whisper worker limits, bounded shadow verification/strict phrase matching/latency/deadlines, immediate pre-roll dispatch, opening-sentence phrase filenames, review clip bounds/WAV and gap/Stop handling, TP/FP/TN/FN comparisons, review playback guards and saved labels, continuous anti-alias resampling, speech/level gates, failed writes/late tails, actual encoder-start fallback, model-before-microphone ordering/cancellation, idempotent cleanup, final data after microphone loss, silent AudioWorklet packets, scripts and offline asset integrity. |
 | [tests/test_recording_download.py](tests/test_recording_download.py) | Local timestamps, portable names, dialog preview/confirmation/cancellation, single-dialog ownership, actual download format and URL behavior, current-playback button creation/start-time naming and retained downloads without database metadata, and saved/emergency cancellation outside the writer lock. |
 | [tests/test_recording_finalization.py](tests/test_recording_finalization.py) | Complete recovery module and recorder wiring: integrity/error/delay handling, fullest-copy retention, truthful status, confirmed discard with failure retention and current-player isolation. |
+| [tests/test_recording_combine.py](tests/test_recording_combine.py) | Production packet history, nested/repeated sources, embedded metadata and worker lifecycle guards. |
+| [tests/browser_combine_check.py](tests/browser_combine_check.py) | Isolated Chrome acceptance check with actual AAC packet hashes, decoded tones and real library/IndexedDB behavior. |
 | [tests/test_audio_prompts.py](tests/test_audio_prompts.py) | Spoken prompt gain, mute/full-volume restoration, serialization, active/queued cancellation and full-buffer playback checks for all spoken prompts. |
 | [tests/test_recording_storage.py](tests/test_recording_storage.py) | Complete store module plus recorder wiring: ordering, counters, ownership, competing startup/deletion, abort/restore, diagnostic cleanup, schema and blocked/failed opens. |
 | [tests/test_speech_detection.py](tests/test_speech_detection.py) | Production speech policy, settings, worker warm-up/lifecycle, bounded queue/timeout cancellation and streaming context/resampling regression checks. |

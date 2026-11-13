@@ -177,6 +177,35 @@ export function createRecordingStore({
         });
     }
 
+    // Hold the shared writer lock from source read through atomic publication.
+    // build runs outside any IDB transaction; originals are never rewritten.
+    async function combineSessions(ids, build) {
+        if (new Set(ids).size !== ids.length || ids.length < 2) throw new Error("Select at least two different recordings.");
+        return recordingStorage.run(async () => {
+            const recordings = [];
+            for (const id of ids) {
+                assertSessionIdle(id);
+                const session = await getSession(id);
+                if (!session || session.state !== "completed" || session.integrityReport?.ok === false) {
+                    throw new Error("Combine requires finished recordings in Saved Recordings with complete stored audio.");
+                }
+                recordings.push({ session, chunks: await getChunks(id) });
+            }
+            const { session, blob } = await build(recordings);
+            if (!session?.id || ids.includes(session.id) || session.state !== "completed" || !blob?.size || session.bytesStored !== blob.size) {
+                throw new Error("Combined recording is not ready to save.");
+            }
+            const transaction = db.transaction([SESSION_STORE, CHUNK_STORE], "readwrite");
+            const done = transactionDone(transaction);
+            // add, rather than put, also prevents an accidental ID collision.
+            transaction.objectStore(SESSION_STORE).add(session);
+            transaction.objectStore(CHUNK_STORE).add({sessionId:session.id, sequence:0,
+                blob, type:blob.type, bytes:blob.size});
+            await done;
+            return session;
+        });
+    }
+
     async function deleteSessionData(id) {
         return recordingStorage.run(async () => {
             assertSessionIdle(id);
@@ -222,7 +251,7 @@ export function createRecordingStore({
         open: openDatabase,
         isOpen: () => Boolean(db),
         getAllSessions, getSession, getChunks,
-        putSession, persistChunk,
+        putSession, persistChunk, combineSessions,
         // Only for operations already inside the same coordinator.run callback;
         // queuing again there would deadlock. Normal callers use putSession.
         putSessionOwned: putSessionNow,
