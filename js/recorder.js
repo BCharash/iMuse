@@ -510,6 +510,8 @@ function setRecordingControlState(state) {
     recordButton.title = action;
     recordButton.classList.toggle("is-recording", state === "recording");
     recordButton.disabled = combiningRecording || state === "preparing" || state === "finalizing";
+    const readyStatus = document.getElementById('recordingReadyStatus');
+    if (readyStatus) readyStatus.hidden = state !== 'idle' || recordButton.disabled;
     pauseButton.disabled = !["recording", "paused"].includes(state);
     publishMicrophoneCheckState();
 }
@@ -1199,7 +1201,7 @@ async function combineRecordings(ids, {signal, onProgress = () => {}} = {}) {
         throw new Error("Stop and finish recording before combining saved recordings.");
     }
     combiningRecording = true;
-    recordButton.disabled = true;
+    setRecordingControlState('idle');
     try {
         const {runRecordingCombine} = await import('./recording-combine.js');
         return await recordingStore.combineSessions(ids, async recordings => {

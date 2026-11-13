@@ -1,6 +1,6 @@
 # iMuse documentation
 
-Updated 13 November 2026. Current production source: **2026-11-13.7**. Current guides take precedence over historical journal entries and archived proposals.
+Updated 13 November 2026. Current production source: **2026-11-13.8**. Current guides take precedence over historical journal entries and archived proposals.
 
 | Document | Purpose |
 | --- | --- |
@@ -22,6 +22,7 @@ Updated 13 November 2026. Current production source: **2026-11-13.7**. Current g
 ## Current checkpoint
 
 - Audio-command button and Settings checkbox share one persisted preference. Status below Microphone reports enabled with the selected wake phrase, or disabled.
+- Below Stop: Ready to record (18 px, whenever New Recording is available), the Microphone banner, Suspend/Resume audio commands, then command status with the active wake phrase. Readiness hides during capture/preparation/finalization/Combine and returns independently of the successful-recording message. Inactive microphone wording is Microphone: inactive.
 - Completion says Audio recording successful/unsuccessful, followed by the current player, Download and confirmed Delete. Recovery warnings and structural checks remain.
 - Saved and Archived Recordings have View/Hide; opening View silently rereads storage. Archive retains audio, Unarchive preserves original chronology, and Delete permanently removes after confirmation. Recovery copies retain explicit Discard protections.
 - Download pulses until initiation. Saved and archived rows report Download requested or Not yet downloaded; neither wording verifies successful external saving. Cancel retains the reminder; downloading again remains available.

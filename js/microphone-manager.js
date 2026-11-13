@@ -20,7 +20,7 @@ let refreshGeneration = 0;
 const headsetPattern = /shokz|openrun|openmove|aeropex|headset|headphones|headphone|hands.free|airpods|earpods|earbuds|earphones|beats|jabra|plantronics|poly voyager|bose|sony wh-|sony wf-|sennheiser|bluetooth|wireless headset|usb headset|usb audio headset/i;
 const internalPattern = /built.in|internal|macbook|iphone microphone|ipad microphone|integrated|facetime|continuity|default/i;
 function report(message) { if (indicator) indicator.textContent = message; }
-export function showMicrophoneInactive() { report("Microphone: inactive (not listening)"); }
+export function showMicrophoneInactive() { report("Microphone: inactive"); }
 function isHeadset(device) { return headsetPattern.test(device.label || ""); }
 function chooseHeadset(devices) {
     const candidates = devices.filter(d => d.deviceId && d.deviceId !== "default" && isHeadset(d));

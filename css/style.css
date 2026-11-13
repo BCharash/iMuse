@@ -354,3 +354,15 @@ button:active {
 .recording-sources { flex: 1 1 100%; font-size: 1rem; }
 .recording-sources summary { cursor: pointer; width: fit-content; }
 .recording-sources li { overflow-wrap: anywhere; margin: .35rem 0; }
+
+.recording-ready-status {
+  margin: 4px auto 14px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent-dark);
+}
+.recording-ready-status[hidden] { display: none; }
+#suspendAudioCommands { display: block; margin: 0 auto 10px; }
+#suspendAudioCommands[hidden] { display: none; }
+#audioCommandsSuspensionStatus { margin: 0 auto; }

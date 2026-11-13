@@ -1,6 +1,6 @@
 # 13 November 2026 — recording library and Combine
 
-End-of-day production checkpoint: **2026-11-13.7**. The user reports that the changes look good and that Combine works. Automated/browser evidence and remaining device checks are distinguished below. This summary records today's final outcome; earlier proposals are not implementation instructions.
+End-of-day production checkpoint: **2026-11-13.8**. The user reports that the changes look good and that Combine works. Automated/browser evidence and remaining device checks are distinguished below. This summary records today's final outcome; earlier proposals are not implementation instructions.
 
 ## Main screen and recording library
 
@@ -31,4 +31,8 @@ The user's positive reports establish practical acceptance of the exercised work
 
 [Waveform playback and recording editing](waveform-editing-project.md) is a separately documented future project: waveform/seek first, then trimming into a new copy, with long-file memory and cut precision designed explicitly. The brief subsequently incorporated the reviewed Gemini ideas: peak resolutions, viewport drawing, bounded decoding and an edit decision list, with corrected Safari/storage claims and explicit preview/resource limits. No editor code or dependency was added.
 
-The documentation index, roadmap, recording/voice guides, Combine guide, test guide and file map were synchronized. Removed stale Refresh instructions, conflicting current-build/test counts, obsolete append instructions and prototype resume gates from active guidance. The journal retains dated decisions with superseded status identified. This final documentation pass leaves application code and build .7 unchanged.
+The documentation index, roadmap, recording/voice guides, Combine guide, test guide and file map were synchronized. Removed stale Refresh instructions, conflicting current-build/test counts, obsolete append instructions and prototype resume gates from active guidance. The journal retains dated decisions with superseded status identified. That documentation pass left application code and build .7 unchanged. The subsequent UI change below advances the production candidate to .8.
+
+## Readiness status follow-up — build 2026-11-13.8
+
+Placed an independent 18 px Ready to record status below Stop, followed by Microphone, Suspend/Resume audio commands and enabled/disabled command status with the active phrase. Removed (not listening) from inactive microphone wording. Readiness is visible whenever New Recording is available, including alongside Audio recording successful, and hidden during recording, pause, preparation, finalization and Combine. Recording/storage/voice behavior is unchanged. All 123 regression methods pass; isolated Chrome checks cover initial layout and the capture/finalization/success readiness transition.
