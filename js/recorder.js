@@ -2,6 +2,7 @@ import { playSpokenResponse, prepareSpokenResponses, primeSpokenResponses } from
 import { acquireRecordingMicrophone, releaseRecordingMicrophone, setMicrophoneSelectionLocked, getRequestedMicrophoneConstraints } from "./microphone-manager.js";
 import { loadWakeDetector, evaluateWakeDetector } from "./wake-detector.js";
 import { localRecordingStamp, requestDownloadFilename } from "./recording-download.js";
+import { embedRecordingIdentity } from "./recording-identity.js";
 import { createSpeechDetection } from "./speech-detection.js";
 import { speechPolicyEnabled } from "./speech-detection-core.js";
 import { announceStoppedAndRelease } from "./stopped-audio.js";
@@ -1179,12 +1180,15 @@ function audioFileExtension(blob) {
     return "audio";
 }
 
-async function downloadAudioBlob(blob, filenameBase) {
+async function downloadAudioBlob(blob, filenameBase, recordingId, notify = () => {}) {
     if (!blob || !blob.size) throw new Error("There is no audio data to download.");
     const extension = audioFileExtension(blob);
     const selectedName = await requestDownloadFilename(filenameBase, extension);
     if (!selectedName) return false;
-    const url = URL.createObjectURL(blob);
+    let exported = blob;
+    try { exported = await embedRecordingIdentity(blob, recordingId); }
+    catch (error) { notify(` Audio was downloaded unchanged without an embedded recording ID: ${error.message}`); }
+    const url = URL.createObjectURL(exported);
     const link = document.createElement("a");
     link.href = url;
     link.download = `${selectedName}.${extension}`;
@@ -1262,9 +1266,10 @@ function ensureCurrentDownloadButton() {
             if (!window.lastRecording) throw new Error("No recording is currently loaded.");
             const blob = window.lastRecording;
             const downloadSessionId = displayedSessionId;
-            const downloaded = await downloadAudioBlob(blob, displayedRecordingFilename);
+            let identityNotice = "";
+            const downloaded = await downloadAudioBlob(blob, displayedRecordingFilename, downloadSessionId, message => { identityNotice = message; });
             if(downloaded)await noteDownloadRequested(downloadSessionId);
-            status.textContent = downloaded ? "Recording download requested." : "Download canceled. Recording retained.";
+            status.textContent = downloaded ? "Recording download requested." + identityNotice : "Download canceled. Recording retained.";
         } catch (error) {
             status.textContent = `Could not download audio: ${error.message || "unknown error"}`;
         } finally {

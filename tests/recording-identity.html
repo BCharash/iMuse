@@ -1,0 +1,31 @@
+﻿<!doctype html><meta charset="utf-8"><title>Recording identity browser check</title><pre id="results"></pre>
+<script type="module">
+import {embedRecordingIdentity,readRecordingIdentity} from '../js/recording-identity.js';
+import {Input,ALL_FORMATS,BlobSource,EncodedPacketSink} from '../js/vendor/mediabunny-1.65.2.mjs';
+const results=document.getElementById('results'),id='12345678-1234-4234-8234-123456789abc';
+const assert=(v,m)=>{if(!v)throw Error(m);};
+async function packets(blob){const input=new Input({formats:ALL_FORMATS,source:new BlobSource(blob)});try{const track=await input.getPrimaryAudioTrack();assert(track,'audio track');const output=[];for await(const packet of new EncodedPacketSink(track).packets())output.push({timestamp:packet.timestamp,duration:packet.duration,data:Array.from(packet.data)});return output;}finally{input.dispose();}}
+(async()=>{
+ const context=new AudioContext({sampleRate:48000});await context.resume();let count=0;
+ try{
+ for(const mime of ['audio/mp4;codecs=mp4a.40.2','audio/webm;codecs=opus','audio/ogg;codecs=opus']){
+  if(!MediaRecorder.isTypeSupported(mime)){results.textContent+='UNSUPPORTED in this browser: '+mime+'\n';continue;}
+  const destination=context.createMediaStreamDestination(),osc=context.createOscillator(),chunks=[];
+  osc.connect(destination);const recorder=new MediaRecorder(destination.stream,{mimeType:mime});
+  recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+  const stopped=new Promise(resolve=>recorder.onstop=resolve);osc.start();recorder.start(100);
+  await new Promise(resolve=>setTimeout(resolve,400));recorder.stop();await stopped;osc.stop();destination.stream.getTracks().forEach(track=>track.stop());
+  const original=new Blob(chunks,{type:mime}),tagged=await embedRecordingIdentity(original,id);
+  assert((await readRecordingIdentity(tagged)).recordingId===id,'identity readback');
+  const before=await packets(original),after=await packets(tagged);
+  assert(before.length>0&&JSON.stringify(before)===JSON.stringify(after),'encoded packets and timestamps preserved');
+  const decodedBefore=await context.decodeAudioData(await original.arrayBuffer()),decodedAfter=await context.decodeAudioData(await tagged.arrayBuffer());
+  assert(decodedBefore.length===decodedAfter.length&&decodedBefore.sampleRate===decodedAfter.sampleRate,'decoded duration preserved');
+  for(let ch=0;ch<decodedBefore.numberOfChannels;ch++){const a=decodedBefore.getChannelData(ch),b=decodedAfter.getChannelData(ch);assert(a.every((v,i)=>v===b[i]),'decoded samples preserved');}
+  results.textContent+='PASS '+mime+': '+before.length+' identical encoded packets; identical decoded samples; ID recovered\n';count++;
+ }
+ assert(count>=1,'at least one native recording format tested');
+ document.body.dataset.result='PASS';
+ }finally{await context.close();}
+})().catch(error=>{results.textContent+='FAIL '+error.stack;document.body.dataset.result='FAIL';});
+</script>

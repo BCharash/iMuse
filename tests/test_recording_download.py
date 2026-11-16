@@ -68,7 +68,7 @@ const emergencyRecordings=new Map();
 const getSession=async()=>{throw Error('download must not read deleted database metadata');};
 const boundedStorageRead=promise=>promise;
 let requested,downloaded=true;
-const downloadAudioBlob=async(blob,name)=>{requested={blob,name};return downloaded;};
+const downloadAudioBlob=async(blob,name,id,notify)=>{requested={blob,name,id};notify(" identity notice");return downloaded;};
 ''' + NAMING + between('function clearPlayback()', 'function setAudioCommandsToggleLocked(')
                  + between('function showPlayback(', 'function audioFileExtension(')
                  + between('function sessionFilename(', 'function renderRecoverableSessions(') + r'''
@@ -80,6 +80,7 @@ globalThis.testResult='pending';
  assert(button&&controls.hidden===false&&audioPlayer.hidden===false,'current playback exposes download control');
  await button.events.click();
  assert(requested.blob===blob&&requested.name==='2026-11-05_14-32-08_iMuse','current audio uses original start time');
+ assert(requested.id==='current'&&status.textContent.includes('identity notice'),'identity and warning reach current download');
  assert(!button.disabled&&status.textContent.includes('download requested'),'success restores button');
  showPlayback(blob,'current',metadata);
  assert(controls.children.length===2,'repeated playback does not duplicate control');
@@ -100,18 +101,24 @@ globalThis.testResult='pending';
     def test_actual_download_waits_for_choice_and_keeps_format(self):
         evaluate(r'''
 const assert=(v,m)=>{if(!v)throw Error(m);};
-let choice,created=0,clicked=0,link;
+let choice,created=0,clicked=0,link,encoded=0,exported,fail=false;
+const tagged={size:99,type:'audio/mp4'};
+async function embedRecordingIdentity(blob,id){encoded++;assert(id==='stable-id','same saved identity');if(fail)throw Error('incomplete audio');return tagged;}
 const requestDownloadFilename=async(name,ext)=>{assert(name==='prefix_iMuse'&&ext==='m4a','correct naming request');return choice;};
-const URL={createObjectURL(){created++;return 'blob:audio';},revokeObjectURL(){}};
+const URL={createObjectURL(blob){created++;exported=blob;return 'blob:audio';},revokeObjectURL(){}};
 const document={body:{appendChild(){}},createElement(){link={style:{},click(){clicked++;},remove(){}};return link;}};
 const window={setTimeout(){}};
 ''' + between('function audioFileExtension(', 'function sessionFilename(') + r'''
 globalThis.testResult='pending';
 (async()=>{
  const blob={size:12,type:'audio/mp4'};
- choice=null;assert(await downloadAudioBlob(blob,'prefix_iMuse')===false&&created===0&&clicked===0,'cancel creates no download or URL');
- choice='prefix_Meeting';assert(await downloadAudioBlob(blob,'prefix_iMuse')===true,'confirmation succeeds');
+ choice=null;assert(await downloadAudioBlob(blob,'prefix_iMuse','stable-id')===false&&created===0&&clicked===0,'cancel creates no download or URL');
+ assert(encoded===0,'cancel does not encode');
+ choice='prefix_Meeting';assert(await downloadAudioBlob(blob,'prefix_iMuse','stable-id')===true,'confirmation succeeds');
  assert(link.download==='prefix_Meeting.m4a'&&created===1&&clicked===1,'selected name and actual format used');
+ assert(exported===tagged&&encoded===1,'download uses tagged audio');
+ fail=true;let notice='';await downloadAudioBlob(blob,'prefix_iMuse','stable-id',value=>notice=value);
+ assert(exported===blob&&notice.includes('incomplete audio')&&notice.includes('unchanged'),'failed embedding preserves original with warning');
  globalThis.testResult='PASS';
 })().catch(e=>globalThis.testResult=String(e)+String(e.stack));
 ''')
@@ -130,7 +137,7 @@ globalThis.testResult='pending';
   recordingStorage:{async run(fn){locked=true;try{return await fn();}finally{locked=false;}}},
   status,getSession:async()=>({id:'saved',state:'completed'}),getChunks:async()=>[],
   assertSessionIdle(){},sessionFilename:()=> 'prefix_iMuse',
-  downloadAudioBlob:async()=>{assert(!locked,'no storage lock while choosing name');downloads++;return false;}
+  downloadAudioBlob:async(blob,name,id)=>{assert(id===(downloads===0?'emergency':'saved'),'saved and emergency identity passed');assert(!locked,'no storage lock while choosing name');downloads++;return false;}
  });
  const emergency={blob:{size:12},metadata:{id:'emergency'}};
  recovery.emergencies.set('emergency',emergency);

@@ -93,13 +93,15 @@ export function createRecordingRecovery({
     async function exportSavedSession(id, button) {
         if (button) button.disabled = true;
         try {
+            let identityNotice = "";
+            const notifyIdentity = message => { identityNotice = message; };
             const emergency = emergencyRecordings.get(id);
             if (emergency) {
-                if (await downloadAudioBlob(emergency.blob, sessionFilename(emergency.metadata)) === false) {
+                if (await downloadAudioBlob(emergency.blob, sessionFilename(emergency.metadata), id, notifyIdentity) === false) {
                     status.textContent = "Download canceled. Emergency recording retained.";
                     return;
                 }
-                status.textContent = "Emergency download started. Check the exported audio before closing or reloading iMuse; the emergency copy remains available here.";
+                status.textContent = "Emergency download started. Check the exported audio before closing or reloading iMuse; the emergency copy remains available here." + identityNotice;
                 return true;
             }
             const prepared = await recordingStorage.run(async () => {
@@ -111,11 +113,11 @@ export function createRecordingRecovery({
                 return { blob, report, item };
             });
             // Release the writer lock before waiting for the user's filename choice.
-            if (await downloadAudioBlob(prepared.blob, sessionFilename(prepared.item)) === false) {
+            if (await downloadAudioBlob(prepared.blob, sessionFilename(prepared.item), id, notifyIdentity) === false) {
                 status.textContent = "Download canceled. Recording retained.";
                 return;
             }
-            status.textContent = `Recording download requested.${integrityNotice(prepared.report)}`;
+            status.textContent = `Recording download requested.${integrityNotice(prepared.report)}${identityNotice}`;
             return true;
         } catch (error) {
             console.error("Could not export saved recording:", error);

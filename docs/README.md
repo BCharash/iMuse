@@ -2,6 +2,8 @@
 
 Updated 13 November 2026. Current production source: **2026-11-13.15**. Current guides take precedence over historical journal entries and archived proposals.
 
+Candidate **2026-11-16.2** adds portable recording IDs to audio downloads; see [export contract](recording-identity-export.md). Real iPhone export validation remains pending.
+
 | Document | Purpose |
 | --- | --- |
 | [13 November session summary](2026-11-13-session-summary.md) | Today's completed screen/library changes, production Combine, evidence and remaining checks |

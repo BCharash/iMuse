@@ -45,3 +45,8 @@ Integration is not evidence that background capture or every recovered container
 ## Deferred work
 
 Idle voice-start before first Record, command-audio removal, OPFS/storage redesign, native recording, and headset media-button research are independent workstreams. A future native iMuse may transcribe locally and still export audio/metadata to Memora. Model-management and recording behavior can share contracts without sharing runtime files or databases; full native Search/editor parity is not agreed. Nothing in this contract schedules those features automatically.
+
+
+## 16 November 2026: portable recording identity
+
+Candidate 2026-11-16.2 embeds the saved recording UUID in ordinary downloads. The [versioned export contract](recording-identity-export.md) defines container locations, readback, error behavior and validation limits. Combined provenance remains separate and unchanged. Memora reader integration is still a separate step; real iPhone Safari export validation is pending.

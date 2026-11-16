@@ -8,8 +8,11 @@ python3 -m unittest discover -s tests -v
 
 Python 3 runs JavaScript through Node when available, otherwise the macOS JavaScriptCore framework. Other platforms require Node. No pip dependencies are needed. Python and these files are development tools; the web application does not use them.
 
+Browser identity check: serve the repository locally and open `tests/recording-identity.html`. It makes synthetic tone recordings without microphone access, checks identity readback, compares encoded packets and decoded samples, and reports unsupported browser formats. Edge validation passed M4A/AAC and WebM/Opus; Ogg native recording was unavailable. iPhone Safari remains pending.
+
 | Suite | Why retained |
 | --- | --- |
+| `test_recording_identity.py` | Portable container metadata, UUID readback, audio preservation, combined history, malformed files and Ogg page growth |
 | `test_recording_ids.py` | New-recording UUID assignment: native UUID preserved, cryptographic v4 fallback, distinct IDs, failed randomness and startup-before-persistence wiring |
 | `test_recording_combine.py` | Production packet provenance: chronology, nested/repeated occurrences, embedded M4A history, invalid ranges/configuration, worker cancellation/failure/cleanup |
 | `test_speech_detection.py` | Production state policy, threshold/history boundaries, persisted settings, warmed worker lifetime, queue/timeout/error cancellation, late results, resampler continuity and Silero input context |
