@@ -1345,7 +1345,17 @@ async function startRecording() {
         }
         const recorderChoice = createCompatibleRecorder(stream);
         const recorder = recorderChoice.recorder;
-        const id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+        // Assign once at capture start; every saved chunk and recovery path
+        // retains this same session UUID. Never use a timestamp/random-string ID.
+        const id = (() => {
+            if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+            const bytes = new Uint8Array(16);
+            crypto.getRandomValues(bytes);
+            bytes[6] = (bytes[6] & 0x0f) | 0x40;
+            bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            const hex = Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
+            return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+        })();
         newSessionId = id;
         const actualMimeType = recorder.mimeType || recorderChoice.requestedMimeType || "";
         const formatLabel = describeAudioFormat(actualMimeType) || recorderChoice.formatLabel;

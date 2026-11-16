@@ -10,6 +10,7 @@ Python 3 runs JavaScript through Node when available, otherwise the macOS JavaSc
 
 | Suite | Why retained |
 | --- | --- |
+| `test_recording_ids.py` | New-recording UUID assignment: native UUID preserved, cryptographic v4 fallback, distinct IDs, failed randomness and startup-before-persistence wiring |
 | `test_recording_combine.py` | Production packet provenance: chronology, nested/repeated occurrences, embedded M4A history, invalid ranges/configuration, worker cancellation/failure/cleanup |
 | `test_speech_detection.py` | Production state policy, threshold/history boundaries, persisted settings, warmed worker lifetime, queue/timeout/error cancellation, late results, resampler continuity and Silero input context |
 | `test_recording_download.py` | Local timestamps, portable names, dialog preview/confirmation/cancellation, single-dialog ownership, actual download format and URL behavior, current-playback button creation/start-time naming and retained downloads without database metadata, and saved/emergency cancellation outside the writer lock |
